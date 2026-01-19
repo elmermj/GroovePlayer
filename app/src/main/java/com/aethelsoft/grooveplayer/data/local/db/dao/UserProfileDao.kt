@@ -1,6 +1,10 @@
 package com.aethelsoft.grooveplayer.data.local.db.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserProfileEntity
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import kotlinx.coroutines.flow.Flow

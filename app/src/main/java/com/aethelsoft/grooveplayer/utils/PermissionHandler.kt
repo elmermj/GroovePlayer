@@ -109,3 +109,71 @@ fun rememberBluetoothPermissionState(): Pair<Boolean, () -> Unit> {
     return Pair(hasPermission, requestPermission)
 }
 
+@Composable
+fun rememberNotificationPermissionState(): Pair<Boolean, () -> Unit> {
+    val context = LocalContext.current
+    var hasPermission by remember {
+        mutableStateOf(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Check both permission and notification manager state
+                val hasRuntimePermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+                
+                // Also check if notifications are actually enabled in system settings
+                val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
+                val notificationsEnabled = notificationManager?.areNotificationsEnabled() ?: true
+                
+                hasRuntimePermission && notificationsEnabled
+            } else {
+                // Android 12 and below - notifications are always enabled
+                true
+            }
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Re-check both permission and notification manager state
+            val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
+            val notificationsEnabled = notificationManager?.areNotificationsEnabled() ?: true
+            isGranted && notificationsEnabled
+        } else {
+            true
+        }
+    }
+
+    val requestPermission: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Android 12 and below don't need permission request
+    }
+
+    return Pair(hasPermission, requestPermission)
+}
+
+/**
+ * Utility function to check if notification permission is granted.
+ * Can be called from anywhere in the app (not just from Composable functions).
+ * 
+ * @param context The application context
+ * @return true if notifications are enabled, false otherwise
+ */
+fun checkNotificationPermission(context: android.content.Context): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val hasRuntimePermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
+        val notificationsEnabled = notificationManager?.areNotificationsEnabled() ?: true
+        
+        return hasRuntimePermission && notificationsEnabled
+    }
+    return true // Android 12 and below - notifications are always enabled
+}

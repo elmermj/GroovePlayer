@@ -1,57 +1,17 @@
 package com.aethelsoft.grooveplayer.presentation.player
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import android.util.Log
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import kotlin.math.sin
-import kotlin.math.cos
-import kotlinx.coroutines.delay
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil3.compose.AsyncImage
-import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.presentation.player.layouts.LargeTabletPlayerLayout
 import com.aethelsoft.grooveplayer.presentation.player.layouts.PhonePlayerLayout
 import com.aethelsoft.grooveplayer.presentation.player.layouts.TabletPlayerLayout
-import com.aethelsoft.grooveplayer.utils.DeviceType
-import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.presentation.player.ui.genreColor
-import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
-import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
-import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 
 @Composable
@@ -76,6 +36,7 @@ fun FullPlayerScreen(
         }
     }
 
+    Log.d("FullPlayerScreen SongDetails", "Title : ${song?.title} | Artist : ${song?.artist} | Genre : ${song?.genre} | Album : ${song?.album}")
     val bg by animateColorAsState(genreColor(song?.genre), label = "")
 
     when (deviceType) {

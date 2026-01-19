@@ -1,7 +1,9 @@
 package com.aethelsoft.grooveplayer.data.local.db.dao
 
-import androidx.room.*
+import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -24,17 +26,25 @@ interface PlaybackHistoryDao {
     fun getRecentlyPlayed(limit: Int = 50): Flow<List<PlaybackHistoryEntity>>
     
     @Query("""
-        SELECT songId, songTitle, artist, album, genre, uri, artworkUrl, COUNT(*) as playCount
+        SELECT 
+            songId, 
+            songTitle, 
+            artist, 
+            album, 
+            genre, 
+            uri, 
+            artworkUrl, 
+            COUNT(*) as playCount
         FROM playback_history
         WHERE playedAt >= :sinceTimestamp
         GROUP BY songId
         ORDER BY playCount DESC
         LIMIT :limit
     """)
-    suspend fun getFavoriteTracks(
+    fun getFavoriteTracks(
         sinceTimestamp: Long,
         limit: Int = 50
-    ): List<FavoriteTrackResult>
+    ): Flow<List<FavoriteTrackResult>>
     
     @Query("""
         SELECT artist, COUNT(*) as playCount
@@ -44,10 +54,10 @@ interface PlaybackHistoryDao {
         ORDER BY playCount DESC
         LIMIT :limit
     """)
-    suspend fun getFavoriteArtists(
+    fun getFavoriteArtists(
         sinceTimestamp: Long,
         limit: Int = 50
-    ): List<FavoriteArtistResult>
+    ): Flow<List<FavoriteArtistResult>>
     
     @Query("""
         SELECT album, artist, COUNT(*) as playCount
@@ -57,21 +67,29 @@ interface PlaybackHistoryDao {
         ORDER BY playCount DESC
         LIMIT :limit
     """)
-    suspend fun getFavoriteAlbums(
+    fun getFavoriteAlbums(
         sinceTimestamp: Long,
         limit: Int = 50
-    ): List<FavoriteAlbumResult>
+    ): Flow<List<FavoriteAlbumResult>>
 
     @Query("""
-        SELECT * FROM playback_history
-        WHERE playedAt >= :sinceTimestamp
-        ORDER BY playedAt DESC
+        SELECT ph.*
+        FROM playback_history ph
+        INNER JOIN (
+            SELECT songId, MAX(playedAt) AS latestPlayedAt
+            FROM playback_history
+            WHERE playedAt >= :sinceTimestamp
+            GROUP BY songId
+        ) latest
+        ON ph.songId = latest.songId
+        AND ph.playedAt = latest.latestPlayedAt
+        ORDER BY ph.playedAt DESC
         LIMIT :limit
     """)
-    suspend fun getLastPlayedSongs(
+    fun getLastPlayedSongs(
         sinceTimestamp: Long,
         limit: Int = 8
-    ): List<PlaybackHistoryEntity>
+    ): Flow<List<PlaybackHistoryEntity>>
     
     @Query("DELETE FROM playback_history WHERE playedAt < :beforeTimestamp")
     suspend fun deleteOldHistory(beforeTimestamp: Long)

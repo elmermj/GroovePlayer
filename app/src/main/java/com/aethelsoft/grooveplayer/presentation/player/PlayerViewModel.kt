@@ -3,9 +3,10 @@ package com.aethelsoft.grooveplayer.presentation.player
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
-import com.aethelsoft.grooveplayer.domain.usecase.*
+import com.aethelsoft.grooveplayer.domain.usecase.SetFullScreenPlayerOpenUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ControlsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.NextSongUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ObservePlayerStateUseCase
@@ -17,7 +18,9 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.SeekUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -49,12 +52,27 @@ class PlayerViewModel @Inject constructor(
         viewModelScope, SharingStarted.Eagerly, false
     )
     val isPlayerMuted: StateFlow<Boolean> = observePlayerStateUseCase.observeIsPlayerMuted().stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val audioAmplitude: StateFlow<Float> = observePlayerStateUseCase.observeAudioAmplitude().stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
+    val audioVisualization: StateFlow<AudioVisualizationData> = observePlayerStateUseCase.observeAudioVisualization().stateIn(
+        viewModelScope, SharingStarted.Eagerly, AudioVisualizationData()
+    )
 
 
 
-    fun setQueue(songs: List<Song>, startIndex: Int = 0) = viewModelScope.launch {
-        queueUseCase(songs, startIndex)
+    fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false) = viewModelScope.launch {
+        queueUseCase(songs, startIndex, isEndlessQueue)
     }
+
+    fun setQueueFromLastPlayedSongs(songs: List<Song>, startSongId: String) = viewModelScope.launch {
+        val shuffledSongs = songs.shuffled()
+        val startIndex = shuffledSongs.indexOfFirst { it.id == startSongId }
+        queueUseCase(
+            songs = shuffledSongs,
+            startIndex = if (startIndex >= 0) startIndex else 0,
+            isEndlessQueue = true
+        )
+    }
+
 
     fun playPauseToggle() = viewModelScope.launch {
         if (isPlaying.value) playPauseUseCase.pause() else playPauseUseCase.play()

@@ -3,7 +3,6 @@ package com.aethelsoft.grooveplayer.data.bluetooth
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothHeadset
-import android.bluetooth.BluetoothManager as AndroidBluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -22,12 +21,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.bluetooth.BluetoothDevice as AndroidBluetoothDevice
+import android.bluetooth.BluetoothManager as AndroidBluetoothManager
 
 @Singleton
 class BluetoothRepositoryImpl @Inject constructor(

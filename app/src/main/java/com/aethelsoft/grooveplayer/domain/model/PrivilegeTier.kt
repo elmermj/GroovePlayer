@@ -5,7 +5,7 @@ package com.aethelsoft.grooveplayer.domain.model
  * Domain model - framework independent.
  */
 enum class PrivilegeTier {
-    FREE,      // Free tier with ads
-    BASIC,     // Basic tier with limited features
+    FREE,      // Free tier with ads and users who are not logged in
+    BASIC,     // Basic tier with limited features or users who are logged in
     PREMIUM    // Premium tier with all features
 }

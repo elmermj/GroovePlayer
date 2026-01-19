@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,8 +17,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,24 +27,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.aethelsoft.grooveplayer.domain.model.RepeatMode
-import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
-import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
+import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.ui.GroovePlayerTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
 
 /**
  * This application will be a cross-platform app to gain as many users as possible.
@@ -67,7 +65,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GroovePlayerTheme {
-                // Provide PlayerViewModel to entire app via CompositionLocal
+                // Provide PlayerViewModel and Navigation to entire app via CompositionLocal
                 CompositionLocalProvider(LocalPlayerViewModel provides playerViewModel) {
                     GroovePlayerAppMain()
                 }
@@ -85,6 +83,28 @@ fun GroovePlayerAppMain() {
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
     var pendingNavigation by remember { mutableStateOf<String?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
+    
+    // Request notification permission on app start (Android 13+)
+    val (hasNotificationPermission, requestNotificationPermission) = rememberNotificationPermissionState()
+    
+    // Request notification permission on first launch
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+            // Small delay to let UI settle, then request permission
+            delay(500)
+            requestNotificationPermission()
+        }
+    }
+    
+    // Also request when playback starts if permission not granted
+    val isPlaying by playerViewModel.isPlaying.collectAsState()
+    LaunchedEffect(isPlaying) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && 
+            isPlaying && 
+            !hasNotificationPermission) {
+            requestNotificationPermission()
+        }
+    }
 
     // Keep full-screen player state in sync with the current route so that
     // pressing the system back button from FullPlayerScreen correctly restores the mini player.
@@ -121,20 +141,35 @@ fun GroovePlayerAppMain() {
         delay(100)
         isNavigating = false
     }
+    
+    // Provide navigation actions to entire app
+    val navigationActions = NavigationActions(
+        openFullPlayer = {
+            if (!isNavigating && pendingNavigation == null) {
+                playerViewModel.setFullScreenPlayerOpen(true)
+                pendingNavigation = AppRoutes.FULL_PLAYER
+            }
+        },
+        closeFullPlayer = {
+            playerViewModel.setFullScreenPlayerOpen(false)
+            navController.popBackStack()
+        }
+    )
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .padding(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Rtl),
-                    top = 0.dp,
-                    bottom = 0.dp
-                )
-        ) {
-            AppNavHost(navController = navController)
+    CompositionLocalProvider(LocalNavigation provides navigationActions) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .padding(
+                        start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                        end = innerPadding.calculateRightPadding(LayoutDirection.Rtl),
+                        top = 0.dp,
+                        bottom = 0.dp
+                    )
+            ) {
+                AppNavHost(navController = navController)
             if (currentSong != null) {
                 Column(
                     modifier = Modifier
@@ -176,5 +211,5 @@ fun GroovePlayerAppMain() {
             }
         }
     }
+    }
 }
-

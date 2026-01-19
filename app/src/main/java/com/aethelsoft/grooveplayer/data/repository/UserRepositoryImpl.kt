@@ -9,6 +9,7 @@ import com.aethelsoft.grooveplayer.domain.model.UserProfile
 import com.aethelsoft.grooveplayer.domain.model.UserSettings
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -94,20 +95,30 @@ class UserRepositoryImpl @Inject constructor(
     // ============ UserSettings Operations ============
     
     override fun observeUserSettings(): Flow<UserSettings> {
-        return userSettingsDao.observeUserSettings().map { entity ->
-            entity?.let { UserMapper.userSettingsToDomain(it) }
-                ?: getDefaultSettings() // Return defaults if no settings exist
-        }
+        return userSettingsDao.observeUserSettings()
+            .map { entity ->
+                entity?.let { UserMapper.userSettingsToDomain(it) }
+                    ?: getDefaultSettings() // Return defaults if no settings exist
+            }
+            .catch { e ->
+                android.util.Log.e("UserRepository", "Error observing settings", e)
+                emit(getDefaultSettings())
+            }
     }
     
     override suspend fun getUserSettings(): UserSettings {
-        return userSettingsDao.getUserSettings()?.let { entity ->
-            UserMapper.userSettingsToDomain(entity)
-        } ?: run {
-            // If no settings exist, create and return defaults
-            val defaults = getDefaultSettings()
-            saveUserSettings(defaults)
-            defaults
+        return try {
+            userSettingsDao.getUserSettings()?.let { entity ->
+                UserMapper.userSettingsToDomain(entity)
+            } ?: run {
+                // If no settings exist, create and return defaults
+                val defaults = getDefaultSettings()
+                saveUserSettings(defaults)
+                defaults
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("UserRepository", "Failed to get user settings, returning defaults", e)
+            getDefaultSettings()
         }
     }
     

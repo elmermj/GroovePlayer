@@ -36,24 +36,43 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
     val uiState: StateFlow<UiState<List<Song>>> = _uiState.asStateFlow()
     
+    // All playback history features are now reactive with Flows
+    private val allTimeTimestamp = TimeframeUtils.getAllTimeTimestamp()
+    
     val recentlyPlayed: StateFlow<List<Song>> = getRecentlyPlayedUseCase(20)
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
     
-    private val _favoriteTracks = MutableStateFlow<List<Song>>(emptyList())
-    val favoriteTracks: StateFlow<List<Song>> = _favoriteTracks.asStateFlow()
+    val favoriteTracks: StateFlow<List<Song>> = getFavoriteTracksUseCase(allTimeTimestamp, 20)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
     
-    private val _favoriteArtists = MutableStateFlow<List<FavoriteArtist>>(emptyList())
-    val favoriteArtists: StateFlow<List<FavoriteArtist>> = _favoriteArtists.asStateFlow()
+    val favoriteArtists: StateFlow<List<FavoriteArtist>> = getFavoriteArtistsUseCase(allTimeTimestamp, 20)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
     
-    private val _favoriteAlbums = MutableStateFlow<List<FavoriteAlbum>>(emptyList())
-    val favoriteAlbums: StateFlow<List<FavoriteAlbum>> = _favoriteAlbums.asStateFlow()
+    val favoriteAlbums: StateFlow<List<FavoriteAlbum>> = getFavoriteAlbumsUseCase(allTimeTimestamp, 20)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _lastPlayedSongs = MutableStateFlow<List<Song>>(emptyList())
-    val lastPlayedSongs: StateFlow<List<Song>> = _lastPlayedSongs.asStateFlow()
+    val lastPlayedSongs: StateFlow<List<Song>> = getLastPlayedSongsUseCase(allTimeTimestamp, 8)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         loadSongs()
-        loadFavorites()
+        
+        // Debug logging
+        viewModelScope.launch {
+            recentlyPlayed.collect { songs ->
+                android.util.Log.d("HomeViewModel", "Recently played updated: ${songs.size} songs")
+            }
+        }
+        viewModelScope.launch {
+            favoriteTracks.collect { songs ->
+                android.util.Log.d("HomeViewModel", "Favorite tracks updated: ${songs.size} songs")
+            }
+        }
+        viewModelScope.launch {
+            lastPlayedSongs.collect { songs ->
+                android.util.Log.d("HomeViewModel", "Last played songs updated: ${songs.size} songs - ${songs.joinToString { it.title }}")
+            }
+        }
     }
 
     fun loadSongs() {
@@ -69,23 +88,9 @@ class HomeViewModel @Inject constructor(
             }
         }
     }
-    
-    fun loadFavorites() {
-        viewModelScope.launch {
-            try {
-                // Load favorites for all-time (using 0 as timestamp)
-                val allTimeTimestamp = TimeframeUtils.getAllTimeTimestamp()
-                _favoriteTracks.value = getFavoriteTracksUseCase(allTimeTimestamp, 20)
-                _favoriteArtists.value = getFavoriteArtistsUseCase(allTimeTimestamp, 20)
-                _favoriteAlbums.value = getFavoriteAlbumsUseCase(allTimeTimestamp, 20)
-            } catch (e: Exception) {
-                // TODO: Silently fail - favorites are optional
-            }
-        }
-    }
 
     fun refresh() {
         loadSongs()
-        loadFavorites()
+        // No need to reload favorites - they're reactive Flows that auto-update!
     }
 }

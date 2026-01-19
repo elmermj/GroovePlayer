@@ -6,11 +6,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.MutableWindowInsets
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -18,25 +16,18 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
-import com.aethelsoft.grooveplayer.presentation.home.XAppBar
 import com.aethelsoft.grooveplayer.presentation.home.ui.LastPlayedSectionComponent
 import com.aethelsoft.grooveplayer.presentation.home.ui.LibraryCardComponent
-import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -83,23 +74,18 @@ fun LargeTabletHomeLayout(
                 end = M_PADDING
             )
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }){
+                Box(
+                    modifier = Modifier
+                        .padding(top = initialSpacerHeight, bottom = S_PADDING)
+                ) { }
+            }
             if(lastPlayedSongs.isNotEmpty()){
-                item(span = { GridItemSpan(maxLineSpan) }){
-                    Box(
-                        modifier = Modifier
-                            .padding(top = initialSpacerHeight, bottom = S_PADDING)
-                    ){
-                        Text(
-                            text = "Last Played Songs",
-                            style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
-                        )
-                    }
-                }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     LastPlayedSectionComponent(
                         lastPlayedSongs = lastPlayedSongs,
-                        onNavigateToSongs = onNavigateToSongs,
-                        currentSong = LocalPlayerViewModel.current.currentSong
+                        currentSong = LocalPlayerViewModel.current?.currentSong?.collectAsState()?.value,
+                        allLibrarySongs = state.data.ifEmpty { emptyList() }
                     )
                 }
                 item(span = { GridItemSpan(maxLineSpan) }){
@@ -176,80 +162,8 @@ fun LargeTabletHomeLayout(
                     onClick = onNavigateToFavoriteArtists
                 )
             }
-            item(span = { GridItemSpan(2) }) {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            item {
-                LibraryCardComponent(
-                    title = "Favorite Albums",
-                    subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                    artworks = emptyList(),
-                    emptyNoticeText = "No favorites yet",
-                    onClick = onNavigateToFavoriteAlbums
-                )
-            }
-            items(4){
-                Spacer(modifier = Modifier.height(bottomSpacerHeight + 16.dp))
+            item(span = { GridItemSpan(maxLineSpan) }){
+                Spacer(modifier = Modifier.height(bottomSpacerHeight + 106.dp))
             }
         }
     }

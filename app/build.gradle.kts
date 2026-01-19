@@ -72,6 +72,12 @@ dependencies {
     implementation(libs.androidx.room.common.jvm)
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.ui.text.google.fonts)
+    implementation(libs.androidx.palette.ktx)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.ui.unit)
     ksp(libs.hilt.compiler)
     // Optional: For integrating ViewModel with Compose
     implementation(libs.hilt.navigation.compose)

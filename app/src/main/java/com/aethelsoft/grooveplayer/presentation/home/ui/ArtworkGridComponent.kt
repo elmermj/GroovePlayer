@@ -2,8 +2,8 @@ package com.aethelsoft.grooveplayer.presentation.home.ui
 
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
@@ -31,8 +31,8 @@ fun ArtworkGrid(
                 ArtworkImage(
                     url = artworks[index],
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(2f)
+                        .fillMaxHeight()
+                        .aspectRatio(1/2f)
                 )
             }
             return@LazyVerticalGrid

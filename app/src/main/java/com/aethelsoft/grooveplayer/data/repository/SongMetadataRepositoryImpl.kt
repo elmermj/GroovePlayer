@@ -11,7 +11,6 @@ import com.aethelsoft.grooveplayer.domain.repository.AlbumMetadata
 import com.aethelsoft.grooveplayer.domain.repository.ArtistMetadata
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadata
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadataRepository
-import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 

@@ -29,7 +29,7 @@ object AppModule {
             GroovePlayerDatabase::class.java,
             "grooveplayer_database"
         )
-        .fallbackToDestructiveMigration(false) // For development - in production, use proper migrations
+        .fallbackToDestructiveMigration()  // Allow destructive migration during development
         .build()
     }
     

@@ -1,11 +1,12 @@
 package com.aethelsoft.grooveplayer.domain.repository
 
+import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
 interface PlayerRepository {
-    suspend fun setQueue(songs: List<Song>, startIndex: Int = 0)
+    suspend fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false)
     suspend fun play()
     suspend fun pause()
     suspend fun playSong(song: Song)
@@ -28,4 +29,6 @@ interface PlayerRepository {
     fun observeVolume(): Flow<Float>
     fun observeIsFullScreenPlayerOpen(): Flow<Boolean>
     fun observeIsPlayerMuted(): Flow<Boolean>
+    fun observeAudioAmplitude(): Flow<Float>
+    fun observeAudioVisualization(): Flow<AudioVisualizationData>
 }

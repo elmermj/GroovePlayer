@@ -1,7 +1,5 @@
 package com.aethelsoft.grooveplayer.domain.repository
 
-import com.aethelsoft.grooveplayer.domain.model.Song
-
 interface SongMetadataRepository {
     suspend fun getMetadata(songId: String): SongMetadata?
     suspend fun saveMetadata(metadata: SongMetadata)

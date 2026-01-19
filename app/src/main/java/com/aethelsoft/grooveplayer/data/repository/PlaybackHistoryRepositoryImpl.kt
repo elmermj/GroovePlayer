@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.collections.map
 
 @Singleton
 class PlaybackHistoryRepositoryImpl @Inject constructor(
@@ -28,52 +27,72 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
             artworkUrl = song.artworkUrl,
             playedAt = System.currentTimeMillis()
         )
-        dao.insertPlayback(entity)
+        try {
+            val rowId = dao.insertPlayback(entity)
+            android.util.Log.d("PlaybackHistoryRepo", "Recorded playback: ${song.title}, rowId=$rowId, timestamp=${entity.playedAt}")
+        } catch (e: Exception) {
+            android.util.Log.e("PlaybackHistoryRepo", "Failed to insert playback", e)
+            throw e
+        }
     }
     
     override fun getRecentlyPlayed(limit: Int): Flow<List<Song>> {
         return dao.getRecentlyPlayed(limit).map { entities ->
+            android.util.Log.d("PlaybackHistoryRepo", "getRecentlyPlayed: Found ${entities.size} entries")
             entities.map { it.toDomain() }
         }
     }
     
-    override suspend fun getFavoriteTracks(sinceTimestamp: Long, limit: Int): List<Song> {
-        return dao.getFavoriteTracks(sinceTimestamp, limit).map { result ->
-            Song(
-                id = result.songId,
-                title = result.songTitle,
-                artist = result.artist,
-                uri = result.uri,
-                genre = result.genre,
-                durationMs = 0L,
-                artworkUrl = result.artworkUrl,
-                album = result.album
-            )
+    override fun getFavoriteTracks(sinceTimestamp: Long, limit: Int): Flow<List<Song>> {
+        return dao.getFavoriteTracks(sinceTimestamp, limit).map { results ->
+            android.util.Log.d("PlaybackHistoryRepo", "getFavoriteTracks: Found ${results.size} entries (timestamp=$sinceTimestamp)")
+            results.map { result ->
+                Song(
+                    id = result.songId,
+                    title = result.songTitle,
+                    artist = result.artist,
+                    uri = result.uri,
+                    genre = result.genre,
+                    durationMs = 0L,
+                    artworkUrl = result.artworkUrl,
+                    album = result.album
+                )
+            }
         }
     }
     
-    override suspend fun getFavoriteArtists(sinceTimestamp: Long, limit: Int): List<FavoriteArtist> {
-        return dao.getFavoriteArtists(sinceTimestamp, limit).map { result ->
-            FavoriteArtist(
-                artist = result.artist,
-                playCount = result.playCount
-            )
+    override fun getFavoriteArtists(sinceTimestamp: Long, limit: Int): Flow<List<FavoriteArtist>> {
+        return dao.getFavoriteArtists(sinceTimestamp, limit).map { results ->
+            results.map { result ->
+                FavoriteArtist(
+                    artist = result.artist,
+                    playCount = result.playCount
+                )
+            }
         }
     }
     
-    override suspend fun getFavoriteAlbums(sinceTimestamp: Long, limit: Int): List<FavoriteAlbum> {
-        return dao.getFavoriteAlbums(sinceTimestamp, limit).map { result ->
-            FavoriteAlbum(
-                album = result.album,
-                artist = result.artist,
-                playCount = result.playCount
-            )
+    override fun getFavoriteAlbums(sinceTimestamp: Long, limit: Int): Flow<List<FavoriteAlbum>> {
+        return dao.getFavoriteAlbums(sinceTimestamp, limit).map { results ->
+            results.map { result ->
+                FavoriteAlbum(
+                    album = result.album,
+                    artist = result.artist,
+                    playCount = result.playCount
+                )
+            }
         }
     }
 
-    override suspend fun getLastPlayedSongs(sinceTimestamp: Long, limit: Int): List<Song> {
-        return dao.getLastPlayedSongs(sinceTimestamp, limit).map { entity ->
-            entity.toDomain()
+    override fun getLastPlayedSongs(sinceTimestamp: Long, limit: Int): Flow<List<Song>> {
+        return dao.getLastPlayedSongs(sinceTimestamp, limit).map { entities ->
+            android.util.Log.d("PlaybackHistoryRepo", "getLastPlayedSongs: Found ${entities.size} entries (timestamp=$sinceTimestamp)")
+            entities.forEach { 
+                android.util.Log.d("PlaybackHistoryRepo", "  - ${it.songTitle} at ${it.playedAt}")
+            }
+            entities.map { entity ->
+                entity.toDomain()
+            }
         }
     }
     

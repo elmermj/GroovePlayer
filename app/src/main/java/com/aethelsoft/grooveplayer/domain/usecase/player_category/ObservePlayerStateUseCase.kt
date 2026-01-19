@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.domain.usecase.player_category
 
+import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
@@ -27,5 +28,7 @@ class ObservePlayerStateUseCase @Inject constructor(
     fun observeVolume(): Flow<Float> = playerRepository.observeVolume()
     fun observeIsFullScreenPlayerOpen(): Flow<Boolean> = playerRepository.observeIsFullScreenPlayerOpen()
     fun observeIsPlayerMuted(): Flow<Boolean> = playerRepository.observeIsPlayerMuted()
+    fun observeAudioAmplitude(): Flow<Float> = playerRepository.observeAudioAmplitude()
+    fun observeAudioVisualization(): Flow<AudioVisualizationData> = playerRepository.observeAudioVisualization()
 }
 
