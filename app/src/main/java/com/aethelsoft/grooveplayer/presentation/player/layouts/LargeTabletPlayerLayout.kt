@@ -14,7 +14,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.with
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -138,7 +139,7 @@ fun LargeTabletPlayerLayout(
                 if (result is SuccessResult) {
                     val bitmap = result.image.toBitmap()
                     dominantColor = extractDominantColor(bitmap)
-                    Log.d("LargeTablet", "✨ Extracted dominant color: $dominantColor from ${song?.title}")
+                    Log.d("LargeTablet", "✨ Extracted dominant color: $dominantColor from ${song.title}")
                 }
             } catch (e: Exception) {
                 Log.e("LargeTablet", "Failed to extract color: ${e.message}")
@@ -262,9 +263,6 @@ fun LargeTabletPlayerLayout(
                             SwipeableArtwork(
                                 size = maxArtworkHeight - S_PADDING,
                                 artworkUrl = song?.artworkUrl,
-                                modifier = Modifier
-                                    .size(maxArtworkHeight)   // IMPORTANT
-                                    .aspectRatio(1f),
                                 onTap = { playerViewModel.playPauseToggle() },
                                 onSwipePrevious = { playerViewModel.previous() },
                                 onSwipeNext = { playerViewModel.next() },
@@ -500,7 +498,6 @@ fun extractDominantColor(bitmap: Bitmap): Color {
 fun SwipeableArtwork(
     size: Dp,
     artworkUrl: String?,
-    modifier: Modifier = Modifier,
     swipeThresholdDp: Dp = 240.dp,
     dismissThresholdDp: Dp = 720.dp,
     onTap: () -> Unit,
@@ -520,8 +517,8 @@ fun SwipeableArtwork(
     }
 
     // ===== Drag state (SYNC, FAST) =====
-    var dragX by remember { mutableStateOf(0f) }
-    var dragY by remember { mutableStateOf(0f) }
+    var dragX by remember { mutableFloatStateOf(0f) }
+    var dragY by remember { mutableFloatStateOf(0f) }
     var thresholdHapticSent by remember { mutableStateOf(false) }
 
     // ===== Release animation =====
@@ -539,7 +536,7 @@ fun SwipeableArtwork(
     AnimatedContent(
         targetState = artworkUrl,
         transitionSpec = {
-            fadeIn(tween(300)) with fadeOut(tween(300))
+            fadeIn(tween(300)).togetherWith(fadeOut(tween(300)))
         },
         label = "ArtworkCrossfade"
     ) { url ->
@@ -628,10 +625,10 @@ fun SwipeableArtwork(
  */
 @Composable
 fun GlowingArtworkContainer(
+    modifier: Modifier = Modifier,
     dominantColor: Color,
     visualization: AudioVisualizationData,
     config: GlowEffectConfig = GlowEffectConfig.LargeTablet,
-    modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
@@ -677,8 +674,6 @@ fun GlowingArtworkContainer(
                         red = dominantColor.red * config.bassColorRedMultiplier,
                         blue = dominantColor.blue * config.bassColorBlueMultiplier
                     )
-
-                    val midColor = dominantColor
 
                     val trebleColor = dominantColor.copy(
                         red = (dominantColor.red + config.trebleColorBoost).coerceAtMost(1f),
@@ -747,7 +742,7 @@ fun GlowingArtworkContainer(
                     WaveformUtils(config, size).drawMidLayer(
                         midGlow = midGlow,
                         canvas = canvas,
-                        midColor = midColor,
+                        midColor = dominantColor,
                         glowAlpha = glowAlpha,
                         blurRadiusPx = blurRadiusPx,
                         cornerPx = cornerPx

@@ -70,7 +70,6 @@ fun PhonePlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
-    bg: Color,
     onClose: () -> Unit
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }
@@ -107,7 +106,7 @@ fun PhonePlayerLayout(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(bg)
+            .background(Color.Black)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -180,7 +179,7 @@ fun PhonePlayerLayout(
         VolumeSlider(
             playerViewModel = playerViewModel,
             modifier = Modifier.fillMaxWidth(),
-            backgroundColor = bg
+            backgroundColor = Color.Black
         )
 
         Spacer(modifier = Modifier.height(16.dp))
