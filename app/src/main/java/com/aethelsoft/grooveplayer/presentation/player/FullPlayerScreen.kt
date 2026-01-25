@@ -49,7 +49,6 @@ fun FullPlayerScreen(
                 shuffle = shuffle,
                 repeat = repeat,
                 playerViewModel = playerViewModel,
-                bg = bg,
                 onClose = onClose
             )
         }
@@ -62,7 +61,6 @@ fun FullPlayerScreen(
                 shuffle = shuffle,
                 repeat = repeat,
                 playerViewModel = playerViewModel,
-                bg = bg,
                 onClose = onClose
             )
         }
@@ -75,7 +73,6 @@ fun FullPlayerScreen(
                 shuffle = shuffle,
                 repeat = repeat,
                 playerViewModel = playerViewModel,
-                bg = bg,
                 onClose = onClose
             )
         }

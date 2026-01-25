@@ -70,6 +70,7 @@ fun PhonePlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
+    bg: Color = Color.Black,
     onClose: () -> Unit
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }
@@ -106,7 +107,7 @@ fun PhonePlayerLayout(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(bg)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

@@ -25,6 +25,7 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XRepeatOne
 import com.aethelsoft.grooveplayer.utils.theme.icons.XShuffle
 import com.aethelsoft.grooveplayer.utils.theme.icons.XSkipBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XSkipForward
+import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 
 @Composable
 fun PlayerControls(
@@ -32,65 +33,74 @@ fun PlayerControls(
     isPlaying: Boolean,
     shuffle: Boolean,
     repeat: RepeatMode,
-    playerViewModel: PlayerViewModel
+    playerViewModel: PlayerViewModel,
+    modifier: Modifier = Modifier
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
-        modifier =  if(!isMiniPlayer) Modifier.fillMaxWidth()
-                    else Modifier
+        modifier = if (!isMiniPlayer) modifier.fillMaxWidth() else modifier
     ) {
-        IconButton(onClick = { playerViewModel.setShuffle(!shuffle) }) {
-            AnimatedContent(
-                targetState = shuffle,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)))
-                        .togetherWith(fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)))
-                },
-                label = "shuffleIcon"
-            ) { isShuffled ->
-                Icon(XShuffle, contentDescription = "Shuffle", tint = if (isShuffled) Color.White else Color.White.copy(alpha = 0.6f))
-            }
+
+        // Shuffle
+        ToggledIconButton(
+            state = shuffle,
+            onClick = { playerViewModel.setShuffle(!shuffle) }
+        ) { isShuffled ->
+            Icon(
+                XShuffle,
+                contentDescription = "Shuffle",
+                tint = if (isShuffled) Color.White else Color.White.copy(alpha = 0.6f)
+            )
         }
+
+        // Previous
         IconButton(onClick = { playerViewModel.previous() }) {
             Icon(XSkipBack, contentDescription = "Previous")
         }
-        IconButton(onClick = { playerViewModel.playPauseToggle() }) {
-            AnimatedContent(
-                targetState = isPlaying,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)))
-                        .togetherWith(fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)))
-                },
-                label = "playPauseIcon"
-            ) { playing ->
-                if (playing) {
-                    Icon(XPause, contentDescription = "Pause")
-                } else {
-                    Icon(XPlay, contentDescription = "Play")
-                }
+
+        // Play / Pause
+        ToggledIconButton(
+            state = isPlaying,
+            onClick = { playerViewModel.playPauseToggle() }
+        ) { playing ->
+            if (playing) {
+                Icon(XPause, contentDescription = "Pause")
+            } else {
+                Icon(XPlay, contentDescription = "Play")
             }
         }
+
+        // Next
         IconButton(onClick = { playerViewModel.next() }) {
             Icon(XSkipForward, contentDescription = "Next")
         }
-        IconButton(onClick = {
-            val next = when (repeat) {
-                RepeatMode.OFF -> RepeatMode.ALL
-                RepeatMode.ALL -> RepeatMode.ONE
-                RepeatMode.ONE -> RepeatMode.OFF
+
+        // Repeat (Enum)
+        ToggledIconButton(
+            state = repeat,
+            onClick = {
+                val next = when (repeat) {
+                    RepeatMode.OFF -> RepeatMode.ALL
+                    RepeatMode.ALL -> RepeatMode.ONE
+                    RepeatMode.ONE -> RepeatMode.OFF
+                }
+                playerViewModel.setRepeat(next)
             }
-            playerViewModel.setRepeat(next)
-        }) {
-            AnimatedContent(
-                targetState = repeat,
-                transitionSpec = {
-                    (fadeIn(animationSpec = tween(200)) + scaleIn(initialScale = 0.8f, animationSpec = tween(200)))
-                        .togetherWith(fadeOut(animationSpec = tween(200)) + scaleOut(targetScale = 0.8f, animationSpec = tween(200)))
-                },
-                label = "repeatIcon"
-            ) { repeatMode ->
-                BuildRepeatButtonIcon(repeatMode)
+        ) { repeatMode ->
+            when (repeatMode) {
+                RepeatMode.ALL ->
+                    Icon(XRepeatAll, contentDescription = "Repeat All")
+
+                RepeatMode.OFF ->
+                    Icon(
+                        XRepeatAll,
+                        contentDescription = "Repeat Off",
+                        tint = Color.DarkGray
+                    )
+
+                RepeatMode.ONE ->
+                    Icon(XRepeatOne, contentDescription = "Repeat One")
             }
         }
     }

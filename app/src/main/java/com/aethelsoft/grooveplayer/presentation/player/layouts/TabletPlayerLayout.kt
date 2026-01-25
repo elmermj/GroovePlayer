@@ -70,7 +70,7 @@ fun TabletPlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
-    bg: Color,
+    bg: Color = Color.Black,
     onClose: () -> Unit
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }

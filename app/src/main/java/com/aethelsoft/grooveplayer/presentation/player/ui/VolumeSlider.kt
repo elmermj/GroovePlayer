@@ -41,6 +41,7 @@ import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume1
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume2
+import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume3
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolumeOff
 import com.aethelsoft.grooveplayer.utils.theme.ui.volumeMaxColor
 import com.aethelsoft.grooveplayer.utils.theme.ui.volumeWarningColor
@@ -76,7 +77,7 @@ fun VolumeSlider(
         if (previousVolume != volume && !isInteracting && previousVolume > 0f) {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
-        if (previousVolume < 0.85f && volume >= 0.85f){
+        if (previousVolume < 0.80f && volume >= 0.80f){
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
         previousVolume = volume
@@ -210,9 +211,10 @@ fun VolumeSlider(
                         Icon(
                             imageVector = when {
                                 currentVolume == 0f -> XVolumeOff
-                                currentVolume < 0.3f -> XVolume
-                                currentVolume < 0.7f -> XVolume1
-                                else -> XVolume2
+                                currentVolume < 0.2f -> XVolume
+                                currentVolume < 0.4f -> XVolume1
+                                currentVolume < 0.7f -> XVolume2
+                                else -> XVolume3
                             },
                             contentDescription = "Volume",
                             modifier = Modifier.size(animatedIconSize),

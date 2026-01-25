@@ -6,7 +6,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +18,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -35,10 +38,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
 import androidx.compose.material3.Text
@@ -93,9 +98,12 @@ import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.WaveformUtils
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
+import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
+import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -111,7 +119,7 @@ fun LargeTabletPlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
-    bg: Color,
+    bg: Color = Color.Black,
     onClose: () -> Unit
 ) {
     var showQueue by remember { mutableStateOf(false) }
@@ -120,14 +128,15 @@ fun LargeTabletPlayerLayout(
     val queue by playerViewModel.queue.collectAsState()
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val configuration = LocalWindowInfo.current
-    val maxArtworkHeight = configuration.containerSize.width.dp * 0.6f
+    val screenHeight = configuration.containerSize.height.dp
+    val screenWidth = configuration.containerSize.width.dp
+    val maxArtworkHeight = minOf(screenHeight * 0.4f, screenWidth * 0.5f)
     val context = LocalContext.current
     val xContentWindowInsets = contentWindowInsets
     val safeInsets = remember(contentWindowInsets) { MutableWindowInsets(xContentWindowInsets) }
-    
-    // Extract dominant color from artwork
+
     var dominantColor by remember { mutableStateOf(Color.White) }
-    
+
     LaunchedEffect(song?.artworkUrl) {
         song?.artworkUrl?.let { url ->
             try {
@@ -149,7 +158,7 @@ fun LargeTabletPlayerLayout(
             dominantColor = Color.White
         }
     }
-    
+
     // Log visualization changes for debugging
     LaunchedEffect(audioVisualization) {
         if (audioVisualization.overall > 0.2f) {
@@ -164,14 +173,16 @@ fun LargeTabletPlayerLayout(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(bg)
             .padding(32.dp),
         horizontalArrangement = Arrangement.spacedBy(48.dp)
     ) {
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Bottom
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -181,140 +192,112 @@ fun LargeTabletPlayerLayout(
                 IconButton(onClick = onClose) {
                     Icon(XBack, contentDescription = "Close")
                 }
-                IconButton(onClick = { showBluetoothSheet = true }) {
-                    Icon(XBluetooth, contentDescription = "Bluetooth Devices")
+                ToggledIconButton(
+                    state = showBluetoothSheet,
+                    onClick = { showBluetoothSheet = !showBluetoothSheet },
+                    activeBackground = Color.White,
+                    inactiveBackground = Color.Transparent,
+                ) {
+                    Icon(
+                        XBluetooth,
+                        contentDescription = "More",
+                        tint = if (showBluetoothSheet) Color.Black else Color.White
+                    )
                 }
             }
-            // Animate weight transitions for smooth push effect
-            val artworkWeight by animateFloatAsState(
-                targetValue = if (!showQueue) 1f else 0.6f,
-                animationSpec = tween(
-                    durationMillis = if (showQueue) 500 else 450,
-                    easing = FastOutSlowInEasing
-                ),
-                label = "ArtworkWeight"
-            )
-            
-            val queueWeight by animateFloatAsState(
-                targetValue = if (showQueue) 0.4f else 0.00001f,
-                animationSpec = tween(
-                    durationMillis = if (showQueue) 500 else 450,
-                    easing = FastOutSlowInEasing
-                ),
-                label = "QueueWeight"
-            )
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AnimatedVisibility(
-                    visible = !showQueue,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            500,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) + slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec = tween(500, easing = FastOutSlowInEasing)
-                    ),
-                    exit = fadeOut(
-                        animationSpec = tween(
-                            450,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) + slideOutHorizontally(
-                        targetOffsetX = { it },
-                        animationSpec = tween(450, easing = FastOutSlowInEasing)
-                    ),
-                    modifier = Modifier
-                        .weight(if (!showQueue) 1f else 0.00001f),
-                ){
+            val density = LocalDensity.current
 
-                }
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn(animationSpec = tween(500, easing = FastOutSlowInEasing)) + slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec = tween(500, easing = FastOutSlowInEasing)
-                    ),
-                    exit = fadeOut(animationSpec = tween(450, easing = FastOutSlowInEasing)) + slideOutHorizontally(
-                        targetOffsetX = { it },
-                        animationSpec = tween(450, easing = FastOutSlowInEasing)
-                    ),
-                    modifier = Modifier.weight(artworkWeight)
+            val screenWidthPx = with(density) { screenWidth.toPx() }
+            val sidePanelWidthPx = with(density) { 360.dp.toPx() }
+            val safeMarginPx = screenWidthPx * 0.05f
+
+            // How far artwork can move without leaving viewport
+//            val maxShiftPx = (screenWidthPx / 2f) - sidePanelWidthPx - safeMarginPx
+
+            // Target offset based on visible panels
+            val artworkTargetOffsetPx = when {
+                showQueue && !showEqualizer -> -(sidePanelWidthPx / 2f + safeMarginPx)        // queue only → left
+                showEqualizer && !showQueue -> +(sidePanelWidthPx / 2f + safeMarginPx)        // equalizer only → right
+                else -> 0f                                       // none or both → center
+            }
+
+            val artworkScale by animateFloatAsState(
+                targetValue = if (showQueue || showEqualizer) 0.85f else 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = 300f
+                ),
+                label = "ArtworkScale"
+            )
+
+            val artworkOffsetXPx by animateFloatAsState(
+                targetValue = artworkTargetOffsetPx,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "ArtworkOffsetXPx"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxArtworkHeight + L_PADDING)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
+                    GlowingArtworkContainer(
+                        dominantColor = dominantColor,
+                        visualization = audioVisualization,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = maxArtworkHeight + L_PADDING)
-                            .graphicsLayer { clip = false },
-                        contentAlignment = Alignment.Center
+                            .graphicsLayer {
+                                translationX = artworkOffsetXPx
+                                scaleX = artworkScale
+                                scaleY = artworkScale
+                            }
+                            .fillMaxHeight()
+                            .aspectRatio(1f)
+                            .padding(M_PADDING)
                     ) {
-                        GlowingArtworkContainer(
-                            dominantColor = dominantColor,
-                            visualization = audioVisualization,
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .aspectRatio(1f)
-                                .padding(M_PADDING)
-                        ) {
-                            SwipeableArtwork(
-                                size = maxArtworkHeight - S_PADDING,
-                                artworkUrl = song?.artworkUrl,
-                                onTap = { playerViewModel.playPauseToggle() },
-                                onSwipePrevious = { playerViewModel.previous() },
-                                onSwipeNext = { playerViewModel.next() },
-                                onDismiss = onClose
-                            )
-                        }
+                        SwipeableArtwork(
+                            size = maxArtworkHeight - S_PADDING,
+                            artworkUrl = song?.artworkUrl,
+                            onTap = { playerViewModel.playPauseToggle() },
+                            onSwipePrevious = { playerViewModel.previous() },
+                            onSwipeNext = { playerViewModel.next() },
+                            onDismiss = onClose
+                        )
                     }
                 }
-                AnimatedVisibility(
-                    visible = !showQueue,
-                    enter = fadeIn(
-                        animationSpec = tween(
-                            500,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) + slideInHorizontally(
-                        initialOffsetX = { it },
-                        animationSpec = tween(500, easing = FastOutSlowInEasing)
-                    ),
-                    exit = fadeOut(
-                        animationSpec = tween(
-                            450,
-                            easing = FastOutSlowInEasing
-                        )
-                    ) + slideOutHorizontally(
-                        targetOffsetX = { it },
-                        animationSpec = tween(450, easing = FastOutSlowInEasing)
-                    ),
-                    modifier = Modifier
-                        .weight(if (!showQueue) 1f else 0.00001f),
-                ){
 
-                }
-                // Right side: Queue info
-                AnimatedVisibility(
+                androidx.compose.animation.AnimatedVisibility(
                     visible = showQueue,
-                    enter = fadeIn(animationSpec = tween(500, easing = FastOutSlowInEasing)) + slideInHorizontally(
+                    enter = slideInHorizontally(
                         initialOffsetX = { it },
-                        animationSpec = tween(500, easing = FastOutSlowInEasing)
-                    ),
-                    exit = fadeOut(animationSpec = tween(450, easing = FastOutSlowInEasing)) + slideOutHorizontally(
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
                         targetOffsetX = { it },
-                        animationSpec = tween(450, easing = FastOutSlowInEasing)
-                    ),
-                    modifier = Modifier.weight(queueWeight)
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
                 ) {
-                    Column (
+                    Column(
                         modifier = Modifier
                             .height(maxArtworkHeight)
                             .width(360.dp),
                         horizontalAlignment = Alignment.End
-                    ){
+                    ) {
                         Text(
                             text = "Queue",
                             modifier = Modifier
@@ -323,10 +306,11 @@ fun LargeTabletPlayerLayout(
                             textAlign = TextAlign.End,
                             style = MaterialTheme.typography.titleLarge
                         )
+
                         PlayerQueueComponent(
                             currentSong = song,
                             queue = queue,
-                            onItemClick =  { selectedSong ->
+                            onItemClick = { selectedSong ->
                                 playerViewModel.setQueue(
                                     queue,
                                     queue.indexOf(selectedSong),
@@ -334,9 +318,34 @@ fun LargeTabletPlayerLayout(
                                 )
                                 showQueue = false
                             },
-                            maxHeight = maxArtworkHeight,
+                            maxHeight = maxArtworkHeight
                         )
                     }
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showEqualizer,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { -it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    EqualizerControlsComponent(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp)
+                    )
                 }
             }
             Spacer(modifier = Modifier.height(L_PADDING))
@@ -388,97 +397,60 @@ fun LargeTabletPlayerLayout(
                     }
 
                     Spacer(modifier = Modifier.height(S_PADDING))
-
-                    VolumeSlider(
-                        playerViewModel = playerViewModel,
+                    Box(
                         modifier = Modifier.fillMaxWidth(),
-                        backgroundColor = bg
-                    )
+                    ) {
+                        VolumeSlider(
+                            playerViewModel = playerViewModel,
+                            modifier = Modifier
+                                .align(alignment = Alignment.CenterStart)
+                                .fillMaxWidth(),
+                            backgroundColor = bg,
+                        )
+                        PlayerControls(
+                            modifier = Modifier.align(alignment = Alignment.Center),
+                            isMiniPlayer = false,
+                            isPlaying = isPlaying,
+                            shuffle = shuffle,
+                            repeat = repeat,
+                            playerViewModel = playerViewModel
+                        )
+                        Row(
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                        ) {
+                            ToggledIconButton(
+                                state = showEqualizer,
+                                onClick = { showEqualizer = !showEqualizer },
+                                activeBackground = Color.White,
+                                inactiveBackground = Color.Transparent,
+                            ) {
+                                Icon(
+                                    XAudioLines,
+                                    contentDescription = "Equalizer",
+                                    tint = if (showEqualizer) Color.Black else Color.White
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(L_PADDING * 2))
+                            ToggledIconButton(
+                                state = showQueue,
+                                onClick = { showQueue = !showQueue },
+                                activeBackground = Color.White,
+                                inactiveBackground = Color.Transparent,
+                            ){
+                                Icon(
+                                    XListMusic,
+                                    contentDescription = "Queue",
+                                    tint = if (showQueue) Color.Black else Color.White
+                                )
+                            }
+                        }
+                    }
+
+
                 }
 
             }
-
-
             Spacer(modifier = Modifier.height(S_PADDING))
-
-            PlayerControls(
-                isMiniPlayer = false,
-                isPlaying = isPlaying,
-                shuffle = shuffle,
-                repeat = repeat,
-                playerViewModel = playerViewModel
-            )
-
-            Spacer(modifier = Modifier.height(S_PADDING))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                TextButton(
-                    onClick = { showQueue = !showQueue }
-                ) {
-                    Text(
-                        text = if (showQueue) "Hide Queue" else "Show Queue",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(XMore, contentDescription = "Queue", modifier = Modifier.size(20.dp))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(S_PADDING))
-
-            // Equalizer control toggle
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                TextButton(
-                    onClick = { showEqualizer = !showEqualizer }
-                ) {
-                    Text(
-                        text = if (showEqualizer) "Hide Equalizer" else "Show Equalizer",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            Spacer(
-                Modifier.height(
-                    safeInsets.insets.getBottom(
-                        LocalDensity.current
-                    ).dp
-                )
-            )
-
-            // Equalizer controls (slides up from bottom)
-            AnimatedVisibility(
-                visible = showEqualizer,
-                enter = fadeIn(
-                    animationSpec = tween(
-                        500,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + slideInVertically(
-                    initialOffsetY = { it },
-                    animationSpec = tween(500, easing = FastOutSlowInEasing)
-                ),
-                exit = fadeOut(
-                    animationSpec = tween(
-                        450,
-                        easing = FastOutSlowInEasing
-                    )
-                ) + slideOutVertically(
-                    targetOffsetY = { it },
-                    animationSpec = tween(450, easing = FastOutSlowInEasing)
-                )
-            ) {
-                EqualizerControlsComponent(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 24.dp)
-                )
-            }
         }
     }
 }

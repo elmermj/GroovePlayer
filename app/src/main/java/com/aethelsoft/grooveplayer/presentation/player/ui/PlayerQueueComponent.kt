@@ -1,8 +1,10 @@
 package com.aethelsoft.grooveplayer.presentation.player.ui
 
 import android.icu.number.IntegerWidth
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.FlingBehavior
@@ -12,6 +14,7 @@ import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.gestures.snapping.SnapLayoutInfoProvider
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.gestures.snapping.snapFlingBehavior
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,21 +32,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.animations.AudioWaveAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.rememberLottieComposition
 
 @Composable
 fun PlayerQueueComponent(
@@ -55,6 +67,9 @@ fun PlayerQueueComponent(
     val scrollableState = rememberScrollableState { delta -> delta }
     val lazyListState = rememberLazyListState()
     val flingBehavior = rememberSnapFlingBehavior(lazyListState)
+    val lottieComposition by rememberLottieComposition(
+        LottieCompositionSpec.Asset("animations/audiowave.json")
+    )
     
     LazyColumn(
         modifier = Modifier
@@ -69,68 +84,88 @@ fun PlayerQueueComponent(
                 flingBehavior = flingBehavior,
             )
     ) {
-        items(count = queue.size){ index ->
-            Row(
+        items(count = queue.size) { index ->
+            val song = queue[index]
+            val isPlaying = currentSong?.id == song.id
+
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick =  {
-                        onItemClick(queue[index])
-                    })
                     .width(360.dp)
-                    .drawBehind {
-                        val strokeWidth = 1.dp.toPx()
+            ) {
 
-                        val brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Transparent,
-                                Color.Gray.copy(alpha = 0.2f),
-                                Color.Gray.copy(alpha = 0.5f),
-                                Color.White
-                            ),
-                            startX = 0f,
-                            endX = size.width
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onItemClick(song) }
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Spacer(modifier = Modifier.height(S_PADDING))
+                        Text(
+                            text = song.title,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        drawLine(
-                            brush = brush,
-                            start = Offset(0f, size.height - strokeWidth / 2),
-                            end = Offset(size.width, size.height - strokeWidth / 2),
-                            strokeWidth = strokeWidth
+                        Spacer(modifier = Modifier.height(XS_PADDING / 2))
+                        Text(
+                            text = song.artist,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.End,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(S_PADDING))
+                    }
+
+                    Column(
+                        modifier = Modifier.padding(horizontal = S_PADDING)
+                    ) {
+                        Spacer(modifier = Modifier.height(S_PADDING))
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(song.artworkUrl)
+                                .size(36, 36)
+                                .allowHardware(false)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(S_PADDING))
+                    }
+                }
+                if (isPlaying) {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.85f), // left edge
+                                    Color.Black.copy(alpha = 0.55f), // inner fade
+                                    Color.Black.copy(alpha = 0.35f), // center
+                                    Color.Black.copy(alpha = 0.55f), // inner fade
+                                    Color.Black.copy(alpha = 0.85f)  // right edge
+                                )
+                            )
+                        ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AudioWaveAnimation(
+                            waveHeight = 24.dp,
+                            edgeFadeWidth = 36.dp,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
-            ) {
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = S_PADDING)
-                ) {
-                    Spacer(modifier = Modifier.height(S_PADDING))
-                    Text(
-                        text = queue[index].title,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(XS_PADDING/2))
-                    Text(
-                        text = queue[index].artist,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.End,
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(S_PADDING))
                 }
-                AsyncImage(
-                    model = queue[index].artworkUrl,
-                    contentDescription = "Artwork",
-                    modifier = Modifier
-                        .aspectRatio(1f)
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(4f))
-                )
             }
         }
     }
