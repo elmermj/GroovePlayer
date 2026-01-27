@@ -61,6 +61,22 @@ interface UserRepository {
      */
     suspend fun updateLastPlayedSongsTimer(days: Int)
     suspend fun updateFadeTimer(seconds: Int)
+    suspend fun updateEqualizerSettings(
+        enabled: Boolean,
+        preset: Int,
+        bandLevels: List<Int>
+    )
+    suspend fun updateVisualizationMode(mode: com.aethelsoft.grooveplayer.domain.model.VisualizationMode)
+    suspend fun updateLastPlayedSong(songId: String?, position: Long)
+    suspend fun updatePlayerState(
+        songId: String?,
+        position: Long,
+        shuffle: Boolean,
+        repeat: String,
+        queueSongIds: List<String>,
+        queueStartIndex: Int,
+        isEndlessQueue: Boolean
+    )
     
     /**
      * Resets settings to defaults.

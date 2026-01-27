@@ -52,7 +52,7 @@ class EditSongMetadataViewModel @Inject constructor(
                 title = metadata?.title ?: song.title,
                 genres = metadata?.genres ?: (if (song.genre.isNotBlank()) listOf(song.genre) else emptyList()),
                 artists = metadata?.artists ?: (if (song.artist.isNotBlank()) listOf(song.artist) else emptyList()),
-                album = metadata?.album ?: song.album,
+                album = metadata?.album ?: song.album?.name,
                 year = metadata?.year,
                 useAlbumYear = metadata?.useAlbumYear ?: false
             )

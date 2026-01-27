@@ -1,19 +1,16 @@
 package com.aethelsoft.grooveplayer.presentation.home.layouts
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
 import com.aethelsoft.grooveplayer.presentation.home.ui.LibraryCardComponent
+import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TabletHomeLayout(
     state: UiState.Success<List<Song>>,
@@ -29,12 +26,7 @@ fun TabletHomeLayout(
     val favoriteArtists by viewModel.favoriteArtists.collectAsState()
     val favoriteAlbums by viewModel.favoriteAlbums.collectAsState()
 
-    LazyVerticalGrid(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        columns = GridCells.Fixed(3),
-        modifier = Modifier.padding(top = 16.dp)
-    ) {
+    TemplateVeritcalGridPage(columns = 3) {
         item {
             LibraryCardComponent(
                 title = "All Songs",

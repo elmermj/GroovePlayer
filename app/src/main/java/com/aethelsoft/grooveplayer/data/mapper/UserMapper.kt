@@ -4,6 +4,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserProfileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
 import com.aethelsoft.grooveplayer.domain.model.UserProfile
 import com.aethelsoft.grooveplayer.domain.model.UserSettings
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 
 /**
  * Mapper for converting between data layer and domain layer user_category models.
@@ -43,7 +44,23 @@ object UserMapper {
         return UserSettings(
             id = entity.id,
             lastPlayedSongsTimer = entity.lastPlayedSongsTimer,
-            fadeTimer = entity.fadeTimer
+            fadeTimer = entity.fadeTimer,
+            equalizerEnabled = entity.equalizerEnabled,
+            equalizerPreset = entity.equalizerPreset,
+            equalizerBandLevels = parseBandLevels(entity.equalizerBandLevels),
+            lastPlayedSongId = entity.lastPlayedSongId,
+            lastPlayedPosition = entity.lastPlayedPosition,
+            shuffleEnabled = entity.shuffleEnabled,
+            repeatMode = entity.repeatMode,
+            queueSongIds = parseSongIds(entity.queueSongIds),
+            queueStartIndex = entity.queueStartIndex,
+            isEndlessQueue = entity.isEndlessQueue,
+            visualizationMode = when (entity.visualizationMode) {
+                "OFF" -> VisualizationMode.OFF
+                "SIMULATED" -> VisualizationMode.SIMULATED
+                "REAL_TIME" -> VisualizationMode.REAL_TIME
+                else -> VisualizationMode.REAL_TIME
+            }
         )
     }
     
@@ -51,8 +68,36 @@ object UserMapper {
         return UserSettingsEntity(
             id = domain.id,
             lastPlayedSongsTimer = domain.lastPlayedSongsTimer,
-            fadeTimer = domain.fadeTimer
+            fadeTimer = domain.fadeTimer,
+            equalizerEnabled = domain.equalizerEnabled,
+            equalizerPreset = domain.equalizerPreset,
+            equalizerBandLevels = bandLevelsToString(domain.equalizerBandLevels),
+            lastPlayedSongId = domain.lastPlayedSongId,
+            lastPlayedPosition = domain.lastPlayedPosition,
+            shuffleEnabled = domain.shuffleEnabled,
+            repeatMode = domain.repeatMode,
+            queueSongIds = songIdsToString(domain.queueSongIds),
+            queueStartIndex = domain.queueStartIndex,
+            isEndlessQueue = domain.isEndlessQueue,
+            visualizationMode = when (domain.visualizationMode) {
+                VisualizationMode.OFF -> "OFF"
+                VisualizationMode.SIMULATED -> "SIMULATED"
+                VisualizationMode.REAL_TIME -> "REAL_TIME"
+            }
         )
+    }
+    
+    // Helper functions for List<Int> <-> String conversion for band levels
+    private fun parseBandLevels(value: String): List<Int> {
+        return if (value.isBlank()) {
+            emptyList()
+        } else {
+            value.split(",").mapNotNull { it.trim().toIntOrNull() }
+        }
+    }
+    
+    private fun bandLevelsToString(list: List<Int>): String {
+        return list.joinToString(",")
     }
     
     // Helper functions for List<Int> <-> String conversion
@@ -65,6 +110,19 @@ object UserMapper {
     }
     
     private fun settingsReferencesToString(list: List<Int>): String {
+        return list.joinToString(",")
+    }
+    
+    // Helper functions for List<String> <-> String conversion for song IDs
+    private fun parseSongIds(value: String): List<String> {
+        return if (value.isBlank()) {
+            emptyList()
+        } else {
+            value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        }
+    }
+    
+    private fun songIdsToString(list: List<String>): String {
         return list.joinToString(",")
     }
 }

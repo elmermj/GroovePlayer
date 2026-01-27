@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.utils
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalConfiguration
 
 /**
@@ -23,16 +24,20 @@ enum class DeviceType {
  * - Phone: < 600dp
  * - Tablet: 600dp - 840dp
  * - Large Tablet: > 840dp
+ * 
+ * Uses remember to cache the device type and only recalculate when screen width changes.
  */
 @Composable
 fun rememberDeviceType(): DeviceType {
     val configuration = LocalConfiguration.current
     val screenWidthDp = configuration.screenWidthDp
     
-    return when {
-        screenWidthDp < 600 -> DeviceType.PHONE
-        screenWidthDp < 840 -> DeviceType.TABLET
-        else -> DeviceType.LARGE_TABLET
+    return remember(screenWidthDp) {
+        when {
+            screenWidthDp < 600 -> DeviceType.PHONE
+            screenWidthDp < 840 -> DeviceType.TABLET
+            else -> DeviceType.LARGE_TABLET
+        }
     }
 }
 

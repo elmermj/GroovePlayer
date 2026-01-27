@@ -34,6 +34,7 @@ import kotlin.collections.ifEmpty
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TemplateVeritcalGridPage(
+    columns: Int = 8,
     contents: LazyGridScope.() -> Unit
 ){
     val gridState = rememberLazyGridState()
@@ -52,7 +53,7 @@ fun TemplateVeritcalGridPage(
             state = gridState,
             horizontalArrangement = Arrangement.spacedBy(M_PADDING),
             verticalArrangement = Arrangement.spacedBy(M_PADDING),
-            columns = GridCells.Fixed(8),
+            columns = GridCells.Fixed(columns),
             modifier = Modifier.padding(
                 top = 20.dp,
                 start = M_PADDING,

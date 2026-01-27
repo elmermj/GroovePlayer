@@ -34,12 +34,46 @@ interface UserSettingsDao {
     @Query("UPDATE user_settings SET fadeTimer = :seconds WHERE id = 1")
     suspend fun updateFadeTimer(seconds: Int)
     
+    @Query("UPDATE user_settings SET equalizerEnabled = :enabled, equalizerPreset = :preset, equalizerBandLevels = :bandLevels WHERE id = 1")
+    suspend fun updateEqualizerSettings(enabled: Boolean, preset: Int, bandLevels: String)
+    
+    @Query("UPDATE user_settings SET visualizationMode = :mode WHERE id = 1")
+    suspend fun updateVisualizationMode(mode: String)
+    
+    @Query("UPDATE user_settings SET lastPlayedSongId = :songId, lastPlayedPosition = :position WHERE id = 1")
+    suspend fun updateLastPlayedSong(songId: String?, position: Long)
+    
+    @Query("UPDATE user_settings SET lastPlayedSongId = :songId, lastPlayedPosition = :position, shuffleEnabled = :shuffle, repeatMode = :repeat, queueSongIds = :queueSongIds, queueStartIndex = :queueStartIndex, isEndlessQueue = :isEndlessQueue WHERE id = 1")
+    suspend fun updatePlayerState(
+        songId: String?,
+        position: Long,
+        shuffle: Boolean,
+        repeat: String,
+        queueSongIds: String,
+        queueStartIndex: Int,
+        isEndlessQueue: Boolean
+    )
+    
     @Query("DELETE FROM user_settings")
     suspend fun deleteAllSettings()
     
     @Transaction
     suspend fun resetToDefault() {
         deleteAllSettings()
-        insertUserSettings(UserSettingsEntity(id = 1, lastPlayedSongsTimer = 30, fadeTimer = 0))
+        insertUserSettings(UserSettingsEntity(
+            id = 1, 
+            lastPlayedSongsTimer = 30, 
+            fadeTimer = 0,
+            equalizerEnabled = false,
+            equalizerPreset = -1,
+            equalizerBandLevels = "",
+            lastPlayedSongId = null,
+            lastPlayedPosition = 0L,
+            shuffleEnabled = false,
+            repeatMode = "OFF",
+            queueSongIds = "",
+            queueStartIndex = 0,
+            isEndlessQueue = false
+        ))
     }
 }

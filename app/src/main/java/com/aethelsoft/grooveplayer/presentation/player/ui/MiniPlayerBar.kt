@@ -3,6 +3,8 @@ package com.aethelsoft.grooveplayer.presentation.player.ui
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,9 +40,13 @@ import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.utils.DeviceType
+import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
+import com.aethelsoft.grooveplayer.utils.theme.icons.XPause
+import com.aethelsoft.grooveplayer.utils.theme.icons.XPlay
+import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,16 +68,57 @@ fun MiniPlayerBar(
     val targetColor = genreColor(song?.genre)
     val bg by animateColorAsState(targetColor)
     val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    
-    val showBluetoothIcon = deviceType == DeviceType.TABLET || deviceType == DeviceType.LARGE_TABLET
 
     if (showBluetoothSheet) {
         BluetoothBottomSheet(onDismiss = { showBluetoothSheet = false })
     }
 
+    when (deviceType) {
+        DeviceType.PHONE -> {
+            PhoneMiniPlayerBarContent(
+                song = song!!,
+                isPlaying = isPlaying,
+                pos = pos,
+                dur = dur,
+                playerViewModel = playerViewModel,
+                navigationBarPadding = navigationBarPadding,
+                onMiniPlayerClicked = onMiniPlayerClicked
+            )
+        }
+        DeviceType.TABLET, DeviceType.LARGE_TABLET -> {
+            TabletMiniPlayerBarContent(
+                song = song!!,
+                isPlaying = isPlaying,
+                shuffle = shuffle,
+                repeat = repeat,
+                pos = pos,
+                dur = dur,
+                bg = bg,
+                playerViewModel = playerViewModel,
+                navigationBarPadding = navigationBarPadding,
+                showBluetoothIcon = deviceType == DeviceType.TABLET || deviceType == DeviceType.LARGE_TABLET,
+                onShowBluetoothSheet = { showBluetoothSheet = true },
+                onMiniPlayerClicked = onMiniPlayerClicked
+            )
+        }
+    }
+}
 
-//    MiniPlayerBackdrop()
-
+@Composable
+private fun PhoneMiniPlayerBarContent(
+    song: com.aethelsoft.grooveplayer.domain.model.Song,
+    isPlaying: Boolean,
+    pos: Long,
+    dur: Long,
+    playerViewModel: com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel,
+    navigationBarPadding: androidx.compose.ui.unit.Dp,
+    onMiniPlayerClicked: () -> Unit
+) {
+    // Swipe gesture state for phone layout
+    var dragOffsetX by remember { mutableStateOf(0f) }
+    var dragOffsetY by remember { mutableStateOf(0f) }
+    val swipeThreshold = 100f
+    
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -79,60 +126,168 @@ fun MiniPlayerBar(
                 Brush.verticalGradient(
                     colors = listOf(
                         Color.Transparent,
-                        Color.Black.copy(alpha = 0.5f * 1),
-                        Color.Black.copy(alpha = 0.6f * 1),
-                        Color.Black.copy(alpha = 0.95f * 1),
+                        Color.Black.copy(alpha = 0.5f),
+                        Color.Black.copy(alpha = 0.6f),
+                        Color.Black.copy(alpha = 0.95f),
+                    )
+                )
+            )
+            .padding()
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragEnd = {
+                        dragOffsetX = 0f
+                        dragOffsetY = 0f
+                    }
+                ) { change, dragAmount ->
+                    dragOffsetX += dragAmount.x
+                    dragOffsetY += dragAmount.y
+                    
+                    if (kotlin.math.abs(dragOffsetX) > kotlin.math.abs(dragOffsetY)) {
+                        if (dragOffsetX > swipeThreshold) {
+                            playerViewModel.previous()
+                            dragOffsetX = 0f
+                            dragOffsetY = 0f
+                        } else if (dragOffsetX < -swipeThreshold) {
+                            playerViewModel.next()
+                            dragOffsetX = 0f
+                            dragOffsetY = 0f
+                        }
+                    } else if (dragOffsetY > swipeThreshold) {
+                        playerViewModel.stop()
+                        dragOffsetX = 0f
+                        dragOffsetY = 0f
+                    }
+                }
+            }
+            .clickable { onMiniPlayerClicked() }
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.fillMaxWidth().height(S_PADDING))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(M_PADDING)
+            ) {
+                AsyncImage(
+                    model = song.artworkUrl,
+                    contentDescription = "Artwork",
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.width(180.dp)) {
+                            SongDetails(song = song)
+                        }
+                        Spacer(modifier = Modifier.weight(1f).height(24.dp))
+                        
+                        // Play/Pause button only for phone
+                        ToggledIconButton(
+                            state = isPlaying,
+                            onClick = { playerViewModel.playPauseToggle() }
+                        ) { playing ->
+                            if (playing) {
+                                Icon(XPause, contentDescription = "Pause", tint = Color.White)
+                            } else {
+                                Icon(XPlay, contentDescription = "Play", tint = Color.White)
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.weight(1f).height(24.dp))
+                        Spacer(modifier = Modifier.width(56.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CustomSlider(
+                            value = if (dur > 0) pos.toFloat() / dur else 0f,
+                            onValueChange = { frac ->
+                                val target = (frac * dur).toLong()
+                                playerViewModel.seekTo(target)
+                            },
+                            modifier = Modifier.weight(1f),
+                            height = 4.dp,
+                            activeColor = Color.White,
+                            inactiveColor = Color.White.copy(alpha = 0.3f)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            formatMillis(pos),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(navigationBarPadding))
+        }
+    }
+}
+
+@Composable
+private fun TabletMiniPlayerBarContent(
+    song: com.aethelsoft.grooveplayer.domain.model.Song,
+    isPlaying: Boolean,
+    shuffle: Boolean,
+    repeat: com.aethelsoft.grooveplayer.domain.model.RepeatMode,
+    pos: Long,
+    dur: Long,
+    bg: Color,
+    playerViewModel: com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel,
+    navigationBarPadding: androidx.compose.ui.unit.Dp,
+    showBluetoothIcon: Boolean,
+    onShowBluetoothSheet: () -> Unit,
+    onMiniPlayerClicked: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Black.copy(alpha = 0.5f),
+                        Color.Black.copy(alpha = 0.6f),
+                        Color.Black.copy(alpha = 0.95f),
                     )
                 )
             )
             .padding()
             .clickable { onMiniPlayerClicked() }
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(S_PADDING)
-            )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(modifier = Modifier.fillMaxWidth().height(S_PADDING))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp)
+                modifier = Modifier.fillMaxWidth().padding(M_PADDING)
             ) {
-
                 AsyncImage(
-                    model = song?.artworkUrl,
+                    model = song.artworkUrl,
                     contentDescription = "Artwork",
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
                 )
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                ) {
-                    Row (
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
-                    ){
-                        Box(
-                            modifier = Modifier
-                                .width(180.dp)
-                        ) {
-                            SongDetails(
-                                song = song
-                            )
+                    ) {
+                        Box(modifier = Modifier.width(180.dp)) {
+                            SongDetails(song = song)
                         }
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(24.dp)
-                        )
+                        Spacer(modifier = Modifier.weight(1f).height(24.dp))
+                        
+                        // All controls for tablet
                         PlayerControls(
                             isMiniPlayer = true,
                             isPlaying = isPlaying,
@@ -140,23 +295,18 @@ fun MiniPlayerBar(
                             repeat = repeat,
                             playerViewModel = playerViewModel
                         )
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(24.dp)
-                        )
+                        
+                        Spacer(modifier = Modifier.weight(1f).height(24.dp))
+                        
                         if (showBluetoothIcon) {
-                            IconButton(onClick = { showBluetoothSheet = true }) {
+                            IconButton(onClick = onShowBluetoothSheet) {
                                 Icon(XBluetooth, contentDescription = "Bluetooth Devices", tint = Color.White)
                             }
                         } else {
                             Spacer(modifier = Modifier.width(56.dp))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .width(180.dp)
-                        ) {
+                        Box(modifier = Modifier.width(180.dp)) {
                             VolumeSlider(
                                 playerViewModel = playerViewModel,
                                 backgroundColor = bg,
@@ -180,9 +330,7 @@ fun MiniPlayerBar(
                             activeColor = Color.White,
                             inactiveColor = Color.White.copy(alpha = 0.3f)
                         )
-                        Spacer(
-                            modifier = Modifier.width(12.dp)
-                        )
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             formatMillis(pos),
                             maxLines = 1,
@@ -192,49 +340,10 @@ fun MiniPlayerBar(
                     }
                 }
             }
-            // Extend the background beneath the navigation bar
             Spacer(modifier = Modifier.height(navigationBarPadding))
         }
     }
 }
-
-//@Composable
-//fun MiniPlayerBackdrop(
-//    height: Dp = 96.dp,
-//    blurRadius: Dp = 20.dp,
-//    darkAlpha: Float = 0.35f
-//) {
-//    val supportsBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-//
-//    Box(
-//        modifier = Modifier
-//            .align(Alignment.BottomCenter)
-//            .fillMaxWidth()
-//            .height(height)
-//            .then(
-//                if (supportsBlur) {
-//                    Modifier.graphicsLayer {
-//                        renderEffect = RenderEffect.createBlurEffect(
-//                            blurRadius.toPx(),
-//                            blurRadius.toPx(),
-//                            Shader.TileMode.CLAMP
-//                        )
-//                    }
-//                } else {
-//                    Modifier
-//                }
-//            )
-//            .background(
-//                Brush.verticalGradient(
-//                    colors = listOf(
-//                        Color.Transparent,
-//                        Color.Black.copy(alpha = darkAlpha * 0.6f),
-//                        Color.Black.copy(alpha = darkAlpha)
-//                    )
-//                )
-//            )
-//    )
-//}
 
 
 

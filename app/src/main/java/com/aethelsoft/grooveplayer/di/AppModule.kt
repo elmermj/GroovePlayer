@@ -50,4 +50,7 @@ object AppModule {
     
     @Provides
     fun provideUserSettingsDao(database: GroovePlayerDatabase) = database.userSettingsDao()
+    
+    @Provides
+    fun provideSearchHistoryDao(database: GroovePlayerDatabase) = database.searchHistoryDao()
 }

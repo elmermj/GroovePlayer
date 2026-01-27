@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
@@ -54,7 +55,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val ctx: Context,
     private val playbackHistoryRepository: PlaybackHistoryRepository,
     private val userRepository: UserRepository,
-    private val serviceManager: MusicPlaybackServiceManager
+    private val serviceManager: MusicPlaybackServiceManager,
+    private val equalizerManager: EqualizerManager,
+    private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 ) : PlayerRepository {
 
     private val player: ExoPlayer = ExoPlayer.Builder(ctx).build()
@@ -81,6 +84,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     // Observe fade timer from user_category settings
     private var fadeTimerSeconds = 0
     private var isFading = false
+    private var visualizationMode: VisualizationMode = VisualizationMode.REAL_TIME
     
     // Endless queue feature
     private var isEndlessQueue = false
@@ -98,11 +102,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         get() = this.player
 
     init {
-        // Observe fade timer from user_category settings
+        // Observe fade timer and visualization mode from user_category settings
         scope.launch {
             try {
                 userRepository.observeUserSettings().collect { settings ->
                     fadeTimerSeconds = settings.fadeTimer
+                    visualizationMode = settings.visualizationMode
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ExoPlayerManager", "Failed to observe user settings", e)
@@ -120,6 +125,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                     _currentSong.value?.let { song ->
                         recordPlaybackIfNeeded(song)
                     }
+                    
+                    // Ensure visualizer is initialized once we actually have playback.
+                    // On some devices the audioSessionId is 0 at app startup and only
+                    // becomes valid after playback begins, which previously left us
+                    // stuck on the fallback "template" visualization.
+                    initializeVisualizerIfNeeded(reason = "onIsPlayingChanged")
                 }
             }
 
@@ -158,6 +169,61 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
         }
         
+        // Save player state periodically
+        scope.launch {
+            var lastSaveTime = 0L
+            while (true) {
+                val now = System.currentTimeMillis()
+                if (now - lastSaveTime >= 5000) { // Save every 5 seconds
+                    _currentSong.value?.let { song ->
+                        if (_position.value > 0) {
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    userRepository.updatePlayerState(
+                                        songId = song.id,
+                                        position = _position.value,
+                                        shuffle = _shuffle.value,
+                                        repeat = _repeat.value.name,
+                                        queueSongIds = _queue.value.map { it.id },
+                                        queueStartIndex = _queue.value.indexOfFirst { it.id == song.id }.coerceAtLeast(0),
+                                        isEndlessQueue = isEndlessQueue
+                                    )
+                                    lastSaveTime = now
+                                } catch (e: Exception) {
+                                    android.util.Log.e("ExoPlayerManager", "Error saving player state: ${e.message}", e)
+                                }
+                            }
+                        }
+                    }
+                }
+                kotlinx.coroutines.delay(1000)
+            }
+        }
+        
+        // Also save on pause/stop
+        scope.launch {
+            _isPlaying.collect { isPlaying ->
+                if (!isPlaying && _currentSong.value != null && _position.value > 0) {
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val song = _currentSong.value!!
+                            userRepository.updatePlayerState(
+                                songId = song.id,
+                                position = _position.value,
+                                shuffle = _shuffle.value,
+                                repeat = _repeat.value.name,
+                                queueSongIds = _queue.value.map { it.id },
+                                queueStartIndex = _queue.value.indexOfFirst { it.id == song.id }.coerceAtLeast(0),
+                                isEndlessQueue = isEndlessQueue
+                            )
+                        } catch (e: Exception) {
+                            android.util.Log.e("ExoPlayerManager", "Error saving player state on pause: ${e.message}", e)
+                        }
+                    }
+                }
+            }
+        }
+        
         // volume ticker - listen to system volume changes
         scope.launch {
             while (true) {
@@ -169,10 +235,19 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
         }
         
-        // Start simulation immediately for testing/fallback
+        // Start simulation loop for visualization.
+        // This drives the visualization only when:
+        // - Mode is SIMULATED, or
+        // - Mode is REAL_TIME but the Visualizer is not available (fallback).
         scope.launch {
             while (true) {
-                if (_isPlaying.value && visualizer?.enabled != true) {
+                val useSimulation = when (visualizationMode) {
+                    VisualizationMode.OFF -> false
+                    VisualizationMode.SIMULATED -> true
+                    VisualizationMode.REAL_TIME -> visualizer == null || visualizer?.enabled != true
+                }
+
+                if (_isPlaying.value && useSimulation) {
                     // Animated pulsing effect based on time for fallback
                     val time = System.currentTimeMillis() / 150.0
                     val bassPulse = kotlin.math.sin(time * 0.8) * 0.5 + 0.5
@@ -196,213 +271,282 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
         }
         
-        // Try to initialize audio visualizer for real waveform data
+        // Try to initialize audio visualizer for real waveform data once the player is ready.
+        // We also retry later from onIsPlayingChanged when playback actually starts.
         scope.launch(Dispatchers.Main) {
-            delay(1000) // Wait for player to fully initialize
-            try {
-                val sessionId = player.audioSessionId
-                android.util.Log.d("ExoPlayerManager", "Attempting to initialize Visualizer with session ID: $sessionId")
-                
-                if (sessionId != 0) {
-                    visualizer = Visualizer(sessionId).apply {
-                        captureSize = Visualizer.getCaptureSizeRange()[1]
-                        setDataCaptureListener(
-                            object : Visualizer.OnDataCaptureListener {
-                                override fun onWaveFormDataCapture(
-                                    vis: Visualizer?,
-                                    waveform: ByteArray?,
-                                    samplingRate: Int
-                                ) {
-                                    waveform?.let { data ->
-                                        // Extract stereo balance from waveform
-                                        // Waveform contains interleaved left/right samples
-                                        var leftSum = 0.0
-                                        var rightSum = 0.0
-                                        val halfSize = data.size / 2
-                                        
-                                        for (i in 0 until halfSize) {
-                                            val leftValue = kotlin.math.abs(data[i].toInt() - 128).toDouble()
-                                            leftSum += leftValue * leftValue
-                                        }
-                                        for (i in halfSize until data.size) {
-                                            val rightValue = kotlin.math.abs(data[i].toInt() - 128).toDouble()
-                                            rightSum += rightValue * rightValue
-                                        }
-                                        
+            delay(1000) // Initial attempt after player construction
+            initializeVisualizerIfNeeded(reason = "init_delay")
+        }
+    }
+
+    /**
+     * Initialize the Visualizer + Equalizer pipeline if we have a valid audioSessionId
+     * and haven't successfully initialized yet.
+     *
+     * This is idempotent and can be safely called from multiple places.
+     */
+    private fun initializeVisualizerIfNeeded(reason: String) {
+        // If we already have an enabled visualizer, nothing to do.
+        val existing = visualizer
+        if (existing != null && existing.enabled) {
+            android.util.Log.d("ExoPlayerManager", "Visualizer already initialized (reason=$reason)")
+            return
+        }
+
+        try {
+            val sessionId = player.audioSessionId
+            android.util.Log.d("ExoPlayerManager", "Attempting to initialize Visualizer (reason=$reason) with session ID: $sessionId")
+
+            if (sessionId == 0) {
+                // This often happens before playback starts; we'll retry on next call.
+                android.util.Log.w("ExoPlayerManager", "⚠️ Audio session ID is 0, deferring Visualizer initialization (reason=$reason)")
+                return
+            }
+
+            // Initialize equalizer with the same audio session ID
+            val equalizerInitialized = equalizerManager.initialize(sessionId)
+            if (equalizerInitialized) {
+                android.util.Log.d("ExoPlayerManager", "✅ Equalizer initialized successfully (reason=$reason)")
+                // Load saved equalizer settings (defer to avoid blocking initialization)
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        // Small delay to ensure database is ready
+                        kotlinx.coroutines.delay(100)
+                        equalizerRepository.loadSettings()
+                    } catch (e: Exception) {
+                        android.util.Log.e("ExoPlayerManager", "Error loading equalizer settings: ${e.message}", e)
+                    }
+                }
+            } else {
+                android.util.Log.w("ExoPlayerManager", "⚠️ Equalizer initialization failed (reason=$reason)")
+            }
+
+            visualizer = Visualizer(sessionId).apply {
+                captureSize = Visualizer.getCaptureSizeRange()[1]
+                setDataCaptureListener(
+                    object : Visualizer.OnDataCaptureListener {
+                        override fun onWaveFormDataCapture(
+                            vis: Visualizer?,
+                            waveform: ByteArray?,
+                            samplingRate: Int
+                        ) {
+                            waveform?.let { data ->
+                                // Extract stereo balance from waveform
+                                // Waveform contains interleaved left/right samples
+                                var leftSum = 0.0
+                                var rightSum = 0.0
+                                val halfSize = data.size / 2
+
+                                for (i in 0 until halfSize) {
+                                    val leftValue = kotlin.math.abs(data[i].toInt() - 128).toDouble()
+                                    leftSum += leftValue * leftValue
+                                }
+                                for (i in halfSize until data.size) {
+                                    val rightValue = kotlin.math.abs(data[i].toInt() - 128).toDouble()
+                                    rightSum += rightValue * rightValue
+                                }
+
                                         val leftRms = sqrt(leftSum / halfSize)
                                         val rightRms = sqrt(rightSum / (data.size - halfSize))
                                         val totalRms = leftRms + rightRms
                                         
                                         // Calculate stereo balance: -1 (left) to 1 (right)
-                                        val stereoBalance = if (totalRms > 0.01) {
+                                        // Use RMS-based channel energy difference, then:
+                                        // - apply a small dead-zone to avoid jitter around center
+                                        // - apply a non-linear curve for slightly more dramatic separation
+                                        val rawStereo = if (totalRms > 0.01) {
                                             ((rightRms - leftRms) / totalRms).toFloat().coerceIn(-1f, 1f)
                                         } else {
                                             0f
                                         }
                                         
-                                        // Calculate overall amplitude
-                                        val overallRms = sqrt((leftSum + rightSum) / data.size)
-                                        val rawNormalized = (overallRms / 128.0).coerceIn(0.0, 1.0)
-                                        val logScaled = kotlin.math.log10(1.0 + rawNormalized * 9.0) / kotlin.math.log10(10.0)
-                                        val overall = logScaled.toFloat()
+                                        // Dead-zone: treat tiny differences as center
+                                        val stereoWithDeadZone = if (kotlin.math.abs(rawStereo) < 0.05f) {
+                                            0f
+                                        } else {
+                                            rawStereo
+                                        }
                                         
-                                        // Moderate stereo smoothing for smooth panning
+                                        // Slightly dramatic curve: abs(x)^0.7 keeps sign, pushes small
+                                        // imbalances farther from 0 while keeping -1..1 bounds.
+                                        val emphasizedStereo = if (stereoWithDeadZone != 0f) {
+                                            val sign = kotlin.math.sign(stereoWithDeadZone)
+                                            val boosted = kotlin.math.abs(stereoWithDeadZone.toDouble())
+                                                .pow(0.7)
+                                                .toFloat()
+                                            (sign * boosted).coerceIn(-1f, 1f)
+                                        } else {
+                                            0f
+                                        }
+
+                                // Calculate overall amplitude
+                                val overallRms = sqrt((leftSum + rightSum) / data.size)
+                                val rawNormalized = (overallRms / 128.0).coerceIn(0.0, 1.0)
+                                val logScaled = kotlin.math.log10(1.0 + rawNormalized * 9.0) / kotlin.math.log10(10.0)
+                                val overall = logScaled.toFloat()
+
+                                        // Moderate stereo smoothing for smooth but responsive panning.
+                                        // Bias slightly toward the new emphasized value so that the
+                                        // glow feels more reactive to pan changes.
                                         val currentData = _audioVisualization.value
-                                        val smoothedStereo = currentData.stereoBalance * 0.55f + stereoBalance * 0.45f
-                                        
-                                        // Update with stereo info (frequency analysis comes from FFT)
-                                        _audioVisualization.value = currentData.copy(
-                                            stereoBalance = smoothedStereo,
-                                            overall = overall
-                                        )
+                                        val smoothedStereo = (currentData.stereoBalance * 0.4f +
+                                                emphasizedStereo * 0.6f).coerceIn(-1f, 1f)
+
+                                // Update with stereo info (frequency analysis comes from FFT)
+                                _audioVisualization.value = currentData.copy(
+                                    stereoBalance = smoothedStereo,
+                                    overall = overall
+                                )
+                            }
+                        }
+
+                        override fun onFftDataCapture(
+                            vis: Visualizer?,
+                            fft: ByteArray?,
+                            samplingRate: Int
+                        ) {
+                            fft?.let { data ->
+                                // Android FFT format: [DC, Nyquist, real1, imag1, real2, imag2, ...]
+                                // Index 0: DC component, Index 1: Nyquist frequency
+                                // Then alternating real/imaginary pairs
+
+                                val numFrequencies = data.size / 2
+                                val magnitudes = FloatArray(numFrequencies)
+
+                                // DC component (index 0)
+                                magnitudes[0] = kotlin.math.abs(data[0].toFloat())
+
+                                // Process real/imaginary pairs (indices 2 onwards)
+                                for (i in 1 until numFrequencies) {
+                                    val real = data[i * 2].toFloat()
+                                    val imag = data[i * 2 + 1].toFloat()
+                                    magnitudes[i] = sqrt((real * real + imag * imag).toDouble()).toFloat()
+                                }
+
+                                // Frequency bins mapping
+                                // Android's samplingRate parameter is unreliable, use standard audio rate
+                                // Most music is 44.1kHz or 48kHz - using 44100 as safe default
+                                val audioSampleRate = 44100f
+                                val nyquist = audioSampleRate / 2f  // 22050 Hz
+                                val binFreq = nyquist / numFrequencies
+
+                                // Extract frequency bands
+                                var bassSum = 0.0
+                                var bassCount = 0
+                                var midSum = 0.0
+                                var midCount = 0
+                                var trebleSum = 0.0
+                                var trebleCount = 0
+
+                                for (i in magnitudes.indices) {
+                                    val freq = i * binFreq
+                                    val magnitude = magnitudes[i].toDouble()
+
+                                    when {
+                                        freq < 250 -> { // Bass: 20-250 Hz
+                                            bassSum += magnitude
+                                            bassCount++
+                                        }
+                                        freq < 4000 -> { // Mid/Voice: 250-4000 Hz
+                                            midSum += magnitude
+                                            midCount++
+                                        }
+                                        freq < 20000 -> { // Treble: 4000-20000 Hz
+                                            trebleSum += magnitude
+                                            trebleCount++
+                                        }
                                     }
                                 }
-                                
-                                override fun onFftDataCapture(
-                                    vis: Visualizer?,
-                                    fft: ByteArray?,
-                                    samplingRate: Int
-                                ) {
-                                    fft?.let { data ->
-                                        // Android FFT format: [DC, Nyquist, real1, imag1, real2, imag2, ...]
-                                        // Index 0: DC component, Index 1: Nyquist frequency
-                                        // Then alternating real/imaginary pairs
-                                        
-                                        val numFrequencies = data.size / 2
-                                        val magnitudes = FloatArray(numFrequencies)
-                                        
-                                        // DC component (index 0)
-                                        magnitudes[0] = kotlin.math.abs(data[0].toFloat())
-                                        
-                                        // Process real/imaginary pairs (indices 2 onwards)
-                                        for (i in 1 until numFrequencies) {
-                                            val real = data[i * 2].toFloat()
-                                            val imag = data[i * 2 + 1].toFloat()
-                                            magnitudes[i] = sqrt((real * real + imag * imag).toDouble()).toFloat()
-                                        }
-                                        
-                                        // Frequency bins mapping
-                                        // Android's samplingRate parameter is unreliable, use standard audio rate
-                                        // Most music is 44.1kHz or 48kHz - using 44100 as safe default
-                                        val audioSampleRate = 44100f
-                                        val nyquist = audioSampleRate / 2f  // 22050 Hz
-                                        val binFreq = nyquist / numFrequencies
-                                        
-                                        // Extract frequency bands
-                                        var bassSum = 0.0
-                                        var bassCount = 0
-                                        var midSum = 0.0
-                                        var midCount = 0
-                                        var trebleSum = 0.0
-                                        var trebleCount = 0
-                                        
-                                        for (i in magnitudes.indices) {
-                                            val freq = i * binFreq
-                                            val magnitude = magnitudes[i].toDouble()
-                                            
-                                            when {
-                                                freq < 250 -> { // Bass: 20-250 Hz
-                                                    bassSum += magnitude
-                                                    bassCount++
-                                                }
-                                                freq < 4000 -> { // Mid/Voice: 250-4000 Hz
-                                                    midSum += magnitude
-                                                    midCount++
-                                                }
-                                                freq < 20000 -> { // Treble: 4000-20000 Hz
-                                                    trebleSum += magnitude
-                                                    trebleCount++
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Normalize frequency bands
-                                        val bassAvg = if (bassCount > 0) (bassSum / bassCount) / 128.0 else 0.0
-                                        val midAvg = if (midCount > 0) (midSum / midCount) / 128.0 else 0.0
-                                        val trebleAvg = if (trebleCount > 0) (trebleSum / trebleCount) / 128.0 else 0.0
-                                        
-                                        // Apply logarithmic scaling for better visualization
-                                        val bassScaled = kotlin.math.log10(1.0 + bassAvg * 9.0) / kotlin.math.log10(10.0)
-                                        val midScaled = kotlin.math.log10(1.0 + midAvg * 9.0) / kotlin.math.log10(10.0)
-                                        val trebleScaled = kotlin.math.log10(1.0 + trebleAvg * 9.0) / kotlin.math.log10(10.0)
-                                        
-                                        // Beat detection: sudden increase in bass energy
-                                        val currentEnergy = bassSum / bassCount.coerceAtLeast(1)
-                                        beatHistory.add(currentEnergy)
-                                        if (beatHistory.size > 30) { // Keep ~0.7 second of history (shorter = more sensitive)
-                                            beatHistory.removeAt(0)
-                                        }
-                                        
-                                        val avgEnergy = if (beatHistory.isNotEmpty()) {
-                                            beatHistory.average()
-                                        } else currentEnergy
-                                        
-                                        val energyRatio = if (avgEnergy > 0.01) {
-                                            (currentEnergy / avgEnergy).coerceIn(0.0, 4.0)
-                                        } else 0.0
-                                        
-                                        // More sensitive beat detection with amplification
-                                        val beatIntensity = if (energyRatio > 1.15) { // Lower threshold (was 1.3)
-                                            // Amplified mapping: 1.15->0.0, 2.5->1.0
-                                            val normalized = ((energyRatio - 1.15) / 1.35).coerceIn(0.0, 1.0)
-                                            // Apply power curve for more dramatic beats
-                                            normalized.pow(0.7) // Power < 1 = more sensitive
-                                        } else {
-                                            0.0
-                                        }
-                                        
-                                        // Balanced smoothing: responsive but not jittery
-                                        val currentData = _audioVisualization.value
-                                        
-                                        // Bass: smooth but responsive
-                                        val smoothedBass = currentData.bass * 0.5f + bassScaled.toFloat() * 0.5f
-                                        
-                                        // Mid: balanced for vocals
-                                        val smoothedMid = currentData.mid * 0.45f + midScaled.toFloat() * 0.55f
-                                        
-                                        // Treble: responsive for highs with slight smoothing
-                                        val smoothedTreble = currentData.treble * 0.35f + trebleScaled.toFloat() * 0.65f
-                                        
-                                        // Beat: fast rise, moderate fall for punchy but smooth impact
-                                        val smoothedBeat = if (beatIntensity.toFloat() > currentData.beat) {
-                                            // Rise fast
-                                            currentData.beat * 0.25f + beatIntensity.toFloat() * 0.75f
-                                        } else {
-                                            // Fall moderately
-                                            currentData.beat * 0.6f + beatIntensity.toFloat() * 0.4f
-                                        }
-                                        
-                                        // Update visualization data
-                                        _audioVisualization.value = currentData.copy(
-                                            bass = smoothedBass.coerceIn(0f, 1f),
-                                            mid = smoothedMid.coerceIn(0f, 1f),
-                                            treble = smoothedTreble.coerceIn(0f, 1f),
-                                            beat = smoothedBeat.coerceIn(0f, 1f)
-                                        )
-                                        
-                                        // Debug logging with raw and processed values
-//                                        if (bassCount > 0 || midCount > 0 || trebleCount > 0) {
-//                                            android.util.Log.v("ExoPlayerManager", "🎵 Bass: ${"%.2f".format(smoothedBass)} (bins:$bassCount) | Mid: ${"%.2f".format(smoothedMid)} (bins:$midCount) | Treble: ${"%.2f".format(smoothedTreble)} (bins:$trebleCount) | Stereo: ${"%.2f".format(currentData.stereoBalance)} | Beat: ${"%.2f".format(smoothedBeat)}")
-//                                            android.util.Log.v("ExoPlayerManager", "   Raw→ BassAvg: ${"%.3f".format(bassAvg)} | MidAvg: ${"%.3f".format(midAvg)} | TrebleAvg: ${"%.3f".format(trebleAvg)} | BinFreq: ${"%.1f".format(binFreq)}Hz | NumBins: $numFrequencies")
-//                                        }
-                                    }
+
+                                // Normalize frequency bands
+                                val bassAvg = if (bassCount > 0) (bassSum / bassCount) / 128.0 else 0.0
+                                val midAvg = if (midCount > 0) (midSum / midCount) / 128.0 else 0.0
+                                val trebleAvg = if (trebleCount > 0) (trebleSum / trebleCount) / 128.0 else 0.0
+
+                                // Apply logarithmic scaling for better visualization
+                                val bassScaled = kotlin.math.log10(1.0 + bassAvg * 9.0) / kotlin.math.log10(10.0)
+                                val midScaled = kotlin.math.log10(1.0 + midAvg * 9.0) / kotlin.math.log10(10.0)
+                                val trebleScaled = kotlin.math.log10(1.0 + trebleAvg * 9.0) / kotlin.math.log10(10.0)
+
+                                // Beat detection: sudden increase in bass energy
+                                val currentEnergy = bassSum / bassCount.coerceAtLeast(1)
+                                beatHistory.add(currentEnergy)
+                                if (beatHistory.size > 30) { // Keep ~0.7 second of history (shorter = more sensitive)
+                                    beatHistory.removeAt(0)
                                 }
-                            },
-                            Visualizer.getMaxCaptureRate() / 1.3.toInt(), // Maximum rate for lowest latency
-                            true,
-                            true // Enable FFT capture
-                        )
-                        enabled = true
-                    }
-                    android.util.Log.d("ExoPlayerManager", "✅ Visualizer initialized successfully - real waveform with frequency analysis")
-                } else {
-                    android.util.Log.w("ExoPlayerManager", "⚠️ Audio session ID is 0, using simulation only")
-                }
-            } catch (e: SecurityException) {
-                android.util.Log.e("ExoPlayerManager", "❌ RECORD_AUDIO permission not granted - using simulation: ${e.message}")
-            } catch (e: Exception) {
-                android.util.Log.e("ExoPlayerManager", "❌ Failed to initialize visualizer - using simulation: ${e.message}")
+
+                                val avgEnergy = if (beatHistory.isNotEmpty()) {
+                                    beatHistory.average()
+                                } else currentEnergy
+
+                                val energyRatio = if (avgEnergy > 0.01) {
+                                    (currentEnergy / avgEnergy).coerceIn(0.0, 4.0)
+                                } else 0.0
+
+                                // More sensitive beat detection with amplification
+                                val beatIntensity = if (energyRatio > 1.15) { // Lower threshold (was 1.3)
+                                    // Amplified mapping: 1.15->0.0, 2.5->1.0
+                                    val normalized = ((energyRatio - 1.15) / 1.35).coerceIn(0.0, 1.0)
+                                    // Apply power curve for more dramatic beats
+                                    normalized.pow(0.7) // Power < 1 = more sensitive
+                                } else {
+                                    0.0
+                                }
+
+                                // Balanced smoothing: responsive but not jittery
+                                val currentData = _audioVisualization.value
+
+                                // Bass: smooth but responsive
+                                val smoothedBass = currentData.bass * 0.5f + bassScaled.toFloat() * 0.5f
+
+                                // Mid: balanced for vocals
+                                val smoothedMid = currentData.mid * 0.45f + midScaled.toFloat() * 0.55f
+
+                                // Treble: responsive for highs with slight smoothing
+                                val smoothedTreble = currentData.treble * 0.35f + trebleScaled.toFloat() * 0.65f
+
+                                // Beat: fast rise, moderate fall for punchy but smooth impact
+                                val smoothedBeat = if (beatIntensity.toFloat() > currentData.beat) {
+                                    // Rise fast
+                                    currentData.beat * 0.25f + beatIntensity.toFloat() * 0.75f
+                                } else {
+                                    // Fall moderately
+                                    currentData.beat * 0.6f + beatIntensity.toFloat() * 0.4f
+                                }
+
+                                // Update visualization data
+                                _audioVisualization.value = currentData.copy(
+                                    bass = smoothedBass.coerceIn(0f, 1f),
+                                    mid = smoothedMid.coerceIn(0f, 1f),
+                                    treble = smoothedTreble.coerceIn(0f, 1f),
+                                    beat = smoothedBeat.coerceIn(0f, 1f)
+                                )
+
+                                // Debug logging with raw and processed values
+                                // if (bassCount > 0 || midCount > 0 || trebleCount > 0) {
+                                //     android.util.Log.v(
+                                //         "ExoPlayerManager",
+                                //         "🎵 Bass: ${"%.2f".format(smoothedBass)} (bins:$bassCount) | Mid: ${"%.2f".format(smoothedMid)} (bins:$midCount) | Treble: ${"%.2f".format(smoothedTreble)} (bins:$trebleCount) | Stereo: ${"%.2f".format(currentData.stereoBalance)} | Beat: ${"%.2f".format(smoothedBeat)}"
+                                //     )
+                                //     android.util.Log.v(
+                                //         "ExoPlayerManager",
+                                //         "   Raw→ BassAvg: ${"%.3f".format(bassAvg)} | MidAvg: ${"%.3f".format(midAvg)} | TrebleAvg: ${"%.3f".format(trebleAvg)} | BinFreq: ${"%.1f".format(binFreq)}Hz | NumBins: $numFrequencies"
+                                //     )
+                                // }
+                            }
+                        }
+                    },
+                    Visualizer.getMaxCaptureRate() / 1.3.toInt(), // Maximum rate for lowest latency
+                    true,
+                    true // Enable FFT capture
+                )
+                enabled = true
             }
+            android.util.Log.d("ExoPlayerManager", "✅ Visualizer initialized successfully - real waveform with frequency analysis (reason=$reason)")
+        } catch (e: SecurityException) {
+            android.util.Log.e("ExoPlayerManager", "❌ RECORD_AUDIO permission not granted - using simulation (reason=$reason): ${e.message}")
+        } catch (e: Exception) {
+            android.util.Log.e("ExoPlayerManager", "❌ Failed to initialize visualizer - using simulation (reason=$reason): ${e.message}")
         }
     }
 
@@ -439,7 +583,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _duration.value = song.durationMs
     }
 
-    override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean) {
+    override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
         this.isEndlessQueue = isEndlessQueue
         this.allAvailableSongs = songs
         
@@ -452,7 +596,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             player.prepare()
             val idx = startIndex.coerceIn(0, songs.lastIndex.coerceAtLeast(0))
             player.seekTo(idx, 0)
-            player.playWhenReady = true
+            player.playWhenReady = autoPlay
         }
         
         val idx = startIndex.coerceIn(0, songs.lastIndex.coerceAtLeast(0))
@@ -461,7 +605,27 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _duration.value = song?.durationMs ?: 0L
         
         // Record playback immediately when queue is set (force=true for manual selection)
-        song?.let { recordPlaybackIfNeeded(it, force = true) }
+        // Only record if auto-playing
+        if (autoPlay) {
+            song?.let { recordPlaybackIfNeeded(it, force = true) }
+        }
+        
+        // Save player state
+        scope.launch(Dispatchers.IO) {
+            try {
+                userRepository.updatePlayerState(
+                    songId = song?.id,
+                    position = player.currentPosition,
+                    shuffle = _shuffle.value,
+                    repeat = _repeat.value.name,
+                    queueSongIds = songs.map { it.id },
+                    queueStartIndex = idx,
+                    isEndlessQueue = isEndlessQueue
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("ExoPlayerManager", "Error saving player state: ${e.message}", e)
+            }
+        }
     }
 
     /**

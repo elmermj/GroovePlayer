@@ -281,7 +281,7 @@ class MusicPlaybackService : Service() {
             .setLargeIcon(artworkBitmap)
             .setContentTitle(song.title)
             .setContentText(song.artist)
-            .setSubText(song.album ?: "")
+            .setSubText(song.album?.name ?: "")
             .setContentIntent(contentIntent)
             .setDeleteIntent(createActionIntent(ACTION_STOP))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -367,7 +367,7 @@ class MusicPlaybackService : Service() {
         
         view.setTextViewText(R.id.notification_title, song.title)
         view.setTextViewText(R.id.notification_artist, song.artist)
-        view.setTextViewText(R.id.notification_album, song.album ?: "")
+        view.setTextViewText(R.id.notification_album, song.album?.name ?: "")
         
         // Set artwork as background
         if (artworkBitmap != null) {

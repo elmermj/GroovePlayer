@@ -42,6 +42,18 @@ class MediaStoreRepository @Inject constructor(
         )
     }
     
+    override suspend fun searchSongs(query: String): List<Song> = withContext(Dispatchers.IO) {
+        val songsData = fetchSongsFromMediaStore()
+        val lowerQuery = query.lowercase()
+        SongMapper.mediaStoreToDomainList(
+            songsData.filter { 
+                it.title.lowercase().contains(lowerQuery) ||
+                it.artist.lowercase().contains(lowerQuery) ||
+                it.album?.lowercase()?.contains(lowerQuery) == true
+            }
+        )
+    }
+    
     /**
      * Internal method to fetch songs from MediaStore.
      * Returns data layer models (MediaStoreSongData).

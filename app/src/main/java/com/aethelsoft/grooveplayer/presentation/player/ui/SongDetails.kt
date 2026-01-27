@@ -18,25 +18,15 @@ import com.aethelsoft.grooveplayer.domain.model.Song
 fun SongDetails(
     song: Song?,
 ) {
-
-    val scrimBrush = createBackgroundScrimBrush()
     Column(
         horizontalAlignment = Alignment.Start
     ) {
-        Box(
-            modifier = Modifier
-                .wrapContentSize()
-                .background(
-                    brush = scrimBrush
-                )
-        ){
-            Text(
-                text = song?.title ?: "",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+        Text(
+            text = song?.title ?: "",
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.bodyMedium
+        )
 
         Text(
             text = song?.artist ?: "",
@@ -46,19 +36,4 @@ fun SongDetails(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
-}
-
-@Composable
-fun createBackgroundScrimBrush(): Brush {
-
-    return Brush.sweepGradient(
-        colors = listOf(
-            Color.Black.copy(alpha = 0.8f),
-            Color.Black.copy(alpha = 0.8f),
-            Color.Black.copy(alpha = 0.8f),
-            Color.Black.copy(alpha = 0.8f),
-            Color.Black.copy(alpha = 0.8f),
-            Color.Transparent
-        )
-    )
 }

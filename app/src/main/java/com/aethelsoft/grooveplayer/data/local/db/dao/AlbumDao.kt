@@ -22,5 +22,8 @@ interface AlbumDao {
     
     @Query("SELECT DISTINCT album FROM playback_history WHERE album LIKE :query || '%' ORDER BY album ASC")
     suspend fun searchAlbumsFromHistory(query: String): List<String>
+    
+    @Query("SELECT * FROM albums WHERE artist = :artistName ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun getLatestAlbumByArtist(artistName: String): AlbumEntity?
 }
 

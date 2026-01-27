@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
-import com.aethelsoft.grooveplayer.presentation.library.songs.ui.SongItemComponent
+import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 
 @OptIn(ExperimentalMaterial3Api::class)

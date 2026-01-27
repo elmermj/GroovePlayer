@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -55,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.palette.graphics.Palette
 import coil3.Bitmap
 import coil3.compose.AsyncImage
@@ -89,6 +92,8 @@ import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
+import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
+import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothRadialComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
@@ -98,6 +103,9 @@ import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.WaveformUtils
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
@@ -127,6 +135,45 @@ fun LargeTabletPlayerLayout(
     var showBluetoothSheet by remember { mutableStateOf(false) }
     val queue by playerViewModel.queue.collectAsState()
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
+    val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+
+    // Waveform / glow visualization toggle
+    val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
+    var isWaveformVisualizationEnabled by rememberSaveable { mutableStateOf(true) }
+    val effectiveVisualization =
+        when (visualizationMode) {
+            VisualizationMode.OFF -> AudioVisualizationData()
+            VisualizationMode.SIMULATED,
+            VisualizationMode.REAL_TIME -> {
+                if (hasRecordAudioPermission) audioVisualization else AudioVisualizationData()
+            }
+        }
+    
+    // Bluetooth ViewModel
+    val bluetoothViewModel: com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel = hiltViewModel()
+    val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
+    val isScanning by bluetoothViewModel.isScanning.collectAsState()
+    val connectedDevice by bluetoothViewModel.connectedDevice.collectAsState()
+    
+    // Ensure showBluetoothSheet and showQueue are never true at the same time
+    LaunchedEffect(showBluetoothSheet, showQueue) {
+        if (showBluetoothSheet && showQueue) {
+            // If both are true, close the one that wasn't just opened
+            // This is a safeguard in case both get set to true somehow
+            showQueue = false
+        }
+    }
+    
+    // Auto-start scanning when Bluetooth sheet is opened
+    LaunchedEffect(showBluetoothSheet) {
+        if (showBluetoothSheet && 
+            bluetoothViewModel.isBluetoothEnabled() && 
+            bluetoothViewModel.hasBluetoothPermissions() &&
+            !isScanning &&
+            availableDevices.isEmpty()) {
+            bluetoothViewModel.startScanning()
+        }
+    }
     val configuration = LocalWindowInfo.current
     val screenHeight = configuration.containerSize.height.dp
     val screenWidth = configuration.containerSize.width.dp
@@ -166,15 +213,16 @@ fun LargeTabletPlayerLayout(
         }
     }
 
-    if (showBluetoothSheet) {
-        BluetoothBottomSheet(onDismiss = { showBluetoothSheet = false })
-    }
-
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(bg)
-            .padding(32.dp),
+            .padding(
+                top = 32.dp,
+                bottom = 32.dp,
+                start = 32.dp,
+                end = 32.dp
+            ),
         horizontalArrangement = Arrangement.spacedBy(48.dp)
     ) {
         Column(
@@ -194,7 +242,15 @@ fun LargeTabletPlayerLayout(
                 }
                 ToggledIconButton(
                     state = showBluetoothSheet,
-                    onClick = { showBluetoothSheet = !showBluetoothSheet },
+                    onClick = { 
+                        if (!showBluetoothSheet) {
+                            // If opening bluetooth sheet, close queue first
+                            if (showQueue) {
+                                showQueue = false
+                            }
+                        }
+                        showBluetoothSheet = !showBluetoothSheet
+                    },
                     activeBackground = Color.White,
                     inactiveBackground = Color.Transparent,
                 ) {
@@ -216,13 +272,14 @@ fun LargeTabletPlayerLayout(
 
             // Target offset based on visible panels
             val artworkTargetOffsetPx = when {
-                showQueue && !showEqualizer -> -(sidePanelWidthPx / 2f + safeMarginPx)        // queue only → left
-                showEqualizer && !showQueue -> +(sidePanelWidthPx / 2f + safeMarginPx)        // equalizer only → right
+                showQueue && !showEqualizer && !showBluetoothSheet -> -(sidePanelWidthPx / 2f + safeMarginPx)        // queue only → left
+                showEqualizer && !showQueue && !showBluetoothSheet -> +(sidePanelWidthPx / 2f + safeMarginPx)        // equalizer only → right
+                showBluetoothSheet && !showQueue && !showEqualizer -> -(sidePanelWidthPx / 2f + safeMarginPx)        // bluetooth only → left
                 else -> 0f                                       // none or both → center
             }
 
             val artworkScale by animateFloatAsState(
-                targetValue = if (showQueue || showEqualizer) 0.85f else 1f,
+                targetValue = if (showQueue || showEqualizer || showBluetoothSheet) 0.85f else 1f,
                 animationSpec = spring(
                     dampingRatio = 0.8f,
                     stiffness = 300f
@@ -251,7 +308,7 @@ fun LargeTabletPlayerLayout(
                 ) {
                     GlowingArtworkContainer(
                         dominantColor = dominantColor,
-                        visualization = audioVisualization,
+                        visualization = effectiveVisualization,
                         modifier = Modifier
                             .graphicsLayer {
                                 translationX = artworkOffsetXPx
@@ -324,6 +381,47 @@ fun LargeTabletPlayerLayout(
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
+                    visible = showBluetoothSheet,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(32.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(maxArtworkHeight)
+                            .width(360.dp + 32.dp)
+                            .align(Alignment.CenterEnd)
+                    ) {
+                        BluetoothEllipticalLazyScroll(
+                            availableDevices = availableDevices,
+                            connectedDevice = connectedDevice,
+                            onDeviceClick = { device ->
+                                if (connectedDevice?.address == device.address) {
+                                    bluetoothViewModel.disconnectDevice()
+                                } else {
+                                    bluetoothViewModel.connectToDevice(device)
+                                }
+                            },
+                            maxHeight = maxArtworkHeight
+                        )
+                    }
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
                     visible = showEqualizer,
                     enter = slideInHorizontally(
                         initialOffsetX = { -it },
@@ -343,7 +441,7 @@ fun LargeTabletPlayerLayout(
                 ) {
                     EqualizerControlsComponent(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .width(360.dp)
                             .padding(top = 24.dp)
                     )
                 }
@@ -418,6 +516,30 @@ fun LargeTabletPlayerLayout(
                         Row(
                             modifier = Modifier.align(Alignment.CenterEnd),
                         ) {
+                            VisualizationControl(
+                                currentMode = visualizationMode,
+                                onModeSelected = { mode ->
+                                    when (mode) {
+                                        VisualizationMode.REAL_TIME -> {
+                                            if (!hasRecordAudioPermission) {
+                                                requestRecordAudioPermission()
+                                            }
+                                            if (!hasRecordAudioPermission) {
+                                                false
+                                            } else {
+                                                playerViewModel.setVisualizationMode(mode)
+                                                true
+                                            }
+                                        }
+                                        VisualizationMode.OFF,
+                                        VisualizationMode.SIMULATED -> {
+                                            playerViewModel.setVisualizationMode(mode)
+                                            true
+                                        }
+                                    }
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(L_PADDING * 2))
                             ToggledIconButton(
                                 state = showEqualizer,
                                 onClick = { showEqualizer = !showEqualizer },
@@ -433,7 +555,15 @@ fun LargeTabletPlayerLayout(
                             Spacer(modifier = Modifier.width(L_PADDING * 2))
                             ToggledIconButton(
                                 state = showQueue,
-                                onClick = { showQueue = !showQueue },
+                                onClick = { 
+                                    if (!showQueue) {
+                                        // If opening queue, close bluetooth sheet first
+                                        if (showBluetoothSheet) {
+                                            showBluetoothSheet = false
+                                        }
+                                    }
+                                    showQueue = !showQueue
+                                },
                                 activeBackground = Color.White,
                                 inactiveBackground = Color.Transparent,
                             ){

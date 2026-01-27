@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,9 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
 
@@ -75,6 +79,17 @@ fun PhonePlayerLayout(
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
+    val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+    // Waveform / glow visualization toggle
+    val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
+    val effectiveVisualization =
+        when (visualizationMode) {
+            VisualizationMode.OFF -> AudioVisualizationData()
+            VisualizationMode.SIMULATED,
+            VisualizationMode.REAL_TIME -> {
+                if (hasRecordAudioPermission) audioVisualization else AudioVisualizationData()
+            }
+        }
     val context = LocalContext.current
     
     // Extract dominant color from artwork
@@ -127,28 +142,28 @@ fun PhonePlayerLayout(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Box(
-            modifier = Modifier
-                .size(320.dp)
-                .graphicsLayer { clip = false },
-            contentAlignment = Alignment.Center
-        ) {
-            GlowingArtworkContainerPhone(
-                dominantColor = dominantColor,
-                visualization = audioVisualization,
+            Box(
                 modifier = Modifier
                     .size(320.dp)
-                    .padding(24.dp) // Add padding for glow to extend outward
+                    .graphicsLayer { clip = false },
+                contentAlignment = Alignment.Center
             ) {
-                AsyncImage(
-                    model = song?.artworkUrl,
-                    contentDescription = "Artwork",
+                GlowingArtworkContainerPhone(
+                    dominantColor = dominantColor,
+                    visualization = effectiveVisualization,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                )
+                        .size(320.dp)
+                        .padding(24.dp) // Add padding for glow to extend outward
+                ) {
+                    AsyncImage(
+                        model = song?.artworkUrl,
+                        contentDescription = "Artwork",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
             }
-        }
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(song?.title ?: "", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
@@ -191,6 +206,32 @@ fun PhonePlayerLayout(
             shuffle = shuffle,
             repeat = repeat,
             playerViewModel = playerViewModel
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        VisualizationControl(
+            currentMode = visualizationMode,
+            onModeSelected = { mode ->
+                when (mode) {
+                    VisualizationMode.REAL_TIME -> {
+                        if (!hasRecordAudioPermission) {
+                            requestRecordAudioPermission()
+                        }
+                        if (!hasRecordAudioPermission) {
+                            false
+                        } else {
+                            playerViewModel.setVisualizationMode(mode)
+                            true
+                        }
+                    }
+                    VisualizationMode.OFF,
+                    VisualizationMode.SIMULATED -> {
+                        playerViewModel.setVisualizationMode(mode)
+                        true
+                    }
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(12.dp))

@@ -49,6 +49,38 @@ fun rememberAudioPermissionState(): Pair<Boolean, () -> Unit> {
     return Pair(hasPermission, requestPermission)
 }
 
+/**
+ * Runtime permission helper for RECORD_AUDIO, used by the audio visualizer.
+ *
+ * Even though the visualizer only reads the currently playing audio session,
+ * Android treats it as microphone access and requires this permission on
+ * Android 6.0+ devices.
+ */
+@Composable
+fun rememberRecordAudioPermissionState(): Pair<Boolean, () -> Unit> {
+    val context = LocalContext.current
+    var hasPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasPermission = isGranted
+    }
+
+    val requestPermission: () -> Unit = {
+        launcher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    return Pair(hasPermission, requestPermission)
+}
+
 @Composable
 fun rememberBluetoothPermissionState(): Pair<Boolean, () -> Unit> {
     val context = LocalContext.current

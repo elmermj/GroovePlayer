@@ -39,6 +39,7 @@ import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.ui.GroovePlayerTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -86,6 +87,8 @@ fun GroovePlayerAppMain() {
     
     // Request notification permission on app start (Android 13+)
     val (hasNotificationPermission, requestNotificationPermission) = rememberNotificationPermissionState()
+    // Request RECORD_AUDIO permission for the visualizer
+    val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
     
     // Request notification permission on first launch
     LaunchedEffect(Unit) {
@@ -94,6 +97,17 @@ fun GroovePlayerAppMain() {
             delay(500)
             requestNotificationPermission()
         }
+        
+        // Ask for RECORD_AUDIO shortly after launch so the visualizer can use
+        // real waveform data instead of the fallback template.
+        if (!hasRecordAudioPermission) {
+            delay(800)
+            requestRecordAudioPermission()
+        }
+        
+        // Restore last played song and position
+        delay(1000) // Wait for app to initialize
+        playerViewModel.restoreLastPlayedSong()
     }
     
     // Also request when playback starts if permission not granted
@@ -103,6 +117,11 @@ fun GroovePlayerAppMain() {
             isPlaying && 
             !hasNotificationPermission) {
             requestNotificationPermission()
+        }
+        // Also request RECORD_AUDIO when playback starts if not yet granted,
+        // so users who skipped the first prompt still get real visualization.
+        if (isPlaying && !hasRecordAudioPermission) {
+            requestRecordAudioPermission()
         }
     }
 

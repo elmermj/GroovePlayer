@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,10 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
 
@@ -75,6 +80,16 @@ fun TabletPlayerLayout(
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
+    val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+    val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
+    val effectiveVisualization =
+        when (visualizationMode) {
+            VisualizationMode.OFF -> AudioVisualizationData()
+            VisualizationMode.SIMULATED,
+            VisualizationMode.REAL_TIME -> {
+                if (hasRecordAudioPermission) audioVisualization else AudioVisualizationData()
+            }
+        }
     val context = LocalContext.current
     
     // Extract dominant color from artwork
@@ -138,7 +153,7 @@ fun TabletPlayerLayout(
             ) {
                 GlowingArtworkContainerTablet(
                     dominantColor = dominantColor,
-                    visualization = audioVisualization,
+                    visualization = effectiveVisualization,
                     modifier = Modifier
                         .size(400.dp)
                         .padding(32.dp) // Add padding for glow to extend outward
@@ -208,6 +223,32 @@ fun TabletPlayerLayout(
                 shuffle = shuffle,
                 repeat = repeat,
                 playerViewModel = playerViewModel
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            VisualizationControl(
+                currentMode = visualizationMode,
+                onModeSelected = { mode ->
+                    when (mode) {
+                        VisualizationMode.REAL_TIME -> {
+                            if (!hasRecordAudioPermission) {
+                                requestRecordAudioPermission()
+                            }
+                            if (!hasRecordAudioPermission) {
+                                false
+                            } else {
+                                playerViewModel.setVisualizationMode(mode)
+                                true
+                            }
+                        }
+                        VisualizationMode.OFF,
+                        VisualizationMode.SIMULATED -> {
+                            playerViewModel.setVisualizationMode(mode)
+                            true
+                        }
+                    }
+                }
             )
 
             Spacer(modifier = Modifier.height(24.dp))

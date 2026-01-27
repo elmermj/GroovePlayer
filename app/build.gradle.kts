@@ -86,6 +86,9 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.testing)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.text)
     kapt(libs.hilt.compiler)
 
     // Room (KSP OK)

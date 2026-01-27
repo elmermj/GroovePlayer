@@ -5,5 +5,5 @@ import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import javax.inject.Inject
 
 class QueueUseCase @Inject constructor(private val repo: PlayerRepository) {
-    suspend operator fun invoke(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false) = repo.setQueue(songs, startIndex, isEndlessQueue)
+    suspend operator fun invoke(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = repo.setQueue(songs, startIndex, isEndlessQueue, autoPlay)
 }

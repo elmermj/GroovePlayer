@@ -1,17 +1,24 @@
 package com.aethelsoft.grooveplayer.presentation.home.layouts
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
+import com.aethelsoft.grooveplayer.presentation.home.ui.LastPlayedSectionComponent
 import com.aethelsoft.grooveplayer.presentation.home.ui.LibraryCardComponent
+import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 public fun PhoneHomeLayout(
     state: UiState.Success<List<Song>>,
@@ -22,12 +29,33 @@ public fun PhoneHomeLayout(
     onNavigateToFavoriteArtists: () -> Unit,
     onNavigateToFavoriteAlbums: () -> Unit,
 ) {
-    LazyVerticalGrid(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        columns = GridCells.Fixed(2),
-        modifier = Modifier.padding(top = 12.dp)
-    ) {
+    val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsState()
+    val favoriteArtists by viewModel.favoriteArtists.collectAsState()
+    val favoriteAlbums by viewModel.favoriteAlbums.collectAsState()
+    val lastPlayedSongs by viewModel.lastPlayedSongs.collectAsState()
+
+    TemplateVeritcalGridPage(columns = 2) {
+        if(lastPlayedSongs.isNotEmpty()){
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LastPlayedSectionComponent(
+                    lastPlayedSongs = lastPlayedSongs,
+                    currentSong = LocalPlayerViewModel.current?.currentSong?.collectAsState()?.value,
+                    allLibrarySongs = state.data.ifEmpty { emptyList() }
+                )
+            }
+            item(span = { GridItemSpan(maxLineSpan) }){
+                Box(
+                    modifier = Modifier
+                        .padding(top = S_PADDING, bottom = S_PADDING)
+                ){
+                    Text(
+                        text = "Discover More",
+                        style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                    )
+                }
+            }
+        }
         item {
             LibraryCardComponent(
                 title = "All Songs",
@@ -48,8 +76,8 @@ public fun PhoneHomeLayout(
         item {
             LibraryCardComponent(
                 title = "Recently Played",
-                subtitle = "Your recent tracks",
-                artworks = state.data.map { item ->
+                subtitle = if (recentlyPlayed.isNotEmpty()) "${recentlyPlayed.size} tracks" else "No recent tracks",
+                artworks = recentlyPlayed.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
                             "Unknown"
@@ -58,15 +86,15 @@ public fun PhoneHomeLayout(
                         }
                     }
                 },
-                emptyNoticeText = "No songs found",
-                onClick = onNavigateToSongs
+                emptyNoticeText = "No recent tracks",
+                onClick = onNavigateToRecentlyPlayed
             )
         }
         item {
             LibraryCardComponent(
-                title = "Favorites",
-                subtitle = "Your favorite songs",
-                artworks = state.data.map { item ->
+                title = "Favorite Tracks",
+                subtitle = if (favoriteTracks.isNotEmpty()) "${favoriteTracks.size} tracks" else "No favorites yet",
+                artworks = favoriteTracks.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
                             "Unknown"
@@ -75,8 +103,17 @@ public fun PhoneHomeLayout(
                         }
                     }
                 },
-                emptyNoticeText = "No songs found",
-                onClick = onNavigateToSongs
+                emptyNoticeText = "No favorites yet",
+                onClick = onNavigateToFavoriteTracks
+            )
+        }
+        item {
+            LibraryCardComponent(
+                title = "Favorite Artists",
+                subtitle = if (favoriteArtists.isNotEmpty()) "${favoriteArtists.size} artists" else "No favorites yet",
+                artworks = emptyList(),
+                emptyNoticeText = "No favorites yet",
+                onClick = onNavigateToFavoriteArtists
             )
         }
     }

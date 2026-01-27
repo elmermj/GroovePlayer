@@ -27,11 +27,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.util.TimeUtils.formatDuration
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
-import com.aethelsoft.grooveplayer.presentation.library.songs.ui.SongItemComponent
+import com.aethelsoft.grooveplayer.presentation.library.ui.GeneralItemComponent
+import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
@@ -209,12 +211,8 @@ private fun PhoneSongsLayout(
             val song = songs[index]
             SongItemComponent(
                 song = song,
-                onClick = {
-                    playerViewModel.setQueue(songs, index)
-                },
-                onMoreClick = {
-                    onEditSong(song)
-                }
+                onClick = { playerViewModel.setQueue(songs, index) },
+                onMoreClick = { onEditSong(song) }
             )
         }
     }
@@ -242,13 +240,8 @@ private fun TabletSongsLayout(
             val song = songs[index]
             SongItemComponent(
                 song = song,
-                onClick = {
-                    playerViewModel.setQueue(songs, index)
-                },
-                onMoreClick = {
-                    onEditSong(song)
-                },
-                padding = 16.dp
+                onClick = { playerViewModel.setQueue(songs, index) },
+                onMoreClick = { onEditSong(song) }
             )
         }
     }
@@ -277,13 +270,8 @@ private fun LargeTabletSongsLayout(
             val song = songs[index]
             SongItemComponent(
                 song = song,
-                onClick = {
-                    playerViewModel.setQueue(songs, index)
-                },
-                onMoreClick = {
-                    onEditSong(song)
-                },
-                padding = 20.dp
+                onClick = { playerViewModel.setQueue(songs, index) },
+                onMoreClick = { onEditSong(song) }
             )
         }
     }

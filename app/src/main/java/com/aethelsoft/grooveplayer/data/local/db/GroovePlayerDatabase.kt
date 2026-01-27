@@ -6,12 +6,14 @@ import androidx.room.TypeConverters
 import com.aethelsoft.grooveplayer.data.local.db.dao.AlbumDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.SearchHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserProfileDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserSettingsDao
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.SearchHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserProfileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
@@ -23,9 +25,10 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         ArtistEntity::class,
         AlbumEntity::class,
         UserProfileEntity::class,
-        UserSettingsEntity::class
+        UserSettingsEntity::class,
+        SearchHistoryEntity::class
     ],
-    version = 4,  // Incremented for new tables
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -36,5 +39,6 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
     abstract fun albumDao(): AlbumDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun userSettingsDao(): UserSettingsDao
+    abstract fun searchHistoryDao(): SearchHistoryDao
 }
 

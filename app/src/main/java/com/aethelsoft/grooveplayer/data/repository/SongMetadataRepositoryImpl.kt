@@ -40,6 +40,7 @@ class SongMetadataRepositoryImpl @Inject constructor(
         songMetadataDao.insertOrUpdate(entity)
         
         // Also update artist and album entities
+        // Ensure all artists are created
         metadata.artists.forEach { artistName ->
             val existing = artistDao.getArtist(artistName)
             if (existing == null) {
@@ -47,14 +48,21 @@ class SongMetadataRepositoryImpl @Inject constructor(
             }
         }
         
-        metadata.album?.let { albumName ->
-            val existing = albumDao.getAlbum(albumName, metadata.artists.firstOrNull() ?: "")
-            if (existing == null) {
-                albumDao.insertOrUpdate(AlbumEntity(
+        // Determine album name - if missing, create "Single - {song title}"
+        val albumName = metadata.album?.takeIf { 
+            it.isNotBlank() && it != "Unknown Album" 
+        } ?: "Single - ${metadata.title}"
+        
+        // Create/update album entity - link to primary artist
+        val primaryArtist = metadata.artists.firstOrNull() ?: "Unknown Artist"
+        val existingAlbum = albumDao.getAlbum(albumName, primaryArtist)
+        if (existingAlbum == null) {
+            albumDao.insertOrUpdate(
+                AlbumEntity(
                     name = albumName,
-                    artist = metadata.artists.firstOrNull() ?: ""
-                ))
-            }
+                    artist = primaryArtist
+                )
+            )
         }
     }
     
@@ -92,12 +100,7 @@ class SongMetadataRepositoryImpl @Inject constructor(
     
     override suspend fun getAlbum(albumName: String, artistName: String): AlbumMetadata? {
         val entity = albumDao.getAlbum(albumName, artistName) ?: return null
-        return AlbumMetadata(
-            name = entity.name,
-            artist = entity.artist,
-            artworkUrl = entity.artworkUrl,
-            year = entity.year
-        )
+        return entity.toAlbumMetadata()
     }
     
     override suspend fun saveAlbum(album: AlbumMetadata) {
@@ -126,8 +129,18 @@ class SongMetadataRepositoryImpl @Inject constructor(
         artistDao.insertOrUpdate(entity)
     }
     
-    private fun SongMetadataEntity.toDomain(): SongMetadata {
-        return SongMetadata(
+    override suspend fun getLatestAlbumByArtist(artistName: String): AlbumMetadata? {
+        val entity = albumDao.getLatestAlbumByArtist(artistName) ?: return null
+        return AlbumMetadata(
+            name = entity.name,
+            artist = entity.artist,
+            artworkUrl = entity.artworkUrl,
+            year = entity.year
+        )
+    }
+    
+    private fun SongMetadataEntity.toDomain(): SongMetadata =
+        SongMetadata(
             songId = songId,
             title = title,
             genres = genres.split(",").filter { it.isNotBlank() },
@@ -136,6 +149,13 @@ class SongMetadataRepositoryImpl @Inject constructor(
             year = year,
             useAlbumYear = useAlbumYear
         )
-    }
+
+    private fun AlbumEntity.toAlbumMetadata(): AlbumMetadata =
+        AlbumMetadata(
+            name = name,
+            artist = artist,
+            artworkUrl = artworkUrl,
+            year = year
+        )
 }
 

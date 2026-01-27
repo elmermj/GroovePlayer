@@ -6,6 +6,7 @@ interface MusicRepository {
     suspend fun getAllSongs(): List<Song>
     suspend fun getSongsByArtist(artist: String): List<Song>
     suspend fun getSongsByAlbum(album: String): List<Song>
+    suspend fun searchSongs(query: String): List<Song>
 }
 
 

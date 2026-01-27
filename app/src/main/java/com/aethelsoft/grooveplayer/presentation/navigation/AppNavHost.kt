@@ -9,15 +9,20 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.aethelsoft.grooveplayer.presentation.home.HomeScreen
+import com.aethelsoft.grooveplayer.presentation.library.albums.AlbumDetailScreen
+import com.aethelsoft.grooveplayer.presentation.library.artists.ArtistDetailScreen
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteAlbumsScreen
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteArtistsScreen
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteTracksScreen
 import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
+import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 
 /**
  * Main navigation host for the app.
@@ -91,7 +96,10 @@ fun AppNavHost(
                 onNavigateToRecentlyPlayed = { navController.navigate(AppRoutes.RECENTLY_PLAYED) },
                 onNavigateToFavoriteTracks = { navController.navigate(AppRoutes.FAVORITE_TRACKS) },
                 onNavigateToFavoriteArtists = { navController.navigate(AppRoutes.FAVORITE_ARTISTS) },
-                onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) }
+                onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) },
+                onNavigateToSearch = { query ->
+                    navController.navigate(AppRoutes.searchRoute(query))
+                }
             )
         }
         composable(
@@ -219,7 +227,10 @@ fun AppNavHost(
             }
         ) {
             FavoriteArtistsScreen(
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onArtistClick = { artistId ->
+                    navController.navigate(AppRoutes.artistDetailRoute(artistId))
+                }
             )
         }
         composable(
@@ -250,6 +261,118 @@ fun AppNavHost(
             }
         ) {
             FavoriteAlbumsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onAlbumClick = { albumId ->
+                    navController.navigate(AppRoutes.albumDetailRoute(albumId))
+                }
+            )
+        }
+        composable(
+            route = AppRoutes.ALBUM_DETAIL,
+            arguments = listOf(
+                navArgument("albumId") { type = NavType.StringType }
+            ),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            }
+        ) { backStackEntry ->
+            val rawAlbumId = backStackEntry.arguments?.getString("albumId") ?: ""
+            val albumId = android.net.Uri.decode(rawAlbumId)
+            AlbumDetailScreen(
+                albumId = albumId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = AppRoutes.ARTIST_DETAIL,
+            arguments = listOf(
+                navArgument("artistId") { type = NavType.StringType }
+            ),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            }
+        ) { backStackEntry ->
+            val artistId = backStackEntry.arguments?.getString("artistId") ?: ""
+            ArtistDetailScreen(
+                artistId = artistId,
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = AppRoutes.SEARCH,
+            arguments = listOf(
+                navArgument("query") { type = NavType.StringType; defaultValue = "" }
+            ),
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            }
+        ) { backStackEntry ->
+            val query = backStackEntry.arguments?.getString("query") ?: ""
+            SearchScreen(
+                query = query,
                 onNavigateBack = { navController.popBackStack() }
             )
         }

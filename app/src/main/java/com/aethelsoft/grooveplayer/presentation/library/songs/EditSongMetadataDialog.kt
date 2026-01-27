@@ -181,12 +181,32 @@ fun EditSongMetadataDialog(
                             onClick = {
                                 coroutineScope.launch {
                                     viewModel.saveMetadata()
-                                    onSave(song.copy(
-                                        title = uiState.title,
-                                        artist = uiState.artists.firstOrNull() ?: song.artist,
-                                        genre = uiState.genres.firstOrNull() ?: song.genre,
-                                        album = uiState.album
-                                    ))
+                                    val newAlbum = uiState.album?.let { newName ->
+                                        val existing = song.album
+                                        if (existing != null) {
+                                            existing.copy(id = com.aethelsoft.grooveplayer.domain.model.makeAlbumId(existing.artist, newName), name = newName)
+                                        } else {
+                                            com.aethelsoft.grooveplayer.domain.model.Album(
+                                                id = com.aethelsoft.grooveplayer.domain.model.makeAlbumId(
+                                                    uiState.artists.firstOrNull() ?: song.artist,
+                                                    newName
+                                                ),
+                                                name = newName,
+                                                artist = uiState.artists.firstOrNull() ?: song.artist,
+                                                artworkUrl = song.artworkUrl,
+                                                songs = emptyList(),
+                                                year = uiState.year ?: song.year
+                                            )
+                                        }
+                                    }
+                                    onSave(
+                                        song.copy(
+                                            title = uiState.title,
+                                            artist = uiState.artists.firstOrNull() ?: song.artist,
+                                            genre = uiState.genres.firstOrNull() ?: song.genre,
+                                            album = newAlbum
+                                        )
+                                    )
                                     onDismiss()
                                 }
                             }

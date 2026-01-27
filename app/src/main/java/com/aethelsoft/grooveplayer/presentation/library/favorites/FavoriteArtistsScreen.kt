@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.library.favorites
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,7 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 @Composable
 fun FavoriteArtistsScreen(
     onNavigateBack: () -> Unit,
+    onArtistClick: (String) -> Unit,
     viewModel: FavoriteArtistsViewModel = hiltViewModel()
 ) {
     val favoriteArtists = viewModel.favoriteArtists.collectAsState(
@@ -72,7 +74,9 @@ fun FavoriteArtistsScreen(
                     key = { artist -> artist.artist }
                 ) { artist ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onArtistClick(artist.artist) },
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                     ) {
                         Row(

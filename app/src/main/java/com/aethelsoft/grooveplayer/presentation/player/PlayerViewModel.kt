@@ -15,11 +15,14 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.PlaySongUseCas
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.PreviousSongUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.QueueUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SeekUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
+import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -37,7 +40,9 @@ class PlayerViewModel @Inject constructor(
     private val controlsUseCase: ControlsUseCase,
     private val setVolumeUseCase: SetVolumeUseCase,
     private val setFullScreenPlayerOpenUseCase: SetFullScreenPlayerOpenUseCase,
-    private val setMuteUseCase: SetMuteUseCase
+    private val setMuteUseCase: SetMuteUseCase,
+    private val getSongsUseCase: GetSongsUseCase,
+    private val userRepository: UserRepository
 ) : AndroidViewModel(application) {
 
     val currentSong: StateFlow<Song?> = observePlayerStateUseCase.observeCurrentSong().stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -56,11 +61,19 @@ class PlayerViewModel @Inject constructor(
     val audioVisualization: StateFlow<AudioVisualizationData> = observePlayerStateUseCase.observeAudioVisualization().stateIn(
         viewModelScope, SharingStarted.Eagerly, AudioVisualizationData()
     )
+    val visualizationMode: StateFlow<com.aethelsoft.grooveplayer.domain.model.VisualizationMode> =
+        userRepository.observeUserSettings()
+            .map { it.visualizationMode }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                com.aethelsoft.grooveplayer.domain.model.VisualizationMode.SIMULATED
+            )
 
 
 
-    fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false) = viewModelScope.launch {
-        queueUseCase(songs, startIndex, isEndlessQueue)
+    fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = viewModelScope.launch {
+        queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
     }
 
     fun setQueueFromLastPlayedSongs(songs: List<Song>, startSongId: String) = viewModelScope.launch {
@@ -92,4 +105,60 @@ class PlayerViewModel @Inject constructor(
         setFullScreenPlayerOpenUseCase.setFullScreenPlayerOpen(isOpen = isOpen)
     }
     fun setMute(mute: Boolean) = viewModelScope.launch { setMuteUseCase.setMute(mute) }
+    
+    fun stop() = viewModelScope.launch {
+        // Stop playback completely: pause and clear queue
+        playPauseUseCase.pause()
+        queueUseCase(emptyList(), 0, false, false)
+    }
+    
+    fun setVisualizationMode(mode: com.aethelsoft.grooveplayer.domain.model.VisualizationMode) =
+        viewModelScope.launch {
+            userRepository.updateVisualizationMode(mode)
+        }
+    
+    fun restoreLastPlayedSong() = viewModelScope.launch {
+        try {
+            val settings = userRepository.getUserSettings()
+            if (settings.lastPlayedSongId != null && settings.lastPlayedPosition > 0) {
+                val allSongs = getSongsUseCase()
+                
+                // Restore queue if available
+                val queueSongs = if (settings.queueSongIds.isNotEmpty()) {
+                    settings.queueSongIds.mapNotNull { songId ->
+                        allSongs.find { it.id == songId }
+                    }
+                } else {
+                    // Fallback to just the last played song
+                    val lastPlayedSong = allSongs.find { it.id == settings.lastPlayedSongId }
+                    if (lastPlayedSong != null) listOf(lastPlayedSong) else emptyList()
+                }
+                
+                if (queueSongs.isNotEmpty()) {
+                    // Restore queue without auto-playing
+                    setQueue(
+                        songs = queueSongs,
+                        startIndex = settings.queueStartIndex.coerceIn(0, queueSongs.lastIndex),
+                        isEndlessQueue = settings.isEndlessQueue,
+                        autoPlay = false // Don't auto-play on restore
+                    )
+                    
+                    // Restore shuffle and repeat
+                    setShuffle(settings.shuffleEnabled)
+                    val repeatMode = try {
+                        com.aethelsoft.grooveplayer.domain.model.RepeatMode.valueOf(settings.repeatMode)
+                    } catch (e: Exception) {
+                        com.aethelsoft.grooveplayer.domain.model.RepeatMode.OFF
+                    }
+                    setRepeat(repeatMode)
+                    
+                    // Seek to the saved position after a short delay to ensure player is ready
+                    kotlinx.coroutines.delay(500)
+                    seekTo(settings.lastPlayedPosition)
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "Error restoring last played song: ${e.message}", e)
+        }
+    }
 }

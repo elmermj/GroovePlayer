@@ -6,7 +6,7 @@ import com.aethelsoft.grooveplayer.domain.model.Song
 import kotlinx.coroutines.flow.Flow
 
 interface PlayerRepository {
-    suspend fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false)
+    suspend fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true)
     suspend fun play()
     suspend fun pause()
     suspend fun playSong(song: Song)

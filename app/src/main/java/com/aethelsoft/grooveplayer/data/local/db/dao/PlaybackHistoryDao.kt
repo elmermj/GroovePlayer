@@ -60,10 +60,15 @@ interface PlaybackHistoryDao {
     ): Flow<List<FavoriteArtistResult>>
     
     @Query("""
-        SELECT album, artist, COUNT(*) as playCount
-        FROM playback_history
-        WHERE playedAt >= :sinceTimestamp
-        GROUP BY album, artist
+        SELECT 
+            ph.album, 
+            ph.artist, 
+            COALESCE(MAX(a.artworkUrl), MAX(ph.artworkUrl)) as artworkUrl,
+            COUNT(*) as playCount
+        FROM playback_history ph
+        LEFT JOIN albums a ON a.name = ph.album AND a.artist = ph.artist
+        WHERE ph.playedAt >= :sinceTimestamp
+        GROUP BY ph.album, ph.artist
         ORDER BY playCount DESC
         LIMIT :limit
     """)
@@ -126,6 +131,7 @@ data class FavoriteArtistResult(
 data class FavoriteAlbumResult(
     val album: String,
     val artist: String,
+    val artworkUrl: String?,
     val playCount: Int
 )
 
