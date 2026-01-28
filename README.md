@@ -364,7 +364,7 @@ GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The
 
 **Copyright (c) 2025-2026 Elmer Matthew Japara. All Rights Reserved.**
 
-This project is proprietary software protected by copyright law under the Berne Convention, the laws of the Republic of Indonesia, the laws of the United States of America, and international copyright treaties.
+This project is proprietary software protected by copyright law under the Berne Convention and international copyright treaties.
 
 Unauthorized copying, modification, distribution, or use of this software, via any medium, is strictly prohibited without the express written permission of the copyright holder.
 
