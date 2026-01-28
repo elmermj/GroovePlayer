@@ -1,8 +1,20 @@
 package com.aethelsoft.grooveplayer.presentation.player.ui
 
+import XCheckCircle
 import android.graphics.RuntimeShader
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,8 +25,13 @@ import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,7 +46,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.fontscaling.MathUtils.lerp
+import androidx.compose.ui.util.lerp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.shader.ELLIPSE_SHADER
@@ -53,17 +70,58 @@ fun BluetoothEllipticalLazyScroll(
     connectedDevice: BluetoothDevice?,
     onDeviceClick: (BluetoothDevice) -> Unit,
     maxHeight: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    connectingDeviceAddress: String? = null,
+    connectionSuccessDisplay: Boolean = false,
+    connectionFailedDisplay: Boolean = false,
+    hasBluetoothPermissions: Boolean = true,
+    onRequestBluetoothPermission: () -> Unit = {}
 ) {
     val density = LocalDensity.current
 
     /* ───── SHADER SCALE ───── */
     val shaderScale = remember { Animatable(0f) }
+    val colorMix = remember { Animatable(0f) }
+    val colorMixFail = remember { Animatable(0f) }
     var isInteracting by remember { mutableStateOf(false) }
     var hitLimit by remember { mutableStateOf(false) }
 
+    val isConnecting = connectingDeviceAddress != null
+    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    val shaderPulse = if (isConnecting) pulse else 1f
+
     LaunchedEffect(Unit) {
         shaderScale.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+    }
+
+    LaunchedEffect(connectionSuccessDisplay) {
+        if (connectionSuccessDisplay) {
+            colorMixFail.snapTo(0f)
+            colorMix.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+            delay(1000)
+            colorMix.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
+        } else {
+            colorMix.snapTo(0f)
+        }
+    }
+
+    LaunchedEffect(connectionFailedDisplay) {
+        if (connectionFailedDisplay) {
+            colorMix.snapTo(0f)
+            colorMixFail.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
+            delay(1000)
+            colorMixFail.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
+        } else {
+            colorMixFail.snapTo(0f)
+        }
     }
 
     /* ───── ELLIPSE GEOMETRY ───── */
@@ -130,6 +188,50 @@ fun BluetoothEllipticalLazyScroll(
         }
     }
 
+    /* ───── PERMISSION UI ───── */
+    if (!hasBluetoothPermissions) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.12f)),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .padding(24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        "Bluetooth access required",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                    Text(
+                        "Grant Bluetooth permission to scan and connect to audio devices.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Button(
+                        onClick = onRequestBluetoothPermission,
+                        shape = RoundedCornerShape(100.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text("Grant access")
+                    }
+                }
+            }
+        }
+        return
+    }
+
     /* ───── UI ───── */
     Box(
         modifier = modifier
@@ -147,8 +249,91 @@ fun BluetoothEllipticalLazyScroll(
             p = p,
             q = q,
             shaderScale = shaderScale.value,
+            pulse = shaderPulse,
+            colorMix = colorMix.value,
+            colorMixFail = colorMixFail.value,
             modifier = Modifier.matchParentSize()
         )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 48.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            AnimatedVisibility(
+                visible = connectionSuccessDisplay,
+                enter = fadeIn(animationSpec = tween(200)) +
+                        slideInVertically(
+                            initialOffsetY = { it / 4 },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ),
+                exit = fadeOut(animationSpec = tween(300)) +
+                        slideOutVertically(
+                            targetOffsetY = { it / 4 },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        )
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20).copy(alpha = 0.9f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            XCheckCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            "BT connection successful",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+            AnimatedVisibility(
+                visible = connectionFailedDisplay,
+                enter = fadeIn(animationSpec = tween(200)) +
+                        slideInVertically(
+                            initialOffsetY = { it / 4 },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        ),
+                exit = fadeOut(animationSpec = tween(300)) +
+                        slideOutVertically(
+                            targetOffsetY = { it / 4 },
+                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                        )
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFB71C1C).copy(alpha = 0.9f)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            XClose,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            "BT connection failed",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
 
         availableDevices.forEachIndexed { index, device ->
             val virtualIndex = index - scrollOffset
@@ -169,9 +354,12 @@ fun BluetoothEllipticalLazyScroll(
                 maxX = centerXPx
             )
 
+            val isConnectingThis = connectingDeviceAddress == device.address
+
             BluetoothDeviceCircle(
                 device = device,
                 isConnected = connectedDevice?.address == device.address,
+                isConnecting = isConnectingThis,
                 onClick = { onDeviceClick(device) },
                 modifier = Modifier
                     .offset(
@@ -194,15 +382,25 @@ fun BluetoothEllipticalLazyScroll(
 private fun BluetoothDeviceCircle(
     device: BluetoothDevice,
     isConnected: Boolean,
+    isConnecting: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val type = detectBluetoothDeviceType(device.name)
+    val pulseAlpha by rememberInfiniteTransition(label = "circlePulse").animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "circlePulse"
+    )
 
     Column(
         modifier = modifier
             .size(80.dp)
-            .clickable(onClick = onClick),
+            .clickable(enabled = !isConnecting, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -210,14 +408,19 @@ private fun BluetoothDeviceCircle(
                 .size(56.dp)
                 .clip(CircleShape)
                 .background(
-                    if (isConnected)
-                        Color.White.copy(alpha = 0.95f)
-                    else
-                        Color.White.copy(alpha = 0.7f)
+                    when {
+                        isConnected -> Color.White.copy(alpha = 0.95f)
+                        isConnecting -> Color.White.copy(alpha = 0.5f + pulseAlpha * 0.25f)
+                        else -> Color.White.copy(alpha = 0.7f)
+                    }
                 )
                 .border(
-                    width = if (isConnected) 2.dp else 1.dp,
-                    color = Color.White,
+                    width = when {
+                        isConnected -> 2.dp
+                        isConnecting -> 2.dp
+                        else -> 1.dp
+                    },
+                    color = if (isConnecting) Color.White.copy(alpha = pulseAlpha) else Color.White,
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -225,7 +428,11 @@ private fun BluetoothDeviceCircle(
             Icon(
                 imageVector = bluetoothIconFor(type),
                 contentDescription = device.name,
-                tint = if (isConnected) Color(0xFF2196F3) else Color(0xFF1A1A1A),
+                tint = when {
+                    isConnected -> Color(0xFF2196F3)
+                    isConnecting -> Color(0xFF2196F3).copy(alpha = pulseAlpha)
+                    else -> Color(0xFF1A1A1A)
+                },
                 modifier = Modifier.size(28.dp)
             )
         }
@@ -233,7 +440,10 @@ private fun BluetoothDeviceCircle(
         Spacer(Modifier.height(4.dp))
 
         RunningText(
-            text = device.name,
+            text = when {
+                isConnecting -> "Connecting…"
+                else -> device.name
+            },
             maxChars = 14,
             style = MaterialTheme.typography.labelSmall,
             color = Color.White,
@@ -328,16 +538,12 @@ private fun DrawScope.drawLeftHalfEllipseGradient(
     drawIntoCanvas { canvas ->
         canvas.save()
 
-        // 1️⃣ Move origin to center
         canvas.translate(center.x, center.y)
 
-        // 2️⃣ Scale Y ONLY (ellipse → circle in math space)
         canvas.scale(1f, scaleY)
 
-        // 3️⃣ Move back
         canvas.translate(-center.x, -center.y)
 
-        // 4️⃣ Clip AFTER scaling (IMPORTANT)
         val path = Path().apply {
             moveTo(center.x, center.y)
             arcTo(
@@ -356,7 +562,6 @@ private fun DrawScope.drawLeftHalfEllipseGradient(
 
         canvas.clipPath(path)
 
-        // 5️⃣ Draw TRUE radial gradient (now elliptical in screen space)
         drawCircle(
             brush = Brush.radialGradient(
                 colors = listOf(
@@ -374,6 +579,102 @@ private fun DrawScope.drawLeftHalfEllipseGradient(
             radius = radiusX
         )
 
+        canvas.restore()
+    }
+}
+
+/**
+ * Canvas-only fallback for API 24–32. Draws the left-half ellipse glow with [pulse] scale,
+ * [colorMix] (0 = blue, 1 = green), and [colorMixFail] (0 = normal, 1 = red) for connection failed.
+ */
+private fun DrawScope.drawLeftHalfEllipseGradientFallback(
+    center: Offset,
+    radiusX: Float,
+    radiusY: Float,
+    p: Float,
+    q: Float,
+    shaderScale: Float,
+    pulse: Float,
+    colorMix: Float,
+    colorMixFail: Float
+) {
+    val effRadiusX = radiusX * p * shaderScale * pulse
+    val effRadiusY = radiusY * q * shaderScale * pulse
+    val scaleY = effRadiusY / effRadiusX
+
+    val blueColors = listOf(
+        Color.Transparent,
+        Color(0xFF5BA3D0).copy(alpha = 0.25f),
+        Color(0xFF87CEEB).copy(alpha = 0.55f),
+        Color(0xFF5BA3D0).copy(alpha = 0.45f),
+        Color(0xFF2E7DB5).copy(alpha = 0.30f),
+        Color.Transparent
+    )
+    val greenColors = listOf(
+        Color.Transparent,
+        Color(0xFF38C059).copy(alpha = 0.25f),
+        Color(0xFF59D973).copy(alpha = 0.55f),
+        Color(0xFF38C059).copy(alpha = 0.45f),
+        Color(0xFF1F8C47).copy(alpha = 0.30f),
+        Color.Transparent
+    )
+    val redColors = listOf(
+        Color.Transparent,
+        Color(0xFFB71C1C).copy(alpha = 0.25f),
+        Color(0xFFE53935).copy(alpha = 0.55f),
+        Color(0xFFC62828).copy(alpha = 0.45f),
+        Color(0xFFB71C1C).copy(alpha = 0.30f),
+        Color.Transparent
+    )
+    val baseColors = blueColors.zip(greenColors) { b, g ->
+        Color(
+            red = lerp(b.red, g.red, colorMix),
+            green = lerp(b.green, g.green, colorMix),
+            blue = lerp(b.blue, g.blue, colorMix),
+            alpha = lerp(b.alpha, g.alpha, colorMix)
+        )
+    }
+    val colors = baseColors.zip(redColors) { base, r ->
+        Color(
+            red = lerp(base.red, r.red, colorMixFail),
+            green = lerp(base.green, r.green, colorMixFail),
+            blue = lerp(base.blue, r.blue, colorMixFail),
+            alpha = lerp(base.alpha, r.alpha, colorMixFail)
+        )
+    }
+
+    drawIntoCanvas { canvas ->
+        canvas.save()
+        canvas.translate(center.x, center.y)
+        canvas.scale(1f, scaleY)
+        canvas.translate(-center.x, -center.y)
+
+        val path = Path().apply {
+            moveTo(center.x, center.y)
+            arcTo(
+                Rect(
+                    center.x - effRadiusX,
+                    center.y - effRadiusX,
+                    center.x + effRadiusX,
+                    center.y + effRadiusX
+                ),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false
+            )
+            close()
+        }
+        canvas.clipPath(path)
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = colors,
+                center = center,
+                radius = effRadiusX
+            ),
+            center = center,
+            radius = effRadiusX
+        )
         canvas.restore()
     }
 }
@@ -397,7 +698,54 @@ fun EllipticalGradientBackground(
     p: Float,
     q: Float,
     modifier: Modifier = Modifier,
-    shaderScale: Float
+    shaderScale: Float,
+    pulse: Float = 1f,
+    colorMix: Float = 0f,
+    colorMixFail: Float = 0f
+) {
+    if (Build.VERSION.SDK_INT >= 33) {
+        EllipticalGradientBackgroundShader(
+            center = center,
+            radiusX = radiusX,
+            radiusY = radiusY,
+            p = p,
+            q = q,
+            modifier = modifier,
+            shaderScale = shaderScale,
+            pulse = pulse,
+            colorMix = colorMix,
+            colorMixFail = colorMixFail
+        )
+    } else {
+        Canvas(modifier = modifier.fillMaxSize()) {
+            drawLeftHalfEllipseGradientFallback(
+                center = center,
+                radiusX = radiusX,
+                radiusY = radiusY,
+                p = p,
+                q = q,
+                shaderScale = shaderScale,
+                pulse = pulse,
+                colorMix = colorMix,
+                colorMixFail = colorMixFail
+            )
+        }
+    }
+}
+
+@Composable
+@RequiresApi(33)
+private fun EllipticalGradientBackgroundShader(
+    center: Offset,
+    radiusX: Float,
+    radiusY: Float,
+    p: Float,
+    q: Float,
+    modifier: Modifier,
+    shaderScale: Float,
+    pulse: Float,
+    colorMix: Float,
+    colorMixFail: Float
 ) {
     val shader = remember {
         RuntimeShader(ELLIPSE_SHADER)
@@ -411,6 +759,9 @@ fun EllipticalGradientBackground(
         shader.setFloatUniform("p", p)
         shader.setFloatUniform("q", q)
         shader.setFloatUniform("scale", shaderScale)
+        shader.setFloatUniform("pulse", pulse)
+        shader.setFloatUniform("colorMix", colorMix)
+        shader.setFloatUniform("failMix", colorMixFail)
 
         drawRect(
             brush = ShaderBrush(shader),

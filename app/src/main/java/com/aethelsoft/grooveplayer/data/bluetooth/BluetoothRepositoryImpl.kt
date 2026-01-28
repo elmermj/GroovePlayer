@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.data.bluetooth
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothA2dp
 import android.bluetooth.BluetoothClass
 import android.bluetooth.BluetoothHeadset
 import android.bluetooth.BluetoothProfile
@@ -32,6 +33,7 @@ import javax.inject.Singleton
 import android.bluetooth.BluetoothDevice as AndroidBluetoothDevice
 import android.bluetooth.BluetoothManager as AndroidBluetoothManager
 
+
 @Singleton
 class BluetoothRepositoryImpl @Inject constructor(
     private val context: Context
@@ -58,12 +60,13 @@ class BluetoothRepositoryImpl @Inject constructor(
     private var bluetoothProfileServiceListener: BluetoothProfile.ServiceListener? = null
     private var scanReceiver: BroadcastReceiver? = null
     private var connectionReceiver: BroadcastReceiver? = null
+    private var pendingConnectionAddress: String? = null // Track device we're trying to connect to
 
     init {
         Log.d(TAG, "BluetoothRepositoryImpl initializing...")
         setupBluetoothProfile()
         registerReceivers()
-        checkCurrentConnection()
+        if (hasBluetoothPermissions()) checkCurrentConnection()
         Log.d(TAG, "BluetoothRepositoryImpl initialized")
     }
 
@@ -77,10 +80,16 @@ class BluetoothRepositoryImpl @Inject constructor(
     override fun observeIsScanning(): Flow<Boolean> = _isScanning.asStateFlow()
 
     override fun observeConnectedDevice(): Flow<BluetoothDevice?> =
-        _connectedDevice.map { it?.let { BluetoothDeviceMapper.toDomain(it) } }
+        _connectedDevice.asStateFlow().map { it?.let { BluetoothDeviceMapper.toDomain(it) } }
 
-    override fun isBluetoothEnabled(): Boolean =
-        bluetoothAdapter?.isEnabled == true
+    override fun isBluetoothEnabled(): Boolean {
+        if (!hasBluetoothPermissions() || bluetoothAdapter == null) return false
+        return try {
+            bluetoothAdapter.isEnabled
+        } catch (_: SecurityException) {
+            false
+        }
+    }
 
     override fun isBluetoothSupported(): Boolean =
         bluetoothAdapter != null
@@ -179,7 +188,7 @@ class BluetoothRepositoryImpl @Inject constructor(
                 Log.d(TAG, "Cancelling existing discovery")
                 bluetoothAdapter.cancelDiscovery()
                 // Wait a bit for cancellation to complete
-                kotlinx.coroutines.delay(500)
+                delay(500)
             }
             val discoveryStarted = bluetoothAdapter.startDiscovery()
             Log.d(TAG, "startDiscovery() called, returned: $discoveryStarted")
@@ -238,13 +247,13 @@ class BluetoothRepositoryImpl @Inject constructor(
     // ------------------------------------------------------------------------
     // Receivers
     // ------------------------------------------------------------------------
-
     private fun registerReceivers() {
         scanReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 Log.d(TAG, "ScanReceiver received action: ${intent.action}")
                 when (intent.action) {
                     AndroidBluetoothDevice.ACTION_FOUND -> {
+                        if (!hasBluetoothPermissions()) return
                         val device =
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 intent.getParcelableExtra(
@@ -261,17 +270,15 @@ class BluetoothRepositoryImpl @Inject constructor(
                             return
                         }
 
-                        // Log ALL discovered devices first, before filtering
-                        logDiscoveredDevice(device, intent)
-                        devicesFoundDuringDiscovery++
-
-                        // Then filter and add only audio devices
-                        if (!isAudioDevice(device)) {
-                            Log.d(TAG, "Skipping non-audio device: ${device.address} (${device.name})")
-                            return
-                        }
-
-                        addDiscoveredDevice(device, intent)
+                        try {
+                            logDiscoveredDevice(device, intent)
+                            devicesFoundDuringDiscovery++
+                            if (!isAudioDevice(device)) {
+                                Log.d(TAG, "Skipping non-audio device: ${device.address} (${device.name})")
+                                return
+                            }
+                            addDiscoveredDevice(device, intent)
+                        } catch (_: SecurityException) { }
                     }
 
                     BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
@@ -299,39 +306,150 @@ class BluetoothRepositoryImpl @Inject constructor(
 
         connectionReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                when (intent.action) {
-                    "android.bluetooth_category.a2dp.profile.action.CONNECTION_STATE_CHANGED" -> {
-                        val state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
-                        val device =
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                intent.getParcelableExtra(
-                                    AndroidBluetoothDevice.EXTRA_DEVICE,
-                                    AndroidBluetoothDevice::class.java
-                                )
-                            } else {
-                                @Suppress("DEPRECATION")
-                                intent.getParcelableExtra(AndroidBluetoothDevice.EXTRA_DEVICE)
-                            }
+                if (!hasBluetoothPermissions()) return
+                try {
+                    when (intent.action) {
+                        BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED -> {
+                            val state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, -1)
+                            val device =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    intent.getParcelableExtra(
+                                        AndroidBluetoothDevice.EXTRA_DEVICE,
+                                        AndroidBluetoothDevice::class.java
+                                    )
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    intent.getParcelableExtra(AndroidBluetoothDevice.EXTRA_DEVICE)
+                                }
 
-                        when (state) {
-                            BluetoothProfile.STATE_CONNECTED ->
-                                device?.let { handleDeviceConnected(it) }
+                            Log.d(TAG, "ACTION_CONNECTION_STATE_CHANGED: state=$state, device=${device?.address}")
 
-                            BluetoothProfile.STATE_DISCONNECTED ->
-                                device?.let {
-                                    if (_connectedDevice.value?.address == it.address) {
-                                        handleDeviceDisconnected()
+                            when (state) {
+                                BluetoothProfile.STATE_CONNECTED -> {
+                                    device?.let { 
+                                        Log.d(TAG, "A2DP connection established: ${it.address} (${it.name})")
+                                        handleDeviceConnected(it) 
+                                    } ?: run {
+                                        // Device is null but state is connected - check current connection
+                                        Log.d(TAG, "A2DP connected but device is null, checking current connection")
+                                        checkCurrentConnection()
                                     }
                                 }
-                        }
-                    }
 
-                    BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED -> {
-                        val state = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, -1)
-                        if (state == BluetoothProfile.STATE_CONNECTED) {
-                            checkCurrentConnection()
+                                BluetoothProfile.STATE_DISCONNECTED -> {
+                                    device?.let {
+                                        Log.d(TAG, "A2DP disconnection broadcast: ${it.address}")
+                                        if (_connectedDevice.value?.address == it.address) {
+                                            Log.d(TAG, "Disconnected device matches tracked device, calling handleDeviceDisconnected()")
+                                            handleDeviceDisconnected()
+                                        } else {
+                                            // Device disconnected but wasn't tracked - refresh state
+                                            Log.d(TAG, "Disconnected device ${it.address} doesn't match tracked device ${_connectedDevice.value?.address}, checking current connection")
+                                            checkCurrentConnection()
+                                        }
+                                    } ?: run {
+                                        // Device is null but state is disconnected - check current connection
+                                        Log.d(TAG, "A2DP disconnected but device is null, checking current connection")
+                                        checkCurrentConnection()
+                                    }
+                                }
+                                
+                                BluetoothProfile.STATE_CONNECTING -> {
+                                    Log.d(TAG, "A2DP connecting: ${device?.address}")
+                                }
+                                
+                                BluetoothProfile.STATE_DISCONNECTING -> {
+                                    Log.d(TAG, "A2DP disconnecting: ${device?.address}")
+                                }
+                            }
+                        }
+
+                        BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED -> {
+                            val state = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, -1)
+                            if (state == BluetoothProfile.STATE_CONNECTED) {
+                                checkCurrentConnection()
+                            }
+                        }
+
+                        AndroidBluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
+                            val device =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    intent.getParcelableExtra(
+                                        AndroidBluetoothDevice.EXTRA_DEVICE,
+                                        AndroidBluetoothDevice::class.java
+                                    )
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    intent.getParcelableExtra(AndroidBluetoothDevice.EXTRA_DEVICE)
+                                }
+                            val bondState = intent.getIntExtra(AndroidBluetoothDevice.EXTRA_BOND_STATE, -1)
+                            val previousBondState = intent.getIntExtra(AndroidBluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1)
+
+                            device?.let { d ->
+                                Log.d(TAG, "ACTION_BOND_STATE_CHANGED: ${d.address}, state=$bondState (prev=$previousBondState)")
+                                
+                                when (bondState) {
+                                    AndroidBluetoothDevice.BOND_BONDED -> {
+                                        // Bonding completed successfully
+                                        if (d.address == pendingConnectionAddress) {
+                                            Log.d(TAG, "Bonding completed for ${d.address}, attempting A2DP connection")
+                                            pendingConnectionAddress = null
+                                            attemptA2dpConnection(d)
+                                        }
+                                    }
+                                    AndroidBluetoothDevice.BOND_NONE -> {
+                                        // Bonding failed or was removed
+                                        if (d.address == pendingConnectionAddress && previousBondState == AndroidBluetoothDevice.BOND_BONDING) {
+                                            Log.w(TAG, "Bonding failed for ${d.address}")
+                                            pendingConnectionAddress = null
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        AndroidBluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                            val device =
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    intent.getParcelableExtra(
+                                        AndroidBluetoothDevice.EXTRA_DEVICE,
+                                        AndroidBluetoothDevice::class.java
+                                    )
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    intent.getParcelableExtra(AndroidBluetoothDevice.EXTRA_DEVICE)
+                                }
+                            val pairingVariant = intent.getIntExtra(AndroidBluetoothDevice.EXTRA_PAIRING_VARIANT, -1)
+                            
+                            device?.let { d ->
+                                Log.d(TAG, "ACTION_PAIRING_REQUEST: ${d.address}, variant=$pairingVariant")
+                                // For most devices, Android handles pairing automatically
+                                // Some devices may require PIN entry, let the system handle it
+                                // If needed, set PIN here: d.setPin(...) or d.setPairingConfirmation(true)
+                            }
+                        }
+
+                        BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                            val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1)
+                            Log.d(TAG, "Bluetooth adapter state changed: $state")
+                            when (state) {
+                                BluetoothAdapter.STATE_ON -> {
+                                    Log.d(TAG, "Bluetooth turned ON, checking current connection")
+                                    // When Bluetooth is turned on, check for existing connections
+                                    checkCurrentConnection()
+                                }
+                                BluetoothAdapter.STATE_OFF -> {
+                                    Log.d(TAG, "Bluetooth turned OFF, clearing connection state")
+                                    _connectedDevice.value = null
+                                    _isScanning.value = false
+                                }
+                            }
                         }
                     }
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "SecurityException in connectionReceiver: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception in connectionReceiver: ${e.message}", e)
                 }
             }
         }
@@ -343,8 +461,11 @@ class BluetoothRepositoryImpl @Inject constructor(
         }
 
         val connectionFilter = IntentFilter().apply {
-            addAction("android.bluetooth_category.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+            addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)
             addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)
+            addAction(AndroidBluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(AndroidBluetoothDevice.ACTION_PAIRING_REQUEST)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED) // Listen for Bluetooth on/off
         }
 
         try {
@@ -372,7 +493,12 @@ class BluetoothRepositoryImpl @Inject constructor(
                 context.registerReceiver(scanReceiver, scanFilter)
 
                 @Suppress("DEPRECATION")
-                context.registerReceiver(connectionReceiver, connectionFilter)
+                ContextCompat.registerReceiver(
+                    context,
+                    connectionReceiver,
+                    connectionFilter,
+                    ContextCompat.RECEIVER_NOT_EXPORTED
+                )
                 val actions = listOf(
                     AndroidBluetoothDevice.ACTION_FOUND,
                     BluetoothAdapter.ACTION_DISCOVERY_FINISHED,
@@ -428,25 +554,22 @@ class BluetoothRepositoryImpl @Inject constructor(
     // ------------------------------------------------------------------------
 
     private fun isAudioDevice(device: AndroidBluetoothDevice): Boolean {
-        val btClass = device.bluetoothClass ?: return false
-
-        // Audio output devices (headphones, speakers, car audio)
-        if (btClass.hasService(BluetoothClass.Service.RENDER)) {
-            return true
+        if (!hasBluetoothPermissions()) return false
+        return try {
+            val btClass = device.bluetoothClass ?: return false
+            if (btClass.hasService(BluetoothClass.Service.RENDER)) return true
+            if (btClass.hasService(BluetoothClass.Service.CAPTURE)) return true
+            Log.d(
+                TAG,
+                "AudioCheck addr=${device.address} " +
+                        "render=${btClass.hasService(BluetoothClass.Service.RENDER)} " +
+                        "capture=${btClass.hasService(BluetoothClass.Service.CAPTURE)} " +
+                        "major=${btClass.majorDeviceClass}"
+            )
+            false
+        } catch (_: SecurityException) {
+            false
         }
-
-        // Audio input devices (headsets with mic)
-        if (btClass.hasService(BluetoothClass.Service.CAPTURE)) {
-            return true
-        }
-        Log.d(
-            TAG,
-            "AudioCheck addr=${device.address} " +
-                    "render=${btClass.hasService(BluetoothClass.Service.RENDER)} " +
-                    "capture=${btClass.hasService(BluetoothClass.Service.CAPTURE)} " +
-                    "major=${btClass.majorDeviceClass}"
-        )
-        return false
     }
 
     // ------------------------------------------------------------------------
@@ -455,52 +578,52 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     private fun addDiscoveredDevice(device: AndroidBluetoothDevice, intent: Intent) {
         if (!hasBluetoothPermissions()) return
-
-        val advertisedName = intent.getStringExtra(AndroidBluetoothDevice.EXTRA_NAME)
-
-        val resolvedName = when {
-            !advertisedName.isNullOrBlank() -> advertisedName
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                    !device.alias.isNullOrBlank() -> device.alias
-            !device.name.isNullOrBlank() -> device.name
-            else -> "Unknown Device"
-        }
-
-        val deviceInfo = BluetoothDeviceData(
-            name = if(resolvedName.isNullOrEmpty()) "Unknown Device" else resolvedName,
-            address = device.address,
-            isConnected = device.address == _connectedDevice.value?.address,
-            device = device
-        )
-
-        val list = _availableDevices.value.toMutableList()
-        if (list.none { it.address == device.address }) {
-            list.add(deviceInfo)
-            // Deduplicate after adding to handle TWS earbuds
-            val connectedAddress = _connectedDevice.value?.address
-            val deduplicated = deduplicateDevicesByName(list, connectedAddress)
-            _availableDevices.value = deduplicated
-        }
+        try {
+            val advertisedName = intent.getStringExtra(AndroidBluetoothDevice.EXTRA_NAME)
+            val resolvedName = when {
+                !advertisedName.isNullOrBlank() -> advertisedName
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                        !device.alias.isNullOrBlank() -> device.alias
+                !device.name.isNullOrBlank() -> device.name
+                else -> "Unknown Device"
+            }
+            val deviceInfo = BluetoothDeviceData(
+                name = if (resolvedName.isNullOrEmpty()) "Unknown Device" else resolvedName,
+                address = device.address,
+                isConnected = device.address == _connectedDevice.value?.address,
+                device = device
+            )
+            val list = _availableDevices.value.toMutableList()
+            if (list.none { it.address == device.address }) {
+                list.add(deviceInfo)
+                val connectedAddress = _connectedDevice.value?.address
+                val deduplicated = deduplicateDevicesByName(list, connectedAddress)
+                _availableDevices.value = deduplicated
+            }
+        } catch (_: SecurityException) { }
     }
 
     private fun logDiscoveredDevice(device: AndroidBluetoothDevice, intent: Intent) {
-        Log.d(
-            TAG,
-            """
-            ───── Bluetooth Audio Device Found ─────
-            Address       : ${device.address}
-            Name          : ${device.name}
-            Alias         : ${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) device.alias else null}
-            Advertised    : ${intent.getStringExtra(AndroidBluetoothDevice.EXTRA_NAME)}
-            RSSI          : ${intent.getShortExtra(AndroidBluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)}
-            Bond State    : ${device.bondState}
-            Device Class  : ${device.bluetoothClass?.deviceClass}
-            Major Class   : ${device.bluetoothClass?.majorDeviceClass}
-            Type          : ${device.type}
-            UUIDs         : ${device.uuids?.joinToString()}
-            ────────────────────────────────────────
-            """.trimIndent()
-        )
+        if (!hasBluetoothPermissions()) return
+        try {
+            Log.d(
+                TAG,
+                """
+                ───── Bluetooth Audio Device Found ─────
+                Address       : ${device.address}
+                Name          : ${device.name}
+                Alias         : ${if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) device.alias else null}
+                Advertised    : ${intent.getStringExtra(AndroidBluetoothDevice.EXTRA_NAME)}
+                RSSI          : ${intent.getShortExtra(AndroidBluetoothDevice.EXTRA_RSSI, Short.MIN_VALUE)}
+                Bond State    : ${device.bondState}
+                Device Class  : ${device.bluetoothClass?.deviceClass}
+                Major Class   : ${device.bluetoothClass?.majorDeviceClass}
+                Type          : ${device.type}
+                UUIDs         : ${device.uuids?.joinToString()}
+                ────────────────────────────────────────
+                """.trimIndent()
+            )
+        } catch (_: SecurityException) { }
     }
 
     // ------------------------------------------------------------------------
@@ -513,63 +636,151 @@ class BluetoothRepositoryImpl @Inject constructor(
         bluetoothProfileServiceListener = object : BluetoothProfile.ServiceListener {
             override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
                 when (profile) {
-                    BluetoothProfile.A2DP -> bluetoothA2dp = proxy
+                    BluetoothProfile.A2DP -> {
+                        bluetoothA2dp = proxy
+                        Log.d(TAG, "A2DP profile proxy connected")
+                        checkCurrentConnection()
+                        // If we have a pending connection, attempt it now
+                        pendingConnectionAddress?.let { address ->
+                            try {
+                                val device = bluetoothAdapter?.bondedDevices?.firstOrNull { it.address == address }
+                                device?.let { attemptA2dpConnection(it) }
+                            } catch (e: SecurityException) {
+                                Log.e(TAG, "SecurityException getting device for pending connection: ${e.message}")
+                            }
+                        }
+                    }
                     BluetoothProfile.HEADSET -> bluetoothHeadset = proxy as BluetoothHeadset
                 }
-                checkCurrentConnection()
             }
 
             override fun onServiceDisconnected(profile: Int) {
                 if (profile == BluetoothProfile.A2DP) {
+                    Log.d(TAG, "A2DP profile proxy disconnected")
                     bluetoothA2dp = null
                     _connectedDevice.value = null
                 }
             }
         }
 
-        bluetoothAdapter.getProfileProxy(context, bluetoothProfileServiceListener, BluetoothProfile.A2DP)
-        bluetoothAdapter.getProfileProxy(context, bluetoothProfileServiceListener, BluetoothProfile.HEADSET)
+        try {
+            bluetoothAdapter.getProfileProxy(context, bluetoothProfileServiceListener, BluetoothProfile.A2DP)
+            bluetoothAdapter.getProfileProxy(context, bluetoothProfileServiceListener, BluetoothProfile.HEADSET)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException setting up Bluetooth profiles: ${e.message}")
+        }
     }
 
     private fun checkCurrentConnection() {
-        bluetoothA2dp?.connectedDevices?.firstOrNull()?.let {
-            _connectedDevice.value = BluetoothDeviceData(
-                name = it.name ?: "Unknown Device",
-                address = it.address,
-                isConnected = true,
-                device = it
-            )
+        if (!hasBluetoothPermissions()) return
+        try {
+            val connected = bluetoothA2dp?.connectedDevices?.firstOrNull()
+            if (connected != null) {
+                val connectedData = BluetoothDeviceData(
+                    name = connected.name ?: "Unknown Device",
+                    address = connected.address,
+                    isConnected = true,
+                    device = connected
+                )
+                _connectedDevice.value = connectedData
+                
+                // Update available devices list to mark this device as connected
+                val list = _availableDevices.value.toMutableList()
+                val index = list.indexOfFirst { it.address == connected.address }
+                if (index >= 0) {
+                    list[index] = connectedData
+                } else {
+                    // Device not in list, add it
+                    list.add(connectedData)
+                }
+                _availableDevices.value = list
+                Log.d(TAG, "checkCurrentConnection: Found connected device ${connected.address} (${connected.name})")
+            } else {
+                // No device connected - clear connected device and update available devices
+                val previousConnected = _connectedDevice.value
+                _connectedDevice.value = null
+                
+                if (previousConnected != null) {
+                    // Update available devices to mark previous device as disconnected
+                    val list = _availableDevices.value.toMutableList()
+                    val index = list.indexOfFirst { it.address == previousConnected.address }
+                    if (index >= 0) {
+                        list[index] = list[index].copy(isConnected = false)
+                        _availableDevices.value = list
+                    }
+                    Log.d(TAG, "checkCurrentConnection: No device connected (was ${previousConnected.address})")
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException in checkCurrentConnection: ${e.message}")
+            _connectedDevice.value = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in checkCurrentConnection: ${e.message}", e)
+            _connectedDevice.value = null
         }
+    }
+
+    override suspend fun refreshConnectionState() {
+        Log.d(TAG, "refreshConnectionState() called")
+        if (!hasBluetoothPermissions()) {
+            Log.w(TAG, "refreshConnectionState: no permissions")
+            return
+        }
+        checkCurrentConnection()
     }
 
     private fun handleDeviceConnected(device: AndroidBluetoothDevice) {
-        val deviceName = device.name ?: "Unknown Device"
-
-        val connectedData = BluetoothDeviceData(
-            name = deviceName,
-            address = device.address,
-            isConnected = true,
-            device = device
-        )
-
-        val list = _availableDevices.value.toMutableList()
-        val index = list.indexOfFirst { it.address == device.address }
-
-        if (index >= 0) {
-            // Update existing entry
-            list[index] = connectedData
-        } else {
-            // Edge case: device connected without being scanned
-            list.add(connectedData)
+        if (!hasBluetoothPermissions()) {
+            Log.w(TAG, "handleDeviceConnected: no permissions")
+            return
         }
-
-        _availableDevices.value = list
-        _connectedDevice.value = connectedData
+        try {
+            val deviceName = device.name ?: "Unknown Device"
+            val connectedData = BluetoothDeviceData(
+                name = deviceName,
+                address = device.address,
+                isConnected = true,
+                device = device
+            )
+            Log.d(TAG, "handleDeviceConnected: Setting connected device to ${device.address} (${deviceName})")
+            
+            val list = _availableDevices.value.toMutableList()
+            val index = list.indexOfFirst { it.address == device.address }
+            if (index >= 0) {
+                list[index] = connectedData
+            } else {
+                list.add(connectedData)
+            }
+            _availableDevices.value = list
+            
+            // Update connected device - this should trigger the flow
+            val previousConnected = _connectedDevice.value
+            _connectedDevice.value = connectedData
+            Log.d(TAG, "handleDeviceConnected: Updated _connectedDevice from ${previousConnected?.address} to ${connectedData.address}")
+            
+            // Stop scanning when device successfully connects
+            if (_isScanning.value) {
+                Log.d(TAG, "Device connected, stopping scan")
+                CoroutineScope(Dispatchers.IO).launch {
+                    stopScanning()
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException in handleDeviceConnected: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in handleDeviceConnected: ${e.message}", e)
+        }
     }
 
     private fun handleDeviceDisconnected() {
-        val connected = _connectedDevice.value ?: return
+        val connected = _connectedDevice.value
+        if (connected == null) {
+            Log.d(TAG, "handleDeviceDisconnected: No device was connected")
+            return
+        }
 
+        Log.d(TAG, "handleDeviceDisconnected: Disconnecting device ${connected.address} (${connected.name})")
+        
         val list = _availableDevices.value.toMutableList()
         val index = list.indexOfFirst { it.address == connected.address }
 
@@ -578,51 +789,165 @@ class BluetoothRepositoryImpl @Inject constructor(
         }
 
         _availableDevices.value = list
+        
+        // Update connected device - this should trigger the flow
+        val previousConnected = _connectedDevice.value
         _connectedDevice.value = null
+        Log.d(TAG, "handleDeviceDisconnected: Updated _connectedDevice from ${previousConnected?.address} to null")
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override suspend fun connectToDevice(device: BluetoothDevice) {
-        if (!hasBluetoothPermissions()) return
+        if (!hasBluetoothPermissions() || bluetoothAdapter == null) return
 
-        val deviceData =
-            _availableDevices.value.firstOrNull { it.address == device.address }
-                ?: return
-
-        val androidDevice = deviceData.device
-
-        try {
-            when (androidDevice?.bondState) {
-                AndroidBluetoothDevice.BOND_NONE -> {
-                    // Trigger pairing
-                    androidDevice.createBond()
+        val deviceData = _availableDevices.value.firstOrNull { it.address == device.address }
+            ?: run {
+                // Device not in list (e.g. from another screen); try bonded by address
+                val bonded = try {
+                    bluetoothAdapter!!.bondedDevices.firstOrNull { it.address == device.address }
+                } catch (_: SecurityException) {
+                    null
                 }
-
-                AndroidBluetoothDevice.BOND_BONDED -> {
-                    // Try A2DP connect (reflection on Android 11+)
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && bluetoothA2dp != null) {
-                        try {
-                            val connectMethod =
-                                bluetoothA2dp!!::class.java.getMethod(
-                                    "connect",
-                                    AndroidBluetoothDevice::class.java
-                                )
-                            connectMethod.invoke(bluetoothA2dp, androidDevice)
-                        } catch (_: Exception) {
-                            // System may auto-connect
-                        }
-                    }
+                if (bonded != null) {
+                    BluetoothDeviceData(
+                        name = device.name,
+                        address = device.address,
+                        isConnected = false,
+                        device = bonded
+                    )
+                } else {
+                    Log.w(TAG, "connectToDevice: device not found in available or bonded list: ${device.address}")
+                    return
                 }
             }
-        } catch (_: SecurityException) {
+
+        val androidDevice = deviceData.device
+            ?: try {
+                bluetoothAdapter.bondedDevices.firstOrNull { it.address == device.address }
+            } catch (_: SecurityException) {
+                null
+            }
+            ?: run {
+                Log.w(TAG, "connectToDevice: no Android device for ${device.address}")
+                return
+            }
+
+        try {
+            when (androidDevice.bondState) {
+                AndroidBluetoothDevice.BOND_NONE -> {
+                    Log.d(TAG, "connectToDevice: device not bonded, starting bonding for ${androidDevice.address}")
+                    pendingConnectionAddress = androidDevice.address
+                    val bondResult = androidDevice.createBond()
+                    Log.d(TAG, "createBond() returned: $bondResult")
+                    if (!bondResult) {
+                        Log.w(TAG, "createBond() failed for ${androidDevice.address}")
+                        pendingConnectionAddress = null
+                    }
+                }
+                AndroidBluetoothDevice.BOND_BONDING -> {
+                    // Pairing in progress; connection will be attempted after ACTION_BOND_STATE_CHANGED
+                    Log.d(TAG, "connectToDevice: bonding in progress for ${androidDevice.address}, waiting for completion")
+                    pendingConnectionAddress = androidDevice.address
+                }
+                AndroidBluetoothDevice.BOND_BONDED -> {
+                    Log.d(TAG, "connectToDevice: device already bonded, attempting A2DP connection for ${androidDevice.address}")
+                    pendingConnectionAddress = null
+                    attemptA2dpConnection(androidDevice)
+                }
+            }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException in connectToDevice: ${e.message}")
+            pendingConnectionAddress = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in connectToDevice: ${e.message}", e)
+            pendingConnectionAddress = null
+        }
+    }
+
+    /**
+     * Attempts to connect to a device via A2DP profile.
+     * This is called after bonding completes or if device is already bonded.
+     */
+    private fun attemptA2dpConnection(androidDevice: AndroidBluetoothDevice) {
+        if (!hasBluetoothPermissions()) {
+            Log.w(TAG, "attemptA2dpConnection: no permissions")
+            return
+        }
+        
+        if (bluetoothA2dp == null) {
+            Log.w(TAG, "attemptA2dpConnection: A2DP proxy not ready, will retry when proxy connects")
+            // Store pending connection - will be attempted when proxy is ready
+            pendingConnectionAddress = androidDevice.address
+            return
+        }
+
+        try {
+            // Use reflection to call connect() (hidden API on all Android versions)
+            val connectMethod = bluetoothA2dp!!::class.java.getMethod(
+                "connect",
+                AndroidBluetoothDevice::class.java
+            )
+            val result = connectMethod.invoke(bluetoothA2dp, androidDevice)
+            Log.d(TAG, "A2DP connect() called for ${androidDevice.address}, result: $result")
+            
+            // After calling connect(), check connection state periodically
+            // Sometimes the broadcast doesn't fire immediately or at all
+            CoroutineScope(Dispatchers.IO).launch {
+                // Wait a bit first - connection might be immediate
+                delay(1000)
+                
+                var attempts = 0
+                val maxAttempts = 18 // Check for up to 9 more seconds (18 * 500ms) after initial 1s delay
+                while (attempts < maxAttempts) {
+                    // Check if device is now connected
+                    try {
+                        val connected = bluetoothA2dp?.connectedDevices?.firstOrNull { 
+                            it.address == androidDevice.address 
+                        }
+                        if (connected != null) {
+                            Log.d(TAG, "Device ${androidDevice.address} is now connected (checked after ${1000 + attempts * 500}ms)")
+                            handleDeviceConnected(connected)
+                            return@launch
+                        }
+                    } catch (e: SecurityException) {
+                        Log.e(TAG, "SecurityException checking connection state: ${e.message}")
+                        break
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Exception checking connection state: ${e.message}")
+                        break
+                    }
+                    
+                    delay(500)
+                    attempts++
+                }
+                if (attempts >= maxAttempts) {
+                    Log.d(TAG, "Stopped checking connection state for ${androidDevice.address} after ${1000 + maxAttempts * 500}ms - connection may have failed or broadcast will handle it")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to call A2DP connect() for ${androidDevice.address}: ${e.message}", e)
+            // On some devices, the system may auto-connect
         }
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override suspend fun disconnectDevice() {
-        if (!hasBluetoothPermissions()) return
+        if (!hasBluetoothPermissions()) {
+            Log.w(TAG, "disconnectDevice: no permissions")
+            return
+        }
 
-        val androidDevice = _connectedDevice.value?.device ?: return
+        // Clear any pending connection
+        pendingConnectionAddress = null
+
+        val androidDevice = _connectedDevice.value?.device
+        if (androidDevice == null) {
+            Log.d(TAG, "disconnectDevice: No device connected, clearing state anyway")
+            handleDeviceDisconnected()
+            return
+        }
+
+        Log.d(TAG, "disconnectDevice: Disconnecting ${androidDevice.address}")
 
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && bluetoothA2dp != null) {
@@ -632,20 +957,78 @@ class BluetoothRepositoryImpl @Inject constructor(
                             "disconnect",
                             AndroidBluetoothDevice::class.java
                         )
-                    disconnectMethod.invoke(bluetoothA2dp, androidDevice)
-                } catch (_: Exception) {
+                    val result = disconnectMethod.invoke(bluetoothA2dp, androidDevice)
+                    Log.d(TAG, "A2DP disconnect() called for ${androidDevice.address}, result: $result")
+                    
+                    // After calling disconnect(), check connection state periodically
+                    // Sometimes the broadcast doesn't fire immediately or at all
+                    CoroutineScope(Dispatchers.IO).launch {
+                        // Wait a bit first - disconnection might be immediate
+                        delay(500)
+                        
+                        var attempts = 0
+                        val maxAttempts = 10 // Check for up to 5 seconds (10 * 500ms) after initial 500ms delay
+                        while (attempts < maxAttempts) {
+                            // Check if device is now disconnected
+                            try {
+                                val stillConnected = bluetoothA2dp?.connectedDevices?.firstOrNull { 
+                                    it.address == androidDevice.address 
+                                }
+                                if (stillConnected == null) {
+                                    Log.d(TAG, "Device ${androidDevice.address} is now disconnected (checked after ${500 + attempts * 500}ms)")
+                                    handleDeviceDisconnected()
+                                    return@launch
+                                }
+                            } catch (e: SecurityException) {
+                                Log.e(TAG, "SecurityException checking disconnection state: ${e.message}")
+                                break
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Exception checking disconnection state: ${e.message}")
+                                break
+                            }
+                            
+                            delay(500)
+                            attempts++
+                        }
+                        if (attempts >= maxAttempts) {
+                            Log.d(TAG, "Stopped checking disconnection state for ${androidDevice.address} after ${500 + maxAttempts * 500}ms - checking current connection")
+                            // Final check - if no device is connected, update state
+                            checkCurrentConnection()
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to call A2DP disconnect(), handling as disconnected: ${e.message}")
                     handleDeviceDisconnected()
                 }
             } else {
                 handleDeviceDisconnected()
             }
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SecurityException in disconnectDevice: ${e.message}")
             handleDeviceDisconnected()
         }
     }
 
-    fun cleanup() {
-        scanReceiver?.let { context.unregisterReceiver(it) }
-        connectionReceiver?.let { context.unregisterReceiver(it) }
+    override fun cleanup() {
+        try {
+            scanReceiver?.let { context.unregisterReceiver(it) }
+            scanReceiver = null
+        } catch (_: Exception) { /* already unregistered */ }
+        try {
+            connectionReceiver?.let { context.unregisterReceiver(it) }
+            connectionReceiver = null
+        } catch (_: Exception) { /* already unregistered */ }
+        try {
+            bluetoothA2dp?.let { proxy ->
+                bluetoothAdapter?.closeProfileProxy(BluetoothProfile.A2DP, proxy)
+            }
+        } catch (_: SecurityException) { }
+        bluetoothA2dp = null
+        try {
+            bluetoothHeadset?.let { proxy ->
+                bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HEADSET, proxy)
+            }
+        } catch (_: SecurityException) { }
+        bluetoothHeadset = null
     }
 }

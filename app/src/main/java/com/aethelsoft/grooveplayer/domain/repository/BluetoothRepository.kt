@@ -58,4 +58,16 @@ interface BluetoothRepository {
      * Disconnects from the currently connected device
      */
     suspend fun disconnectDevice()
+
+    /**
+     * Refreshes the current connection state by checking A2DP profile.
+     * Useful for detecting connections made through Android settings or other apps.
+     */
+    suspend fun refreshConnectionState()
+
+    /**
+     * Unregisters receivers and releases Bluetooth profile proxies.
+     * Call when the repository is no longer needed (e.g. app process stopping).
+     */
+    fun cleanup()
 }

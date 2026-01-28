@@ -2,7 +2,9 @@ package com.aethelsoft.grooveplayer.data.local.mediastore
 
 import android.content.ContentUris
 import android.content.Context
+import android.os.Build
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import com.aethelsoft.grooveplayer.data.local.mediastore.model.MediaStoreSongData
 import com.aethelsoft.grooveplayer.data.mapper.SongMapper
 import com.aethelsoft.grooveplayer.domain.model.Song
@@ -58,6 +60,7 @@ class MediaStoreRepository @Inject constructor(
      * Internal method to fetch songs from MediaStore.
      * Returns data layer models (MediaStoreSongData).
      */
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun fetchSongsFromMediaStore(): List<MediaStoreSongData> {
         val songs = mutableListOf<MediaStoreSongData>()
         val projection = arrayOf(

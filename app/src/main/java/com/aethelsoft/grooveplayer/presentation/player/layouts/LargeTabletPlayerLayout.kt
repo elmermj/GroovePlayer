@@ -103,6 +103,7 @@ import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.WaveformUtils
+import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
@@ -151,10 +152,14 @@ fun LargeTabletPlayerLayout(
     
     // Bluetooth ViewModel
     val bluetoothViewModel: com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel = hiltViewModel()
+    val (hasBluetoothPermissions, requestBluetoothPermissions) = rememberBluetoothPermissionState()
     val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
     val isScanning by bluetoothViewModel.isScanning.collectAsState()
     val connectedDevice by bluetoothViewModel.connectedDevice.collectAsState()
-    
+    val connectingDeviceAddress by bluetoothViewModel.connectingDeviceAddress.collectAsState()
+    val connectionSuccessDisplay by bluetoothViewModel.connectionSuccessDisplay.collectAsState()
+    val connectionFailedDisplay by bluetoothViewModel.connectionFailedDisplay.collectAsState()
+
     // Ensure showBluetoothSheet and showQueue are never true at the same time
     LaunchedEffect(showBluetoothSheet, showQueue) {
         if (showBluetoothSheet && showQueue) {
@@ -165,10 +170,10 @@ fun LargeTabletPlayerLayout(
     }
     
     // Auto-start scanning when Bluetooth sheet is opened
-    LaunchedEffect(showBluetoothSheet) {
-        if (showBluetoothSheet && 
-            bluetoothViewModel.isBluetoothEnabled() && 
-            bluetoothViewModel.hasBluetoothPermissions() &&
+    LaunchedEffect(showBluetoothSheet, hasBluetoothPermissions) {
+        if (showBluetoothSheet &&
+            hasBluetoothPermissions &&
+            bluetoothViewModel.isBluetoothEnabled() &&
             !isScanning &&
             availableDevices.isEmpty()) {
             bluetoothViewModel.startScanning()
@@ -416,7 +421,12 @@ fun LargeTabletPlayerLayout(
                                     bluetoothViewModel.connectToDevice(device)
                                 }
                             },
-                            maxHeight = maxArtworkHeight
+                            maxHeight = maxArtworkHeight,
+                            connectingDeviceAddress = connectingDeviceAddress,
+                            connectionSuccessDisplay = connectionSuccessDisplay,
+                            connectionFailedDisplay = connectionFailedDisplay,
+                            hasBluetoothPermissions = hasBluetoothPermissions,
+                            onRequestBluetoothPermission = requestBluetoothPermissions
                         )
                     }
                 }
