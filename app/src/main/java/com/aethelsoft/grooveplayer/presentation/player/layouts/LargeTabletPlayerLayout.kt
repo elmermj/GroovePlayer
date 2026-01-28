@@ -94,7 +94,6 @@ import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
-import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothRadialComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
@@ -111,10 +110,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
-import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
-import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

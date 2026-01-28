@@ -22,6 +22,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -49,11 +50,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
 import com.aethelsoft.grooveplayer.presentation.player.BTConnectionState
+import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.shader.ELLIPSE_SHADER
@@ -465,13 +469,13 @@ private fun BluetoothDeviceCircle(
 
     Column(
         modifier = modifier
-            .size(80.dp)
+            .size(120.dp)
             .clickable(enabled = !isConnecting, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
+                .size(72.dp)
                 .clip(CircleShape)
                 .background(
                     when {
@@ -499,21 +503,23 @@ private fun BluetoothDeviceCircle(
                     isConnecting -> Color(0xFF2196F3).copy(alpha = pulseAlpha)
                     else -> Color(0xFF1A1A1A)
                 },
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(36.dp)
             )
         }
 
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(S_PADDING))
 
         RunningText(
             text = when {
                 isConnecting -> "Connecting…"
                 else -> device.name
             },
-            maxChars = 14,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-            modifier = Modifier.width(80.dp)
+            textStyle = MaterialTheme.typography.labelSmall.copy(
+                color = Color.White,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier.width(80.dp).basicMarquee()
         )
     }
 }
