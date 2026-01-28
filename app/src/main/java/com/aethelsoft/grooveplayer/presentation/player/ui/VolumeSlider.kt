@@ -89,23 +89,22 @@ fun VolumeSlider(
     ) {
         val sliderWidth = if (maxWidth < 180.dp) maxWidth * 0.2f else 180.dp
         val iconSize = 24.dp
-        val expandedIconSize = iconSize * 1.25f // 25% larger
-        
-        // Animate icon size based on interaction
+        val expandedIconSize = iconSize * 1.25f
+
         val animatedIconSize by animateDpAsState(
             targetValue = if (isInteracting) expandedIconSize else iconSize,
             animationSpec = tween(durationMillis = 150),
             label = "iconSize"
         )
-        
-        // Animate icon horizontal position: right side when not interacting, center of SLIDER when interacting
+
+        val adjustedSliderWidth = sliderWidth - 12.dp - animatedIconSize
         val iconPositionX by animateDpAsState(
             targetValue = if (isInteracting) {
                 // Center of the SLIDER (not the container)
-                sliderWidth / 2f - animatedIconSize / 2f
+                adjustedSliderWidth / 2f - animatedIconSize / 2f
             } else {
                 // Right side of the slider
-                sliderWidth + 12.dp
+                sliderWidth - animatedIconSize
             },
             animationSpec = tween(durationMillis = 150),
             label = "iconPositionX"
@@ -113,7 +112,6 @@ fun VolumeSlider(
 
         // Slider row
         Row(
-            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
@@ -121,7 +119,7 @@ fun VolumeSlider(
                 CustomSlider(
                     value = volume,
                     onValueChange = { playerViewModel.setVolume(it) },
-                    modifier = Modifier.width(sliderWidth),
+                    modifier = Modifier.width(adjustedSliderWidth),
                     valueRange = 0f..1f,
                     height = 4.dp,
                     activeColor =  if(volume > 0.85f) volumeWarningColor else Color.White,
@@ -134,9 +132,9 @@ fun VolumeSlider(
 
         val shadowPositionX by animateDpAsState(
             targetValue = if (isInteracting) {
-                sliderWidth / 2f - animatedIconSize * 8f
+                adjustedSliderWidth / 2f - animatedIconSize * 8f
             } else {
-                sliderWidth + 12.dp
+                adjustedSliderWidth + 12.dp
             },
             animationSpec = tween(durationMillis = 150),
             label = "shadowPositionX"

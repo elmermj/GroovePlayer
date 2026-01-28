@@ -323,9 +323,12 @@ private fun TabletMiniPlayerBarContent(
                             Spacer(modifier = Modifier.width(56.dp))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
-                        Box(modifier = Modifier.width(180.dp)) {
+                        Box(
+                            modifier = Modifier.width(180.dp)
+                        ) {
                             VolumeSlider(
                                 playerViewModel = playerViewModel,
+                                modifier = Modifier.width(222.dp),
                                 backgroundColor = bg,
                             )
                         }

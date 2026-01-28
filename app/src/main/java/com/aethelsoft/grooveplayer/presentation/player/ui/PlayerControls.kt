@@ -9,7 +9,9 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPause
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPlay
 import com.aethelsoft.grooveplayer.utils.theme.icons.XRepeatAll
@@ -54,10 +57,14 @@ fun PlayerControls(
             )
         }
 
+        Spacer(modifier = Modifier.width(M_PADDING))
+
         // Previous
         IconButton(onClick = { playerViewModel.previous() }) {
             Icon(XSkipBack, contentDescription = "Previous")
         }
+
+        Spacer(modifier = Modifier.width(M_PADDING))
 
         // Play / Pause
         ToggledIconButton(
@@ -71,10 +78,14 @@ fun PlayerControls(
             }
         }
 
+        Spacer(modifier = Modifier.width(M_PADDING))
+
         // Next
         IconButton(onClick = { playerViewModel.next() }) {
             Icon(XSkipForward, contentDescription = "Next")
         }
+
+        Spacer(modifier = Modifier.width(M_PADDING))
 
         // Repeat (Enum)
         ToggledIconButton(

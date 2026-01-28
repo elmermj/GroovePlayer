@@ -532,7 +532,7 @@ fun LargeTabletPlayerLayout(
                             playerViewModel = playerViewModel,
                             modifier = Modifier
                                 .align(alignment = Alignment.CenterStart)
-                                .fillMaxWidth(),
+                                .width(180.dp),
                             backgroundColor = bg,
                         )
                         PlayerControls(

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -203,11 +204,16 @@ fun PhonePlayerLayout(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        VolumeSlider(
-            playerViewModel = playerViewModel,
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color.Black
-        )
+            contentAlignment = Alignment.Center
+        ) {
+            VolumeSlider(
+                playerViewModel = playerViewModel,
+                modifier = Modifier.width(180.dp),
+                backgroundColor = Color.Black
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
