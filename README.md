@@ -12,7 +12,7 @@ A modern, high-performance music player for Android built with Jetpack Compose, 
 - **Media Session Integration**: Full Media3 session support for lock screen and notification controls
 
 ### Audio Features
-- **10-Band Equalizer**: Real-time audio equalization with custom presets (Normal, Pop, Rock, Jazz, Classic, Dance, Electronic, Hip-Hop)
+- **5-Band Equalizer**: Real-time audio equalization with custom presets (Normal, Pop, Rock, Jazz, Classic, Dance, Electronic, Hip-Hop)
 - **Audio Visualization**: Real-time waveform visualization with multiple modes
 - **Beat Detection**: Advanced beat detection algorithm for visual effects
 - **Stereo Balance**: Visual representation of stereo audio balance
