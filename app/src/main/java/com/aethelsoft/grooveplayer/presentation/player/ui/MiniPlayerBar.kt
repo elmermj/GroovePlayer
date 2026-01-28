@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,15 +36,21 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
+import com.aethelsoft.grooveplayer.domain.model.RepeatMode
+import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPause
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPlay
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
@@ -54,6 +61,8 @@ fun MiniPlayerBar(
     onMiniPlayerClicked: () -> Unit
 ) {
     val playerViewModel = rememberPlayerViewModel()
+    val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    val connectedBtDevice by bluetoothViewModel.connectedDevice.collectAsState()
     val song by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val shuffle by playerViewModel.shuffle.collectAsState()
@@ -64,6 +73,8 @@ fun MiniPlayerBar(
     var showBluetoothSheet by remember { mutableStateOf(false) }
 
     if (song == null) return
+
+    fun connectedBtIcon() = BluetoothHelpers.connectedBtIconFromName(connectedBtDevice?.name)
 
     val targetColor = genreColor(song?.genre)
     val bg by animateColorAsState(targetColor)
@@ -96,9 +107,10 @@ fun MiniPlayerBar(
                 bg = bg,
                 playerViewModel = playerViewModel,
                 navigationBarPadding = navigationBarPadding,
-                showBluetoothIcon = deviceType == DeviceType.TABLET || deviceType == DeviceType.LARGE_TABLET,
+                showBluetoothIcon = true,
                 onShowBluetoothSheet = { showBluetoothSheet = true },
-                onMiniPlayerClicked = onMiniPlayerClicked
+                onMiniPlayerClicked = onMiniPlayerClicked,
+                bluetoothViewModel = bluetoothViewModel
             )
         }
     }
@@ -106,17 +118,17 @@ fun MiniPlayerBar(
 
 @Composable
 private fun PhoneMiniPlayerBarContent(
-    song: com.aethelsoft.grooveplayer.domain.model.Song,
+    song: Song,
     isPlaying: Boolean,
     pos: Long,
     dur: Long,
-    playerViewModel: com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel,
-    navigationBarPadding: androidx.compose.ui.unit.Dp,
+    playerViewModel: PlayerViewModel,
+    navigationBarPadding: Dp,
     onMiniPlayerClicked: () -> Unit
 ) {
     // Swipe gesture state for phone layout
-    var dragOffsetX by remember { mutableStateOf(0f) }
-    var dragOffsetY by remember { mutableStateOf(0f) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
     val swipeThreshold = 100f
     
     Box(
@@ -235,16 +247,17 @@ private fun PhoneMiniPlayerBarContent(
 
 @Composable
 private fun TabletMiniPlayerBarContent(
-    song: com.aethelsoft.grooveplayer.domain.model.Song,
+    song: Song,
     isPlaying: Boolean,
     shuffle: Boolean,
-    repeat: com.aethelsoft.grooveplayer.domain.model.RepeatMode,
+    repeat: RepeatMode,
     pos: Long,
     dur: Long,
     bg: Color,
-    playerViewModel: com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel,
-    navigationBarPadding: androidx.compose.ui.unit.Dp,
+    playerViewModel: PlayerViewModel,
+    navigationBarPadding: Dp,
     showBluetoothIcon: Boolean,
+    bluetoothViewModel: BluetoothViewModel,
     onShowBluetoothSheet: () -> Unit,
     onMiniPlayerClicked: () -> Unit
 ) {
@@ -300,7 +313,11 @@ private fun TabletMiniPlayerBarContent(
                         
                         if (showBluetoothIcon) {
                             IconButton(onClick = onShowBluetoothSheet) {
-                                Icon(XBluetooth, contentDescription = "Bluetooth Devices", tint = Color.White)
+                                BTIndicatorIcon(
+                                    modifier = Modifier.size(24.dp).padding(),
+                                    connectedDeviceName = bluetoothViewModel.connectedDevice.collectAsState().value?.name ?: "",
+                                    isConnected = bluetoothViewModel.connectedDevice.collectAsState().value != null
+                                )
                             }
                         } else {
                             Spacer(modifier = Modifier.width(56.dp))

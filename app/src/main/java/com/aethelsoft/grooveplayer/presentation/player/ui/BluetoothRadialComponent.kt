@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.ui.RunningText
 import kotlin.math.cos
@@ -33,9 +34,7 @@ import kotlin.math.sin
 private const val DEGREE_STEP = 15f
 private const val START_ANGLE = 270f
 
-enum class BluetoothDeviceType {
-    EARBUDS, SPEAKER, PHONE, HEADPHONES, UNKNOWN
-}
+// BluetoothDeviceType moved to BluetoothHelpers (DRY)
 
 @Composable
 fun BluetoothRadialComponent(
@@ -171,7 +170,7 @@ private fun BluetoothDeviceCircle(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val type = detectBluetoothDeviceType(device.name)
+    val type = BluetoothHelpers.detectBluetoothDeviceType(device.name)
 
     Column(
         modifier = modifier
@@ -197,7 +196,7 @@ private fun BluetoothDeviceCircle(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = bluetoothIconFor(type),
+                imageVector = BluetoothHelpers.bluetoothIconFor(type),
                 contentDescription = device.name,
                 tint = if (isConnected) Color(0xFF2196F3) else Color(0xFF1A1A1A),
                 modifier = Modifier.size(28.dp)
@@ -269,23 +268,4 @@ private fun DrawScope.drawLeftHalfEllipseGradient(
     drawPath(path, brush = gradient)
 }
 
-// HELPERS
-@Composable
-private fun bluetoothIconFor(type: BluetoothDeviceType) = when (type) {
-    BluetoothDeviceType.EARBUDS,
-    BluetoothDeviceType.HEADPHONES -> XHeadphones
-    BluetoothDeviceType.SPEAKER -> XSpeaker
-    BluetoothDeviceType.PHONE -> XSmartphone
-    BluetoothDeviceType.UNKNOWN -> XBluetooth
-}
-
-private fun detectBluetoothDeviceType(name: String): BluetoothDeviceType {
-    val n = name.lowercase()
-    return when {
-        n.contains("bud") || n.contains("airpod") || n.contains("tws") -> BluetoothDeviceType.EARBUDS
-        n.contains("headphone") || n.contains("xm") || n.contains("beats") -> BluetoothDeviceType.HEADPHONES
-        n.contains("speaker") || n.contains("jbl") || n.contains("sound") -> BluetoothDeviceType.SPEAKER
-        n.contains("phone") || n.contains("pixel") || n.contains("iphone") -> BluetoothDeviceType.PHONE
-        else -> BluetoothDeviceType.UNKNOWN
-    }
-}
+// Bluetooth type detection + icon mapping moved to BluetoothHelpers (DRY)

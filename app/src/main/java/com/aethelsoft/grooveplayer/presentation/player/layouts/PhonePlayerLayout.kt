@@ -52,6 +52,7 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
+import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
@@ -61,8 +62,11 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,6 +82,9 @@ fun PhonePlayerLayout(
     onClose: () -> Unit
 ) {
     var showBluetoothSheet by remember { mutableStateOf(false) }
+    val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    val connectedBtDevice by bluetoothViewModel.connectedDevice.collectAsState()
+
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val visualizationMode by playerViewModel.visualizationMode.collectAsState()
     // Waveform / glow visualization toggle
@@ -136,7 +143,11 @@ fun PhonePlayerLayout(
                 Icon(XBack, contentDescription = "Close")
             }
             IconButton(onClick = { showBluetoothSheet = true }) {
-                Icon(XBluetooth, contentDescription = "Bluetooth Devices")
+
+                BTIndicatorIcon(
+                    connectedDeviceName = connectedBtDevice?.name,
+                    isConnected = connectedBtDevice != null,
+                )
             }
         }
 

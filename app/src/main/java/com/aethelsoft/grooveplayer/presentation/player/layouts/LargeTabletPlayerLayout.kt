@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.palette.graphics.Palette
 import coil3.Bitmap
 import coil3.compose.AsyncImage
@@ -106,13 +107,16 @@ import com.aethelsoft.grooveplayer.utils.WaveformUtils
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -155,10 +159,21 @@ fun LargeTabletPlayerLayout(
     val (hasBluetoothPermissions, requestBluetoothPermissions) = rememberBluetoothPermissionState()
     val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
     val isScanning by bluetoothViewModel.isScanning.collectAsState()
-    val connectedDevice by bluetoothViewModel.connectedDevice.collectAsState()
+    val connectedDevice by bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle()
     val connectingDeviceAddress by bluetoothViewModel.connectingDeviceAddress.collectAsState()
     val connectionSuccessDisplay by bluetoothViewModel.connectionSuccessDisplay.collectAsState()
     val connectionFailedDisplay by bluetoothViewModel.connectionFailedDisplay.collectAsState()
+    val isBluetoothEnabledNow = bluetoothViewModel.isBluetoothEnabled()
+
+    LaunchedEffect(connectionSuccessDisplay, showBluetoothSheet) {
+        if (connectionSuccessDisplay && showBluetoothSheet) {
+            // Allow BluetoothEllipticalLazyScroll to show the green success UI and settle
+            delay(2000)
+            if (showBluetoothSheet) {
+                showBluetoothSheet = false
+            }
+        }
+    }
 
     // Ensure showBluetoothSheet and showQueue are never true at the same time
     LaunchedEffect(showBluetoothSheet, showQueue) {
@@ -259,10 +274,10 @@ fun LargeTabletPlayerLayout(
                     activeBackground = Color.White,
                     inactiveBackground = Color.Transparent,
                 ) {
-                    Icon(
-                        XBluetooth,
-                        contentDescription = "More",
-                        tint = if (showBluetoothSheet) Color.Black else Color.White
+                    BTIndicatorIcon(
+                        connectedDeviceName = connectedDevice?.name,
+                        isConnected = connectedDevice != null,
+                        tint = if(showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
                     )
                 }
             }
@@ -417,6 +432,8 @@ fun LargeTabletPlayerLayout(
                             onDeviceClick = { device ->
                                 if (connectedDevice?.address == device.address) {
                                     bluetoothViewModel.disconnectDevice()
+                                    showBluetoothSheet = false
+                                    playerViewModel.playPauseToggle()
                                 } else {
                                     bluetoothViewModel.connectToDevice(device)
                                 }
@@ -425,8 +442,11 @@ fun LargeTabletPlayerLayout(
                             connectingDeviceAddress = connectingDeviceAddress,
                             connectionSuccessDisplay = connectionSuccessDisplay,
                             connectionFailedDisplay = connectionFailedDisplay,
+                            isBluetoothEnabled = isBluetoothEnabledNow,
                             hasBluetoothPermissions = hasBluetoothPermissions,
-                            onRequestBluetoothPermission = requestBluetoothPermissions
+                            onRequestBluetoothPermission = requestBluetoothPermissions,
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
+                            onDismiss = { showBluetoothSheet = false }
                         )
                     }
                 }

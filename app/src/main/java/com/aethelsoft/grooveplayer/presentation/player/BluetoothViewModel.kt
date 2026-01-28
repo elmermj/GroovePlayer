@@ -25,6 +25,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+
+/* ─────────────────────── CONN STATE ENUMS ─────────────────────── */
+enum class BTConnectionState {
+    IDLE,
+    FAILED,
+    SUCCESS,
+}
+
 /**
  * ViewModel for managing Bluetooth device connections.
  * Follows MVVM and Clean Architecture by only using UseCases.
@@ -67,9 +75,11 @@ class BluetoothViewModel @Inject constructor(
     private var connectionSuccessJob: Job? = null
     private var connectionFailedJob: Job? = null
     private var connectingTimeoutJob: Job? = null
+    private var periodicRefreshJob: Job? = null
 
     init {
         viewModelScope.launch {
+            startBluetoothScanUseCase()
             observeConnectedDeviceUseCase().collect { connected ->
                 val connecting = _connectingDeviceAddress.value
                 
@@ -93,6 +103,26 @@ class BluetoothViewModel @Inject constructor(
                         }
                     }
                     // If connected is null or different device, keep timeout running
+                }
+            }
+        }
+
+        // Keep UI in sync with external/automatic connections (e.g., TWS auto-connect).
+        // Broadcasts can be missed; a lightweight periodic refresh makes the UI reliable.
+        periodicRefreshJob?.cancel()
+        periodicRefreshJob = viewModelScope.launch {
+            while (true) {
+                try {
+                    val hasPerms = checkBluetoothStateUseCase.hasBluetoothPermissions()
+                    val enabled = checkBluetoothStateUseCase.isBluetoothEnabled()
+                    if (hasPerms && enabled) {
+                        refreshConnectionStateUseCase()
+                        delay(2000)
+                    } else {
+                        delay(5000)
+                    }
+                } catch (_: Exception) {
+                    delay(5000)
                 }
             }
         }

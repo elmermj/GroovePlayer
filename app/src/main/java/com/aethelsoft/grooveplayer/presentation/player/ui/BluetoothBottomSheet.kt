@@ -1,6 +1,10 @@
 package com.aethelsoft.grooveplayer.presentation.player.ui
 
 import XCheckCircle
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,6 +52,14 @@ fun BluetoothBottomSheet(
     onDismiss: () -> Unit,
     viewModel: BluetoothViewModel = hiltViewModel()
 ) {
+    val context = LocalContext.current
+    val enableBluetoothLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        // Refresh regardless of outcome; if user enabled, state will update.
+        viewModel.refreshConnectionState()
+    }
+
     val (hasPermissions, requestPermissions) = rememberBluetoothPermissionState()
     val availableDevices by viewModel.availableDevices.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -97,9 +110,20 @@ fun BluetoothBottomSheet(
 
                 !isBluetoothEnabled -> {
                     Text(
-                        "Please enable Bluetooth in settings",
+                        "Bluetooth is turned off",
                         color = MaterialTheme.colorScheme.error
                     )
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            enableBluetoothLauncher.launch(
+                                Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Enable Bluetooth")
+                    }
                     Spacer(Modifier.height(16.dp))
                 }
 

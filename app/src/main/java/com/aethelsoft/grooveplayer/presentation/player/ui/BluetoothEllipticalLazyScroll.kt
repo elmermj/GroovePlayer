@@ -1,8 +1,12 @@
 package com.aethelsoft.grooveplayer.presentation.player.ui
 
 import XCheckCircle
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.graphics.RuntimeShader
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -43,11 +47,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
+import com.aethelsoft.grooveplayer.presentation.player.BTConnectionState
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.shader.ELLIPSE_SHADER
 import com.aethelsoft.grooveplayer.utils.theme.ui.RunningText
@@ -74,9 +81,19 @@ fun BluetoothEllipticalLazyScroll(
     connectingDeviceAddress: String? = null,
     connectionSuccessDisplay: Boolean = false,
     connectionFailedDisplay: Boolean = false,
+    connectionStateDisplay: BTConnectionState = BTConnectionState.IDLE,
+    isBluetoothEnabled: Boolean = true,
     hasBluetoothPermissions: Boolean = true,
-    onRequestBluetoothPermission: () -> Unit = {}
+    onRequestBluetoothPermission: () -> Unit = {},
+    onBluetoothEnabledResult: () -> Unit = {},
+    onDismiss: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val enableBluetoothLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        onBluetoothEnabledResult()
+    }
     val density = LocalDensity.current
 
     /* ───── SHADER SCALE ───── */
@@ -106,7 +123,7 @@ fun BluetoothEllipticalLazyScroll(
         if (connectionSuccessDisplay) {
             colorMixFail.snapTo(0f)
             colorMix.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
-            delay(1000)
+            delay(2000)
             colorMix.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
         } else {
             colorMix.snapTo(0f)
@@ -117,7 +134,7 @@ fun BluetoothEllipticalLazyScroll(
         if (connectionFailedDisplay) {
             colorMix.snapTo(0f)
             colorMixFail.animateTo(1f, tween(300, easing = FastOutSlowInEasing))
-            delay(1000)
+            delay(2000)
             colorMixFail.animateTo(0f, tween(400, easing = FastOutSlowInEasing))
         } else {
             colorMixFail.snapTo(0f)
@@ -180,9 +197,8 @@ fun BluetoothEllipticalLazyScroll(
     /* ───── IDLE SHRINK ───── */
     LaunchedEffect(scrollState.isScrollInProgress) {
         if (!scrollState.isScrollInProgress) {
-            delay(100)
             if (!scrollState.isScrollInProgress) {
-                shaderScale.animateTo(0.5f, tween(150, easing = FastOutSlowInEasing))
+                shaderScale.animateTo(0.7f, tween(150, easing = FastOutSlowInEasing))
                 isInteracting = false
             }
         }
@@ -225,6 +241,54 @@ fun BluetoothEllipticalLazyScroll(
                         )
                     ) {
                         Text("Grant access")
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    /* ───── BLUETOOTH DISABLED UI ───── */
+    if (!isBluetoothEnabled) {
+        Box(
+            modifier = modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .padding(24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        "Bluetooth is turned off",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White
+                    )
+                    Text(
+                        "Turn on Bluetooth to scan and connect to audio devices.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.8f)
+                    )
+                    Button(
+                        onClick = {
+                            enableBluetoothLauncher.launch(
+                                Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                            )
+                        },
+                        shape = RoundedCornerShape(100.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        )
+                    ) {
+                        Text("Enable Bluetooth")
                     }
                 }
             }
@@ -360,7 +424,9 @@ fun BluetoothEllipticalLazyScroll(
                 device = device,
                 isConnected = connectedDevice?.address == device.address,
                 isConnecting = isConnectingThis,
-                onClick = { onDeviceClick(device) },
+                onClick = {
+                    onDeviceClick(device)
+                },
                 modifier = Modifier
                     .offset(
                         x = with(density) { pos.x.toDp() - 40.dp },
@@ -386,7 +452,7 @@ private fun BluetoothDeviceCircle(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val type = detectBluetoothDeviceType(device.name)
+    val type = BluetoothHelpers.detectBluetoothDeviceType(device.name)
     val pulseAlpha by rememberInfiniteTransition(label = "circlePulse").animateFloat(
         initialValue = 0.5f,
         targetValue = 1f,
@@ -426,7 +492,7 @@ private fun BluetoothDeviceCircle(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = bluetoothIconFor(type),
+                imageVector = BluetoothHelpers.bluetoothIconFor(type),
                 contentDescription = device.name,
                 tint = when {
                     isConnected -> Color(0xFF2196F3)
@@ -479,108 +545,6 @@ private fun xToScaleAlpha(
     val scale = 1f - t
     val alpha = 1f - t
     return scale to alpha
-}
-
-/* ───────────────────────── GRADIENT ───────────────────────── */
-
-private fun DrawScope.drawEllipticalFieldGradient(
-    center: Offset,
-    radiusX: Float,
-    radiusY: Float,
-    p: Float,
-    q: Float
-) {
-    val a = radiusX * p
-    val b = radiusY * q
-
-    val fadeWidth = 0.35f // thickness of glow inside ellipse
-
-    for (y in 0 until size.height.toInt()) {
-        for (x in 0 until size.width.toInt()) {
-
-            val dx = x - center.x
-            val dy = y - center.y
-
-            val d = kotlin.math.sqrt(
-                (dx * dx) / (a * a) +
-                        (dy * dy) / (b * b)
-            )
-
-            // Only draw inside left half
-            if (dx > 0f || d > 1f) continue
-
-            val t = ((1f - d) / fadeWidth).coerceIn(0f, 1f)
-
-            val color = Color(
-                red = lerp(0.18f, 0.53f, t),
-                green = lerp(0.45f, 0.81f, t),
-                blue = lerp(0.70f, 0.92f, t),
-                alpha = t * 0.65f
-            )
-
-            drawRect(
-                color = color,
-                topLeft = Offset(x.toFloat(), y.toFloat()),
-                size = Size(1f, 1f)
-            )
-        }
-    }
-}
-
-private fun DrawScope.drawLeftHalfEllipseGradient(
-    center: Offset,
-    radiusX: Float,
-    radiusY: Float
-) {
-    // Normalize space: scale Y so ellipse becomes circle in math-space
-    val scaleY = radiusY / radiusX
-
-    drawIntoCanvas { canvas ->
-        canvas.save()
-
-        canvas.translate(center.x, center.y)
-
-        canvas.scale(1f, scaleY)
-
-        canvas.translate(-center.x, -center.y)
-
-        val path = Path().apply {
-            moveTo(center.x, center.y)
-            arcTo(
-                Rect(
-                    center.x - radiusX,
-                    center.y - radiusX,
-                    center.x + radiusX,
-                    center.y + radiusX
-                ),
-                startAngleDegrees = 90f,
-                sweepAngleDegrees = 180f,
-                forceMoveTo = false
-            )
-            close()
-        }
-
-        canvas.clipPath(path)
-
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    Color(0xFF5BA3D0).copy(alpha = 0.25f),
-                    Color(0xFF87CEEB).copy(alpha = 0.55f),
-                    Color(0xFF5BA3D0).copy(alpha = 0.45f),
-                    Color(0xFF2E7DB5).copy(alpha = 0.30f),
-                    Color.Transparent
-                ),
-                center = center,
-                radius = radiusX
-            ),
-            center = center,
-            radius = radiusX
-        )
-
-        canvas.restore()
-    }
 }
 
 /**
@@ -679,17 +643,6 @@ private fun DrawScope.drawLeftHalfEllipseGradientFallback(
     }
 }
 
-/* ───────────────────────── HELPERS ───────────────────────── */
-
-@Composable
-private fun bluetoothIconFor(type: BluetoothDeviceType) = when (type) {
-    BluetoothDeviceType.EARBUDS,
-    BluetoothDeviceType.HEADPHONES -> XHeadphones
-    BluetoothDeviceType.SPEAKER -> XSpeaker
-    BluetoothDeviceType.PHONE -> XSmartphone
-    BluetoothDeviceType.UNKNOWN -> XBluetooth
-}
-
 @Composable
 fun EllipticalGradientBackground(
     center: Offset,
@@ -767,20 +720,5 @@ private fun EllipticalGradientBackgroundShader(
             brush = ShaderBrush(shader),
             size = size
         )
-    }
-}
-
-private fun detectBluetoothDeviceType(name: String): BluetoothDeviceType {
-    val n = name.lowercase()
-    return when {
-        n.contains("bud") || n.contains("airpod") || n.contains("tws") ->
-            BluetoothDeviceType.EARBUDS
-        n.contains("headphone") || n.contains("xm") || n.contains("beats") ->
-            BluetoothDeviceType.HEADPHONES
-        n.contains("speaker") || n.contains("jbl") || n.contains("sound") ->
-            BluetoothDeviceType.SPEAKER
-        n.contains("phone") || n.contains("pixel") || n.contains("iphone") ->
-            BluetoothDeviceType.PHONE
-        else -> BluetoothDeviceType.UNKNOWN
     }
 }

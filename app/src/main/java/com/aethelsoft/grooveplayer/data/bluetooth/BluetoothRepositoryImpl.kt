@@ -32,6 +32,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import android.bluetooth.BluetoothDevice as AndroidBluetoothDevice
 import android.bluetooth.BluetoothManager as AndroidBluetoothManager
+import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 
 
 @Singleton
@@ -523,7 +524,7 @@ class BluetoothRepositoryImpl @Inject constructor(
         devices: List<BluetoothDeviceData>,
         connectedAddress: String?
     ): List<BluetoothDeviceData> {
-        val groupedByName = devices.groupBy { it.name.lowercase().trim() }
+        val groupedByName = devices.groupBy { BluetoothHelpers.normalizedNameKey(it.name) }
         
         return groupedByName.values.map { devicesWithSameName ->
             if (devicesWithSameName.size > 1) {
@@ -693,7 +694,8 @@ class BluetoothRepositoryImpl @Inject constructor(
                     // Device not in list, add it
                     list.add(connectedData)
                 }
-                _availableDevices.value = list
+                // Ensure TWS devices don't show as duplicates when the connected bud differs
+                _availableDevices.value = deduplicateDevicesByName(list, connected.address)
                 Log.d(TAG, "checkCurrentConnection: Found connected device ${connected.address} (${connected.name})")
             } else {
                 // No device connected - clear connected device and update available devices
@@ -706,7 +708,7 @@ class BluetoothRepositoryImpl @Inject constructor(
                     val index = list.indexOfFirst { it.address == previousConnected.address }
                     if (index >= 0) {
                         list[index] = list[index].copy(isConnected = false)
-                        _availableDevices.value = list
+                        _availableDevices.value = deduplicateDevicesByName(list, null)
                     }
                     Log.d(TAG, "checkCurrentConnection: No device connected (was ${previousConnected.address})")
                 }
@@ -751,7 +753,7 @@ class BluetoothRepositoryImpl @Inject constructor(
             } else {
                 list.add(connectedData)
             }
-            _availableDevices.value = list
+            _availableDevices.value = deduplicateDevicesByName(list, device.address)
             
             // Update connected device - this should trigger the flow
             val previousConnected = _connectedDevice.value
@@ -852,7 +854,46 @@ class BluetoothRepositoryImpl @Inject constructor(
                 AndroidBluetoothDevice.BOND_BONDED -> {
                     Log.d(TAG, "connectToDevice: device already bonded, attempting A2DP connection for ${androidDevice.address}")
                     pendingConnectionAddress = null
-                    attemptA2dpConnection(androidDevice)
+                    // TWS earbuds can appear as two separate bonded devices with the same name.
+                    // If we connect to the "wrong" side, connect() may fail. Try fallbacks.
+                    if (bluetoothA2dp == null) {
+                        attemptA2dpConnection(androidDevice)
+                        return
+                    }
+
+                    val targetKey = BluetoothHelpers.normalizedNameKey(deviceData.name)
+                    val candidates = try {
+                        bluetoothAdapter.bondedDevices
+                            .filter { isAudioDevice(it) }
+                            .filter { BluetoothHelpers.normalizedNameKey(it.name ?: "") == targetKey }
+                    } catch (_: SecurityException) {
+                        emptyList()
+                    }
+
+                    val orderedCandidates = buildList {
+                        add(androidDevice)
+                        candidates.forEach { d ->
+                            if (d.address != androidDevice.address) add(d)
+                        }
+                    }
+
+                    // Try each candidate briefly until one becomes connected.
+                    for (candidate in orderedCandidates) {
+                        Log.d(TAG, "connectToDevice: attempting A2DP connect for candidate ${candidate.address} (${candidate.name})")
+                        attemptA2dpConnection(candidate)
+                        // Give the system a moment; some devices connect instantly, others take a second.
+                        delay(2500)
+                        val nowConnected = try {
+                            bluetoothA2dp?.connectedDevices?.any { it.address == candidate.address } == true
+                        } catch (_: SecurityException) {
+                            false
+                        }
+                        if (nowConnected) {
+                            Log.d(TAG, "connectToDevice: candidate connected ${candidate.address}")
+                            checkCurrentConnection()
+                            break
+                        }
+                    }
                 }
             }
         } catch (e: SecurityException) {
