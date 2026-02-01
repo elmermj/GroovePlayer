@@ -24,15 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
-
-/* ─────────────────────── CONN STATE ENUMS ─────────────────────── */
-enum class BTConnectionState {
-    IDLE,
-    FAILED,
-    SUCCESS,
-}
-
 /**
  * ViewModel for managing Bluetooth device connections.
  * Follows MVVM and Clean Architecture by only using UseCases.
@@ -196,4 +187,11 @@ class BluetoothViewModel @Inject constructor(
             disconnectBluetoothDeviceUseCase()
         }
     }
+}
+
+/* ─────────────────────── CONN STATE ENUMS ─────────────────────── */
+enum class BTConnectionState {
+    IDLE,
+    FAILED,
+    SUCCESS,
 }

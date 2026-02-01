@@ -208,9 +208,6 @@ private fun PhoneMiniPlayerBarContent(
                                 Icon(XPlay, contentDescription = "Play", tint = Color.White)
                             }
                         }
-                        
-                        Spacer(modifier = Modifier.weight(1f).height(24.dp))
-                        Spacer(modifier = Modifier.width(56.dp))
                         Spacer(modifier = Modifier.width(12.dp))
                     }
                     Spacer(modifier = Modifier.height(6.dp))

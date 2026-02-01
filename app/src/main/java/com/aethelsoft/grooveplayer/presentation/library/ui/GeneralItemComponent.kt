@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.library.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -34,7 +37,10 @@ import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.Artist
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAlbum
+import com.aethelsoft.grooveplayer.utils.theme.icons.XArtist
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
+import com.aethelsoft.grooveplayer.utils.theme.icons.XMusic
 
 /**
  * Generic, reusable item component (artwork + title + subtitle + optional meta + optional menu)
@@ -49,15 +55,17 @@ fun GeneralItemComponent(
     onClick: () -> Unit,
     onMoreClick: () -> Unit = {},
     moreMenuLabel: String? = null,
-    padding: Dp = S_PADDING
+    padding: Dp = S_PADDING,
+    defaultIcon: ImageVector,
+    contentDescription: String? = null
 ) {
     var showOptionsMenu by remember { mutableStateOf(false) }
 
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            .clickable(onClick = onClick)
+            .background(Color.Transparent),
     ) {
         Row(
             modifier = Modifier
@@ -66,13 +74,24 @@ fun GeneralItemComponent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = null,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(S_PADDING))
-            )
+            if(artworkUrl == null) {
+                Box(modifier = Modifier.size(56.dp)){
+                    Icon(
+                        defaultIcon,
+                        contentDescription = contentDescription,
+                        modifier = Modifier
+                            .size(56.dp)
+                    )
+                }
+            } else {
+                AsyncImage(
+                    model = artworkUrl,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(S_PADDING))
+                )
+            }
             Box(modifier = Modifier.width(S_PADDING))
             Column(modifier = Modifier.weight(1f)) {
                 Row {
@@ -152,7 +171,9 @@ fun SongItemComponent(
         onClick = onClick,
         onMoreClick = onMoreClick,
         moreMenuLabel = "Edit song metadata",
-        padding = padding
+        padding = padding,
+        defaultIcon = XMusic,
+        contentDescription = "${song.title} by ${song.artists}"
     )
 }
 
@@ -170,12 +191,14 @@ fun AlbumItemComponent(
     GeneralItemComponent(
         title = album.name,
         subtitle = album.artist,
-        artworkUrl = album.artworkUrl,
+        artworkUrl =  album.artworkUrl,
         metaText = null,
         onClick = onClick,
         onMoreClick = onMoreClick,
         moreMenuLabel = moreMenuLabel,
-        padding = padding
+        padding = padding,
+        defaultIcon = XAlbum,
+        contentDescription = "${album.name} by ${album.artist}"
     )
 }
 
@@ -198,7 +221,9 @@ fun ArtistItemComponent(
         onClick = onClick,
         onMoreClick = onMoreClick,
         moreMenuLabel = moreMenuLabel,
-        padding = padding
+        padding = padding,
+        defaultIcon = XArtist,
+        contentDescription = artist.name
     )
 }
 

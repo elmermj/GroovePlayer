@@ -66,7 +66,10 @@ fun PlayerQueueComponent(
                 flingBehavior = flingBehavior,
             )
     ) {
-        items(count = queue.size) { index ->
+        items(
+            count = queue.size,
+            key = { index -> queue[index].id }
+        ) { index ->
             val song = queue[index]
             val isPlaying = currentSong?.id == song.id
 

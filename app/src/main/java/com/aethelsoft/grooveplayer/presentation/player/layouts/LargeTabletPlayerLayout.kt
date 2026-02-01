@@ -193,13 +193,6 @@ fun LargeTabletPlayerLayout(
         }
     }
 
-    // Log visualization changes for debugging
-    LaunchedEffect(audioVisualization) {
-        if (audioVisualization.overall > 0.2f) {
-            Log.v("LargeTablet", "🎵 Visualization - Bass: ${"%.2f".format(audioVisualization.bass)} | Mid: ${"%.2f".format(audioVisualization.mid)} | Treble: ${"%.2f".format(audioVisualization.treble)} | Stereo: ${"%.2f".format(audioVisualization.stereoBalance)} | Beat: ${"%.2f".format(audioVisualization.beat)}")
-        }
-    }
-
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -255,7 +248,7 @@ fun LargeTabletPlayerLayout(
             val safeMarginPx = screenWidthPx * 0.05f
 
             // How far artwork can move without leaving viewport
-//            val maxShiftPx = (screenWidthPx / 2f) - sidePanelWidthPx - safeMarginPx
+            // val maxShiftPx = (screenWidthPx / 2f) - sidePanelWidthPx - safeMarginPx
 
             // Target offset based on visible panels
             val artworkTargetOffsetPx = when {
@@ -415,7 +408,8 @@ fun LargeTabletPlayerLayout(
                             isBluetoothEnabled = isBluetoothEnabledNow,
                             hasBluetoothPermissions = hasBluetoothPermissions,
                             onRequestBluetoothPermission = requestBluetoothPermissions,
-                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() }
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
+                            onShaderClicked = { showBluetoothSheet = false }
                         )
                     }
                 }

@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.presentation.player
 
 import android.app.Application
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
@@ -56,9 +57,7 @@ class PlayerViewModel @Inject constructor(
     val shuffle: StateFlow<Boolean> = observePlayerStateUseCase.observeShuffle().stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val repeat: StateFlow<RepeatMode> = observePlayerStateUseCase.observeRepeat().stateIn(viewModelScope, SharingStarted.Eagerly, RepeatMode.OFF)
     val volume: StateFlow<Float> = observePlayerStateUseCase.observeVolume().stateIn(viewModelScope, SharingStarted.Eagerly, 0.5f)
-    val isFullScreenPlayerOpened: StateFlow<Boolean> = observePlayerStateUseCase.observeIsFullScreenPlayerOpen().stateIn(
-        viewModelScope, SharingStarted.Eagerly, false
-    )
+    val isFullScreenPlayerOpened: StateFlow<Boolean> = observePlayerStateUseCase.observeIsFullScreenPlayerOpen().stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val isPlayerMuted: StateFlow<Boolean> = observePlayerStateUseCase.observeIsPlayerMuted().stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val audioAmplitude: StateFlow<Float> = observePlayerStateUseCase.observeAudioAmplitude().stateIn(viewModelScope, SharingStarted.Eagerly, 0f)
     val audioVisualization: StateFlow<AudioVisualizationData> = observePlayerStateUseCase.observeAudioVisualization().stateIn(

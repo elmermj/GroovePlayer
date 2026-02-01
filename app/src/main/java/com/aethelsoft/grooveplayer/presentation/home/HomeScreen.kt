@@ -81,6 +81,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
+import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAlbum
@@ -448,8 +449,8 @@ fun XAppBar(
     searchBarViewModel: SearchBarViewModel
 ) {
     val horizontalPadding = when (deviceType) {
-        DeviceType.PHONE -> 16.dp
-        DeviceType.TABLET -> 24.dp
+        DeviceType.PHONE -> S_PADDING
+        DeviceType.TABLET -> S_PADDING
         DeviceType.LARGE_TABLET -> M_PADDING
     }
     val density = LocalDensity.current

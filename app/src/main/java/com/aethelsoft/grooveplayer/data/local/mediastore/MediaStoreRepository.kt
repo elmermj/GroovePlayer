@@ -30,18 +30,29 @@ class MediaStoreRepository @Inject constructor(
         SongMapper.mediaStoreToDomainList(songsData)
     }
 
+    override suspend fun getSongsPage(offset: Int, limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        val songsData = fetchSongsFromMediaStore(offset = offset, limit = limit)
+        SongMapper.mediaStoreToDomainList(songsData)
+    }
+
     override suspend fun getSongsByArtist(artist: String): List<Song> = withContext(Dispatchers.IO) {
-        val songsData = fetchSongsFromMediaStore()
-        SongMapper.mediaStoreToDomainList(
-            songsData.filter { it.artist.equals(artist, ignoreCase = true) }
-        )
+        val songsData = fetchSongsFromMediaStore(selection = "${MediaStore.Audio.Media.ARTIST}=?", selectionArgs = arrayOf(artist))
+        SongMapper.mediaStoreToDomainList(songsData)
+    }
+
+    override suspend fun getSongsByArtistPage(artist: String, offset: Int, limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        val songsData = fetchSongsFromMediaStore(selection = "${MediaStore.Audio.Media.ARTIST}=?", selectionArgs = arrayOf(artist), offset = offset, limit = limit)
+        SongMapper.mediaStoreToDomainList(songsData)
     }
 
     override suspend fun getSongsByAlbum(album: String): List<Song> = withContext(Dispatchers.IO) {
-        val songsData = fetchSongsFromMediaStore()
-        SongMapper.mediaStoreToDomainList(
-            songsData.filter { it.album?.equals(album, ignoreCase = true) == true }
-        )
+        val songsData = fetchSongsFromMediaStore(selection = "${MediaStore.Audio.Media.ALBUM}=?", selectionArgs = arrayOf(album))
+        SongMapper.mediaStoreToDomainList(songsData)
+    }
+
+    override suspend fun getSongsByAlbumPage(album: String, offset: Int, limit: Int): List<Song> = withContext(Dispatchers.IO) {
+        val songsData = fetchSongsFromMediaStore(selection = "${MediaStore.Audio.Media.ALBUM}=?", selectionArgs = arrayOf(album), offset = offset, limit = limit)
+        SongMapper.mediaStoreToDomainList(songsData)
     }
     
     override suspend fun searchSongs(query: String): List<Song> = withContext(Dispatchers.IO) {
@@ -58,10 +69,18 @@ class MediaStoreRepository @Inject constructor(
     
     /**
      * Internal method to fetch songs from MediaStore.
-     * Returns data layer models (MediaStoreSongData).
+     * @param selection optional WHERE clause (without "AND"); base selection is IS_MUSIC != 0
+     * @param selectionArgs optional args for selection
+     * @param offset number of rows to skip (0 for none)
+     * @param limit max rows to return (Int.MAX_VALUE for all)
      */
     @RequiresApi(Build.VERSION_CODES.R)
-    private fun fetchSongsFromMediaStore(): List<MediaStoreSongData> {
+    private fun fetchSongsFromMediaStore(
+        selection: String? = null,
+        selectionArgs: Array<String>? = null,
+        offset: Int = 0,
+        limit: Int = Int.MAX_VALUE
+    ): List<MediaStoreSongData> {
         val songs = mutableListOf<MediaStoreSongData>()
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -74,14 +93,15 @@ class MediaStoreRepository @Inject constructor(
             MediaStore.Audio.Media.GENRE
         )
 
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        val fullSelection = if (selection != null) "$baseSelection AND $selection" else baseSelection
         val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
 
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             projection,
-            selection,
-            null,
+            fullSelection,
+            selectionArgs,
             sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
@@ -93,7 +113,13 @@ class MediaStoreRepository @Inject constructor(
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val genreColumn = cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
 
+            var index = 0
             while (cursor.moveToNext()) {
+                if (index < offset) {
+                    index++
+                    continue
+                }
+                if (songs.size >= limit) break
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(titleColumn) ?: "Unknown"
                 val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
@@ -132,6 +158,7 @@ class MediaStoreRepository @Inject constructor(
                         album = album
                     )
                 )
+                index++
             }
         }
 

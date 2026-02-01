@@ -403,7 +403,8 @@ fun TabletPlayerLayout(
                             isBluetoothEnabled = isBluetoothEnabledNow,
                             hasBluetoothPermissions = hasBluetoothPermissions,
                             onRequestBluetoothPermission = requestBluetoothPermissions,
-                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() }
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
+                            onShaderClicked = { showBluetoothSheet = false }
                         )
                     }
                 }

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
+import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
@@ -85,7 +86,9 @@ fun BluetoothEllipticalLazyScroll(
     isBluetoothEnabled: Boolean = true,
     hasBluetoothPermissions: Boolean = true,
     onRequestBluetoothPermission: () -> Unit = {},
-    onBluetoothEnabledResult: () -> Unit = {}
+    onBluetoothEnabledResult: () -> Unit = {},
+    deviceType: DeviceType = DeviceType.LARGE_TABLET,
+    onShaderClicked: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val enableBluetoothLauncher = rememberLauncherForActivityResult(
@@ -315,7 +318,12 @@ fun BluetoothEllipticalLazyScroll(
             pulse = shaderPulse,
             colorMix = colorMix.value,
             colorMixFail = colorMixFail.value,
-            modifier = Modifier.matchParentSize()
+            modifier = Modifier
+                .matchParentSize()
+                .clickable(
+                    enabled = false,
+                    onClick = onShaderClicked
+                )
         )
 
         Box(
@@ -466,7 +474,8 @@ private fun BluetoothDeviceCircle(
         modifier = modifier
             .size(120.dp)
             .clickable(enabled = !isConnecting, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
@@ -514,7 +523,7 @@ private fun BluetoothDeviceCircle(
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center
             ),
-            modifier = Modifier.width(80.dp).basicMarquee()
+            modifier = Modifier.width(72.dp).basicMarquee()
         )
     }
 }

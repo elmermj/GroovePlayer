@@ -101,6 +101,10 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // Paging
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
+
     // Misc
     implementation(libs.icons.lucide)
     implementation(libs.javax.inject)

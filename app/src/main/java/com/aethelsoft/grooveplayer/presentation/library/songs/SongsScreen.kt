@@ -16,25 +16,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.util.TimeUtils.formatDuration
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.aethelsoft.grooveplayer.domain.model.Song
-import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
-import com.aethelsoft.grooveplayer.presentation.library.ui.GeneralItemComponent
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.DeviceType
+import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
@@ -47,15 +49,9 @@ fun SongsScreen(
 ) {
 
     val (hasPermission, requestPermission) = rememberAudioPermissionState()
-    val uiState by viewModel.uiState.collectAsState()
+    val songsPagingItems: LazyPagingItems<Song> = viewModel.songsPagingFlow.collectAsLazyPagingItems()
     val deviceType = rememberDeviceType()
     var selectedSongForEdit by remember { mutableStateOf<Song?>(null) }
-
-    LaunchedEffect(hasPermission) {
-        if (hasPermission) {
-            viewModel.refresh()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -65,9 +61,18 @@ fun SongsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(XBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarColors(
+                    containerColor = Color.Black,
+                    titleContentColor = Color.White,
+                    navigationIconContentColor = Color.White,
+                    scrolledContainerColor = Color.Black,
+                    actionIconContentColor = Color.White,
+                    subtitleContentColor = Color.White
+                )
             )
-        }
+        },
+        containerColor = Color.Black
     ) { paddingValues ->
         val horizontalPadding = when (deviceType) {
             DeviceType.PHONE -> 16.dp
@@ -101,76 +106,30 @@ fun SongsScreen(
                 }
             }
         } else {
-            when (val state = uiState) {
-                is UiState.Loading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+            when (deviceType) {
+                DeviceType.PHONE -> {
+                    PhoneSongsLayout(
+                        songsPagingItems = songsPagingItems,
+                        paddingValues = paddingValues,
+                        horizontalPadding = horizontalPadding,
+                        onEditSong = { song -> selectedSongForEdit = song }
+                    )
                 }
-                is UiState.Error -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Error: ${state.message}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                            Button(onClick = { viewModel.refresh() }) {
-                                Text("Retry")
-                            }
-                        }
-                    }
+                DeviceType.TABLET -> {
+                    TabletSongsLayout(
+                        songsPagingItems = songsPagingItems,
+                        paddingValues = paddingValues,
+                        horizontalPadding = horizontalPadding,
+                        onEditSong = { song -> selectedSongForEdit = song }
+                    )
                 }
-                is UiState.Success -> {
-                    if (state.data.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("No songs found. Add music to your device.")
-                        }
-                    } else {
-                        when (deviceType) {
-                            DeviceType.PHONE -> {
-                                PhoneSongsLayout(
-                                    songs = state.data,
-                                    paddingValues = paddingValues,
-                                    horizontalPadding = horizontalPadding,
-                                    onEditSong = { song -> selectedSongForEdit = song }
-                                )
-                            }
-                            DeviceType.TABLET -> {
-                                TabletSongsLayout(
-                                    songs = state.data,
-                                    paddingValues = paddingValues,
-                                    horizontalPadding = horizontalPadding,
-                                    onEditSong = { song -> selectedSongForEdit = song }
-                                )
-                            }
-                            DeviceType.LARGE_TABLET -> {
-                                LargeTabletSongsLayout(
-                                    songs = state.data,
-                                    paddingValues = paddingValues,
-                                    horizontalPadding = horizontalPadding,
-                                    onEditSong = { song -> selectedSongForEdit = song }
-                                )
-                            }
-                        }
-                    }
+                DeviceType.LARGE_TABLET -> {
+                    LargeTabletSongsLayout(
+                        songsPagingItems = songsPagingItems,
+                        paddingValues = paddingValues,
+                        horizontalPadding = horizontalPadding,
+                        onEditSong = { song -> selectedSongForEdit = song }
+                    )
                 }
             }
         }
@@ -191,7 +150,7 @@ fun SongsScreen(
 
 @Composable
 private fun PhoneSongsLayout(
-    songs: List<Song>,
+    songsPagingItems: LazyPagingItems<Song>,
     paddingValues: PaddingValues,
     horizontalPadding: Dp,
     onEditSong: (Song) -> Unit = {}
@@ -202,25 +161,80 @@ private fun PhoneSongsLayout(
             .fillMaxSize()
             .padding(paddingValues),
         contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
     ) {
         items(
-            count = songs.size,
-            key = { index -> songs[index].id }
+            count = songsPagingItems.itemCount,
+            key = songsPagingItems.itemKey { it.id }
         ) { index ->
-            val song = songs[index]
-            SongItemComponent(
-                song = song,
-                onClick = { playerViewModel.setQueue(songs, index) },
-                onMoreClick = { onEditSong(song) }
-            )
+            val song = songsPagingItems[index]
+            if (song != null) {
+                val list = songsPagingItems.itemSnapshotList.mapNotNull { it }
+                SongItemComponent(
+                    song = song,
+                    onClick = {
+                        if (index < list.size) {
+                            playerViewModel.setQueue(list, index)
+                        }
+                    },
+                    onMoreClick = { onEditSong(song) },
+                    padding = 0.dp
+                )
+            }
+        }
+        songsPagingItems.loadState.apply {
+            when {
+                refresh is LoadState.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                append is LoadState.Loading -> {
+                    item {
+                        Box(
+                            modifier = Modifier.padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                refresh is LoadState.Error -> {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Error: ${(refresh as LoadState.Error).error.message}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                Button(onClick = { songsPagingItems.retry() }) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun TabletSongsLayout(
-    songs: List<Song>,
+    songsPagingItems: LazyPagingItems<Song>,
     paddingValues: PaddingValues,
     horizontalPadding: Dp,
     onEditSong: (Song) -> Unit = {}
@@ -231,48 +245,119 @@ private fun TabletSongsLayout(
             .fillMaxSize()
             .padding(paddingValues),
         contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
     ) {
         items(
-            count = songs.size,
-            key = { index -> songs[index].id }
+            count = songsPagingItems.itemCount,
+            key = songsPagingItems.itemKey { it.id }
         ) { index ->
-            val song = songs[index]
-            SongItemComponent(
-                song = song,
-                onClick = { playerViewModel.setQueue(songs, index) },
-                onMoreClick = { onEditSong(song) }
-            )
+            val song = songsPagingItems[index]
+            if (song != null) {
+                val list = songsPagingItems.itemSnapshotList.mapNotNull { it }
+                SongItemComponent(
+                    song = song,
+                    onClick = {
+                        if (index < list.size) {
+                            playerViewModel.setQueue(list, index)
+                        }
+                    },
+                    onMoreClick = { onEditSong(song) },
+                    padding = 0.dp
+                )
+            }
+        }
+        songsPagingItems.loadState.apply {
+            when {
+                refresh is LoadState.Loading -> {
+                    item {
+                        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                append is LoadState.Loading -> {
+                    item {
+                        Box(Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                refresh is LoadState.Error -> {
+                    item {
+                        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Error: ${(refresh as LoadState.Error).error.message}", Modifier.padding(bottom = 16.dp))
+                                Button(onClick = { songsPagingItems.retry() }) { Text("Retry") }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun LargeTabletSongsLayout(
-    songs: List<Song>,
+    songsPagingItems: LazyPagingItems<Song>,
     paddingValues: PaddingValues,
     horizontalPadding: Dp,
     onEditSong: (Song) -> Unit = {}
 ) {
     val playerViewModel = rememberPlayerViewModel()
-    // For large tablets, use a two-column grid layout
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues),
         contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
     ) {
         items(
-            count = songs.size,
-            key = { index -> songs[index].id }
+            count = songsPagingItems.itemCount,
+            key = songsPagingItems.itemKey { it.id }
         ) { index ->
-            val song = songs[index]
-            SongItemComponent(
-                song = song,
-                onClick = { playerViewModel.setQueue(songs, index) },
-                onMoreClick = { onEditSong(song) }
-            )
+            val song = songsPagingItems[index]
+            if (song != null) {
+                val list = songsPagingItems.itemSnapshotList.mapNotNull { it }
+                SongItemComponent(
+                    song = song,
+                    onClick = {
+                        if (index < list.size) {
+                            playerViewModel.setQueue(list, index)
+                        }
+                    },
+                    onMoreClick = { onEditSong(song) },
+                    padding = 0.dp
+                )
+            }
+        }
+        songsPagingItems.loadState.apply {
+            when {
+                refresh is LoadState.Loading -> {
+                    item {
+                        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                append is LoadState.Loading -> {
+                    item {
+                        Box(Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                }
+                refresh is LoadState.Error -> {
+                    item {
+                        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Error: ${(refresh as LoadState.Error).error.message}", Modifier.padding(bottom = 16.dp))
+                                Button(onClick = { songsPagingItems.retry() }) { Text("Retry") }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

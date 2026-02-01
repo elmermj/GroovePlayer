@@ -80,6 +80,15 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private var visualizer: Visualizer? = null
     private var lastBeatEnergy = 0.0
     private var beatHistory = mutableListOf<Double>()
+
+    /** Throttle visualization updates to ~15fps on mid-range devices to reduce glow redraw cost. */
+    @Volatile
+    private var lastVisualizationEmitTime = 0L
+    @Volatile
+    private var pendingVisualization: AudioVisualizationData? = null
+    private companion object {
+        const val VISUALIZATION_EMIT_INTERVAL_MS = 66L
+    }
     
     // Observe fade timer from user_category settings
     private var fadeTimerSeconds = 0
@@ -267,7 +276,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 } else if (!_isPlaying.value) {
                     _audioVisualization.value = AudioVisualizationData()
                 }
-                delay(50)
+                delay(VISUALIZATION_EMIT_INTERVAL_MS)
             }
         }
         
@@ -388,15 +397,21 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                                         // Moderate stereo smoothing for smooth but responsive panning.
                                         // Bias slightly toward the new emphasized value so that the
                                         // glow feels more reactive to pan changes.
-                                        val currentData = _audioVisualization.value
+                                        val currentData = pendingVisualization ?: _audioVisualization.value
                                         val smoothedStereo = (currentData.stereoBalance * 0.4f +
                                                 emphasizedStereo * 0.6f).coerceIn(-1f, 1f)
 
-                                // Update with stereo info (frequency analysis comes from FFT)
-                                _audioVisualization.value = currentData.copy(
+                                val next = currentData.copy(
                                     stereoBalance = smoothedStereo,
                                     overall = overall
                                 )
+                                pendingVisualization = next
+                                val now = System.currentTimeMillis()
+                                if (now - lastVisualizationEmitTime >= VISUALIZATION_EMIT_INTERVAL_MS) {
+                                    _audioVisualization.value = next
+                                    lastVisualizationEmitTime = now
+                                    pendingVisualization = null
+                                }
                             }
                         }
 
@@ -494,7 +509,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                                 }
 
                                 // Balanced smoothing: responsive but not jittery
-                                val currentData = _audioVisualization.value
+                                val currentData = pendingVisualization ?: _audioVisualization.value
 
                                 // Bass: smooth but responsive
                                 val smoothedBass = currentData.bass * 0.5f + bassScaled.toFloat() * 0.5f
@@ -514,13 +529,19 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                                     currentData.beat * 0.6f + beatIntensity.toFloat() * 0.4f
                                 }
 
-                                // Update visualization data
-                                _audioVisualization.value = currentData.copy(
+                                val next = currentData.copy(
                                     bass = smoothedBass.coerceIn(0f, 1f),
                                     mid = smoothedMid.coerceIn(0f, 1f),
                                     treble = smoothedTreble.coerceIn(0f, 1f),
                                     beat = smoothedBeat.coerceIn(0f, 1f)
                                 )
+                                pendingVisualization = next
+                                val now = System.currentTimeMillis()
+                                if (now - lastVisualizationEmitTime >= VISUALIZATION_EMIT_INTERVAL_MS) {
+                                    _audioVisualization.value = next
+                                    lastVisualizationEmitTime = now
+                                    pendingVisualization = null
+                                }
 
                                 // Debug logging with raw and processed values
                                 // if (bassCount > 0 || midCount > 0 || trebleCount > 0) {

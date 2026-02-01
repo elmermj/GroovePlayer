@@ -1,48 +1,28 @@
 package com.aethelsoft.grooveplayer.presentation.library.songs
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.ViewModel
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.aethelsoft.grooveplayer.data.paging.SongsPagingSource
 import com.aethelsoft.grooveplayer.domain.model.Song
-import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
-import com.aethelsoft.grooveplayer.presentation.common.UiState
+import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 @HiltViewModel
 class SongsViewModel @Inject constructor(
-    application: Application,
-    private val getSongsUseCase: GetSongsUseCase
-) : AndroidViewModel(application) {
+    private val musicRepository: MusicRepository
+) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
-    val uiState: StateFlow<UiState<List<Song>>> = _uiState.asStateFlow()
-
-    init {
-        loadSongs()
-    }
-
-    fun loadSongs() {
-        viewModelScope.launch {
-            _uiState.value = UiState.Loading
-            try {
-                val songs = getSongsUseCase()
-                _uiState.value = UiState.Success(songs)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(
-                    message = e.message ?: "Failed to load songs"
-                )
-            }
-        }
-    }
-
-    fun refresh() {
-        loadSongs()
-    }
+    val songsPagingFlow: Flow<PagingData<Song>> = Pager(
+        config = PagingConfig(
+            pageSize = 50,
+            enablePlaceholders = false
+        ),
+        pagingSourceFactory = { SongsPagingSource(musicRepository) }
+    ).flow
 }
 
 
