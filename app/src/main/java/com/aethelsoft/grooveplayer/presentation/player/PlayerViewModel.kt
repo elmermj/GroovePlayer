@@ -19,9 +19,12 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCas
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
+import com.aethelsoft.grooveplayer.presentation.player.layouts.GlowEffectConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -70,7 +73,13 @@ class PlayerViewModel @Inject constructor(
                 com.aethelsoft.grooveplayer.domain.model.VisualizationMode.SIMULATED
             )
 
+    private val _glowEffectConfig = MutableStateFlow<GlowEffectConfig>(GlowEffectConfig.Dramatic)
 
+    val glowEffectConfig: StateFlow<GlowEffectConfig> = _glowEffectConfig.asStateFlow()
+
+    fun setGlowEffect(config: GlowEffectConfig) {
+        _glowEffectConfig.value = config
+    }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = viewModelScope.launch {
         queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)

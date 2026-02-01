@@ -7,12 +7,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 
 @Composable
-fun BTIndicatorIcon(
+fun BTIndicatorIconComponent(
     modifier: Modifier = Modifier,
     connectedDeviceName: String?,
     isConnected: Boolean,

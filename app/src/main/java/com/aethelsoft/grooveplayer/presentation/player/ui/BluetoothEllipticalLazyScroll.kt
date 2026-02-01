@@ -44,7 +44,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -56,14 +55,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
-import com.aethelsoft.grooveplayer.presentation.player.BTConnectionState
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.shader.ELLIPSE_SHADER
 import com.aethelsoft.grooveplayer.utils.theme.ui.RunningText
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -85,12 +82,10 @@ fun BluetoothEllipticalLazyScroll(
     connectingDeviceAddress: String? = null,
     connectionSuccessDisplay: Boolean = false,
     connectionFailedDisplay: Boolean = false,
-    connectionStateDisplay: BTConnectionState = BTConnectionState.IDLE,
     isBluetoothEnabled: Boolean = true,
     hasBluetoothPermissions: Boolean = true,
     onRequestBluetoothPermission: () -> Unit = {},
-    onBluetoothEnabledResult: () -> Unit = {},
-    onDismiss: () -> Unit = {}
+    onBluetoothEnabledResult: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val enableBluetoothLauncher = rememberLauncherForActivityResult(

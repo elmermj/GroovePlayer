@@ -26,9 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,7 +43,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -57,10 +54,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.palette.graphics.Palette
-import coil3.compose.AsyncImage
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -68,30 +63,28 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
-import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
-import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
-import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
-import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
-import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
-import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
-import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
-import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
-import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
-import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
+import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
+import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.GlowingArtworkContainer
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
+import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.extractDominantColor
+import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
+import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
+import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 
@@ -114,6 +107,7 @@ fun TabletPlayerLayout(
     val queue by playerViewModel.queue.collectAsState()
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+    val glowEffectConfig by playerViewModel.glowEffectConfig.collectAsState()
 
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
@@ -237,7 +231,7 @@ fun TabletPlayerLayout(
                     activeBackground = Color.White,
                     inactiveBackground = Color.Transparent,
                 ) {
-                    BTIndicatorIcon(
+                    BTIndicatorIconComponent(
                         connectedDeviceName = connectedDevice?.name,
                         isConnected = connectedDevice != null,
                         tint = if(showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
@@ -300,17 +294,20 @@ fun TabletPlayerLayout(
                             }
                             .fillMaxHeight()
                             .aspectRatio(1f)
-                            .padding(M_PADDING)
-                    ) {
-                        SwipeableArtwork(
-                            size = maxArtworkHeight - S_PADDING,
-                            artworkUrl = song?.artworkUrl,
-                            onTap = { playerViewModel.playPauseToggle() },
-                            onSwipePrevious = { playerViewModel.previous() },
-                            onSwipeNext = { playerViewModel.next() },
-                            onDismiss = onClose
-                        )
-                    }
+                            .padding(M_PADDING),
+                        deviceType = DeviceType.LARGE_TABLET,
+                        config = glowEffectConfig,
+                        content = {
+                            SwipeableArtwork(
+                                size = maxArtworkHeight - S_PADDING,
+                                artworkUrl = song?.artworkUrl,
+                                onTap = { playerViewModel.playPauseToggle() },
+                                onSwipePrevious = { playerViewModel.previous() },
+                                onSwipeNext = { playerViewModel.next() },
+                                onDismiss = onClose
+                            )
+                        }
+                    )
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
@@ -406,8 +403,7 @@ fun TabletPlayerLayout(
                             isBluetoothEnabled = isBluetoothEnabledNow,
                             hasBluetoothPermissions = hasBluetoothPermissions,
                             onRequestBluetoothPermission = requestBluetoothPermissions,
-                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
-                            onDismiss = { showBluetoothSheet = false }
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() }
                         )
                     }
                 }
@@ -779,16 +775,4 @@ fun GlowingArtworkContainerTablet(
     ) {
         content()
     }
-}
-
-fun extractDominantColorTablet(bitmap: coil3.Bitmap): Color {
-    val palette = Palette.from(bitmap).generate()
-    val swatch =
-        palette.vibrantSwatch
-            ?: palette.lightVibrantSwatch
-            ?: palette.darkVibrantSwatch
-            ?: palette.mutedSwatch
-            ?: palette.dominantSwatch
-
-    return swatch?.rgb?.let { Color(it) } ?: Color(0xFFFFFFFF)
 }

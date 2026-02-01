@@ -313,7 +313,7 @@ private fun TabletMiniPlayerBarContent(
                         
                         if (showBluetoothIcon) {
                             IconButton(onClick = onShowBluetoothSheet) {
-                                BTIndicatorIcon(
+                                BTIndicatorIconComponent(
                                     modifier = Modifier.size(24.dp).padding(),
                                     connectedDeviceName = bluetoothViewModel.connectedDevice.collectAsState().value?.name ?: "",
                                     isConnected = bluetoothViewModel.connectedDevice.collectAsState().value != null

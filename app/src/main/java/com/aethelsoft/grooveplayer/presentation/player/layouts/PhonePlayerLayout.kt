@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,11 +26,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
@@ -41,11 +38,12 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.palette.graphics.Palette
-import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -53,21 +51,20 @@ import coil3.request.allowHardware
 import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
+import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
-import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
-import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
-import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBluetooth
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,6 +79,8 @@ fun PhonePlayerLayout(
     bg: Color = Color.Black,
     onClose: () -> Unit
 ) {
+    var showQueue by remember { mutableStateOf(false) }
+    var showEqualizer by remember { mutableStateOf(false) }
     var showBluetoothSheet by remember { mutableStateOf(false) }
     val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
     val connectedBtDevice by bluetoothViewModel.connectedDevice.collectAsState()
@@ -99,6 +98,10 @@ fun PhonePlayerLayout(
             }
         }
     val context = LocalContext.current
+    val configuration = LocalWindowInfo.current
+    val screenHeight = configuration.containerSize.height.dp
+    val screenWidth = configuration.containerSize.width.dp
+    val maxArtworkHeight = minOf(screenHeight * 0.6f, screenWidth * 0.8f)
     
     // Extract dominant color from artwork
     var dominantColor by remember { mutableStateOf(Color.White) }
@@ -127,32 +130,33 @@ fun PhonePlayerLayout(
         BluetoothBottomSheet(onDismiss = { showBluetoothSheet = false })
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(bg)
-            .padding(start = 16.dp, end = 16.dp, top = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    Box {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(bg)
+                .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(onClick = onClose) {
-                Icon(XBack, contentDescription = "Close")
-            }
-            IconButton(onClick = { showBluetoothSheet = true }) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(XBack, contentDescription = "Close")
+                }
+                IconButton(onClick = { showBluetoothSheet = true }) {
 
-                BTIndicatorIcon(
-                    connectedDeviceName = connectedBtDevice?.name,
-                    isConnected = connectedBtDevice != null,
-                )
+                    BTIndicatorIconComponent(
+                        connectedDeviceName = connectedBtDevice?.name,
+                        isConnected = connectedBtDevice != null,
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Box(
                 modifier = Modifier
@@ -167,102 +171,129 @@ fun PhonePlayerLayout(
                         .size(320.dp)
                         .padding(24.dp) // Add padding for glow to extend outward
                 ) {
-                    AsyncImage(
-                        model = song?.artworkUrl,
-                        contentDescription = "Artwork",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp))
+                    SwipeableArtwork(
+                        size = maxArtworkHeight - S_PADDING,
+                        artworkUrl = song?.artworkUrl,
+                        onTap = { playerViewModel.playPauseToggle() },
+                        onSwipePrevious = { playerViewModel.previous() },
+                        onSwipeNext = { playerViewModel.next() },
+                        onDismiss = onClose
                     )
                 }
             }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(song?.title ?: "", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        Text(song?.artist ?: "", style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        CustomSlider(
-            value = if (dur > 0) pos.toFloat() / dur else 0f,
-            onValueChange = { frac ->
-                val target = (frac * dur).toLong()
-                playerViewModel.seekTo(target)
-            },
-            modifier = Modifier.fillMaxWidth(),
-            height = 4.dp,
-            activeColor = Color.White,
-            inactiveColor = Color.White.copy(alpha = 0.3f)
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatMillis(pos))
-            Text(formatMillis(dur - pos))
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            VolumeSlider(
-                playerViewModel = playerViewModel,
-                modifier = Modifier.width(180.dp),
-                backgroundColor = Color.Black
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                song?.title ?: "",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
             )
-        }
+            Text(
+                song?.artist ?: "",
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        PlayerControls(
-            isMiniPlayer = false,
-            isPlaying = isPlaying,
-            shuffle = shuffle,
-            repeat = repeat,
-            playerViewModel = playerViewModel
-        )
+            CustomSlider(
+                value = if (dur > 0) pos.toFloat() / dur else 0f,
+                onValueChange = { frac ->
+                    val target = (frac * dur).toLong()
+                    playerViewModel.seekTo(target)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                height = 4.dp,
+                activeColor = Color.White,
+                inactiveColor = Color.White.copy(alpha = 0.3f)
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        VisualizationControl(
-            currentMode = visualizationMode,
-            onModeSelected = { mode ->
-                when (mode) {
-                    VisualizationMode.REAL_TIME -> {
-                        if (!hasRecordAudioPermission) {
-                            requestRecordAudioPermission()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(formatMillis(pos))
+                Text(formatMillis(dur - pos))
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                VolumeSlider(
+                    playerViewModel = playerViewModel,
+                    modifier = Modifier.width(180.dp),
+                    backgroundColor = Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            PlayerControls(
+                isMiniPlayer = false,
+                isPlaying = isPlaying,
+                shuffle = shuffle,
+                repeat = repeat,
+                playerViewModel = playerViewModel
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            VisualizationControl(
+                currentMode = visualizationMode,
+                onModeSelected = { mode ->
+                    when (mode) {
+                        VisualizationMode.REAL_TIME -> {
+                            if (!hasRecordAudioPermission) {
+                                requestRecordAudioPermission()
+                            }
+                            if (!hasRecordAudioPermission) {
+                                false
+                            } else {
+                                playerViewModel.setVisualizationMode(mode)
+                                true
+                            }
                         }
-                        if (!hasRecordAudioPermission) {
-                            false
-                        } else {
+
+                        VisualizationMode.OFF,
+                        VisualizationMode.SIMULATED -> {
                             playerViewModel.setVisualizationMode(mode)
                             true
                         }
                     }
-                    VisualizationMode.OFF,
-                    VisualizationMode.SIMULATED -> {
-                        playerViewModel.setVisualizationMode(mode)
-                        true
-                    }
                 }
-            }
-        )
+            )
 
-        Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-        val queue by playerViewModel.queue.collectAsState()
-        if (queue.isNotEmpty()) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("Up Next", style = MaterialTheme.typography.labelSmall)
-                queue.take(5).forEach { q ->
-                    Text(q.title, modifier = Modifier.padding(vertical = 2.dp))
+            val queue by playerViewModel.queue.collectAsState()
+            if (queue.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Up Next", style = MaterialTheme.typography.labelSmall)
+                    queue.take(5).forEach { q ->
+                        Text(q.title, modifier = Modifier.padding(vertical = 2.dp))
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+fun OverlayEffectCompoenentPhone(
+    modifier: Modifier = Modifier,
+    screenSize: IntSize
+){
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.5f))
+            .height(screenSize.height.dp)
+            .width(screenSize.width.dp)
+    )
 }
 
 /**
@@ -330,44 +361,45 @@ fun GlowingArtworkContainerPhone(
                     green = (dominantColor.green + config.trebleColorBoost).coerceAtMost(1f),
                     blue = (dominantColor.blue + config.trebleColorBoost).coerceAtMost(1f)
                 )
-                
+
                 // Calculate parameters using config
                 val artworkSizePx = with(density) { 320.dp.toPx() }
                 val baseIntensity = (bassGlow * 0.5f + midGlow * 0.3f + trebleGlow * 0.2f)
-                val glowAlpha = (config.minAlpha + baseIntensity * config.intensityAlphaRange + beatPulse * config.beatAlphaBoost)
-                    .coerceIn(0f, config.maxAlpha)
-                
+                val glowAlpha =
+                    (config.minAlpha + baseIntensity * config.intensityAlphaRange + beatPulse * config.beatAlphaBoost)
+                        .coerceIn(0f, config.maxAlpha)
+
                 val baseBlurRadius = artworkSizePx * config.baseBlurMultiplier
                 val bassExpansion = artworkSizePx * config.bassExpansionMultiplier * bassGlow
                 val trebleTightness = -artworkSizePx * config.trebleTightnessMultiplier * trebleGlow
                 val beatExpansion = artworkSizePx * config.beatExpansionMultiplier * beatPulse
                 val blurRadius = (baseBlurRadius + bassExpansion + trebleTightness + beatExpansion)
                     .coerceAtLeast(artworkSizePx * config.minBlurMultiplier)
-                
+
                 val cornerPx = with(density) { config.cornerRadius.toPx() }
                 val centerX = size.width / 2f
                 val centerY = size.height / 2f
                 val halfSize = artworkSizePx / 2f
-                
+
                 drawIntoCanvas { canvas ->
                     // Layer 1: Bass layer with stereo-based horizontal extension (tapered edges)
                     if (bassGlow > config.bassRenderThreshold) {
                         // Stereo-based horizontal extension
                         val maxHorizontalExtension = artworkSizePx * config.bassHorizontalExtension
-                        
+
                         // Calculate left and right extensions based on stereo balance
                         val leftExtension = if (stereoBalance <= 0) {
                             maxHorizontalExtension * (1f + kotlin.math.abs(stereoBalance))
                         } else {
                             maxHorizontalExtension * (1f - stereoBalance)
                         }
-                        
+
                         val rightExtension = if (stereoBalance >= 0) {
                             maxHorizontalExtension * (1f + stereoBalance)
                         } else {
                             maxHorizontalExtension * (1f + stereoBalance)
                         }
-                        
+
                         // Draw bass as ellipse for pointed/tapered edges
                         val bassPaint = Paint().asFrameworkPaint().apply {
                             isAntiAlias = true
@@ -379,7 +411,7 @@ fun GlowingArtworkContainerPhone(
                                 BlurMaskFilter.Blur.NORMAL
                             )
                         }
-                        
+
                         // Draw as oval/ellipse for tapered horizontal edges
                         canvas.nativeCanvas.drawOval(
                             centerX - halfSize - leftExtension,
@@ -389,7 +421,7 @@ fun GlowingArtworkContainerPhone(
                             bassPaint
                         )
                     }
-                    
+
                     // Layer 2: Mid layer
                     if (midGlow > config.midRenderThreshold) {
                         val midPaint = Paint().asFrameworkPaint().apply {
@@ -402,7 +434,7 @@ fun GlowingArtworkContainerPhone(
                                 BlurMaskFilter.Blur.NORMAL
                             )
                         }
-                        
+
                         canvas.nativeCanvas.drawRoundRect(
                             centerX - halfSize,
                             centerY - halfSize,
@@ -413,7 +445,7 @@ fun GlowingArtworkContainerPhone(
                             midPaint
                         )
                     }
-                    
+
                     // Layer 3: Treble layer
                     if (trebleGlow > config.trebleRenderThreshold) {
                         val treblePaint = Paint().asFrameworkPaint().apply {
@@ -426,9 +458,10 @@ fun GlowingArtworkContainerPhone(
                                 BlurMaskFilter.Blur.NORMAL
                             )
                         }
-                        
-                        val stereoOffsetX = halfSize * config.stereoBalanceTrebleScale * -stereoBalance
-                        
+
+                        val stereoOffsetX =
+                            halfSize * config.stereoBalanceTrebleScale * -stereoBalance
+
                         canvas.nativeCanvas.drawRoundRect(
                             centerX - halfSize - stereoOffsetX,
                             centerY - halfSize,
@@ -439,7 +472,7 @@ fun GlowingArtworkContainerPhone(
                             treblePaint
                         )
                     }
-                    
+
                     // Layer 4: White beat flash
                     if (config.enableBeatFlash && beatPulse > config.beatFlashThreshold) {
                         val beatFlashPaint = Paint().asFrameworkPaint().apply {
@@ -452,7 +485,7 @@ fun GlowingArtworkContainerPhone(
                                 BlurMaskFilter.Blur.NORMAL
                             )
                         }
-                        
+
                         canvas.nativeCanvas.drawRoundRect(
                             centerX - halfSize,
                             centerY - halfSize,

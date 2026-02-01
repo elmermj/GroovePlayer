@@ -1,26 +1,15 @@
 package com.aethelsoft.grooveplayer.presentation.player.layouts
 
 import android.util.Log
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,52 +25,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScaffoldDefaults.contentWindowInsets
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.palette.graphics.Palette
-import coil3.Bitmap
-import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -90,31 +59,31 @@ import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
-import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothBottomSheet
+import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.GlowingArtworkContainer
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
+import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.extractDominantColor
+import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
-import com.aethelsoft.grooveplayer.utils.WaveformUtils
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
-import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
-import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIcon
-import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class,
     ExperimentalLayoutApi::class
@@ -137,6 +106,8 @@ fun LargeTabletPlayerLayout(
     val queue by playerViewModel.queue.collectAsState()
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+    val glowEffectConfig by playerViewModel.glowEffectConfig.collectAsState()
+
 
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
@@ -270,7 +241,7 @@ fun LargeTabletPlayerLayout(
                     activeBackground = Color.White,
                     inactiveBackground = Color.Transparent,
                 ) {
-                    BTIndicatorIcon(
+                    BTIndicatorIconComponent(
                         connectedDeviceName = connectedDevice?.name,
                         isConnected = connectedDevice != null,
                         tint = if(showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
@@ -333,17 +304,20 @@ fun LargeTabletPlayerLayout(
                             }
                             .fillMaxHeight()
                             .aspectRatio(1f)
-                            .padding(M_PADDING)
-                    ) {
-                        SwipeableArtwork(
-                            size = maxArtworkHeight - S_PADDING,
-                            artworkUrl = song?.artworkUrl,
-                            onTap = { playerViewModel.playPauseToggle() },
-                            onSwipePrevious = { playerViewModel.previous() },
-                            onSwipeNext = { playerViewModel.next() },
-                            onDismiss = onClose
-                        )
-                    }
+                            .padding(M_PADDING),
+                        deviceType = DeviceType.LARGE_TABLET,
+                        config = glowEffectConfig,
+                        content = {
+                            SwipeableArtwork(
+                                size = maxArtworkHeight - S_PADDING,
+                                artworkUrl = song?.artworkUrl,
+                                onTap = { playerViewModel.playPauseToggle() },
+                                onSwipePrevious = { playerViewModel.previous() },
+                                onSwipeNext = { playerViewModel.next() },
+                                onDismiss = onClose
+                            )
+                        }
+                    )
                 }
 
                 androidx.compose.animation.AnimatedVisibility(
@@ -441,8 +415,7 @@ fun LargeTabletPlayerLayout(
                             isBluetoothEnabled = isBluetoothEnabledNow,
                             hasBluetoothPermissions = hasBluetoothPermissions,
                             onRequestBluetoothPermission = requestBluetoothPermissions,
-                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
-                            onDismiss = { showBluetoothSheet = false }
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() }
                         )
                     }
                 }
@@ -608,366 +581,5 @@ fun LargeTabletPlayerLayout(
             }
             Spacer(modifier = Modifier.height(S_PADDING))
         }
-    }
-}
-
-fun extractDominantColor(bitmap: Bitmap): Color {
-    val palette = Palette.from(bitmap).generate()
-    val swatch =
-        palette.vibrantSwatch
-            ?: palette.mutedSwatch
-            ?: palette.dominantSwatch
-
-    return swatch?.rgb?.let { Color(it) } ?: Color.White
-}
-
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-fun SwipeableArtwork(
-    size: Dp,
-    artworkUrl: String?,
-    swipeThresholdDp: Dp = 240.dp,
-    dismissThresholdDp: Dp = 720.dp,
-    onTap: () -> Unit,
-    onSwipeNext: () -> Unit,
-    onSwipePrevious: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-
-    val swipeThresholdPx = remember {
-        with(density) { swipeThresholdDp.toPx() }
-    }
-    val dismissThresholdPx = remember {
-        with(density) { dismissThresholdDp.toPx() }
-    }
-
-    // ===== Drag state (SYNC, FAST) =====
-    var dragX by remember { mutableFloatStateOf(0f) }
-    var dragY by remember { mutableFloatStateOf(0f) }
-    var thresholdHapticSent by remember { mutableStateOf(false) }
-
-    // ===== Release animation =====
-    val settleX = remember { Animatable(0f) }
-    val settleY = remember { Animatable(0f) }
-
-    val velocityTracker = remember { VelocityTracker() }
-
-    val offsetX = dragX + settleX.value
-    val offsetY = dragY + settleY.value
-
-    fun rubberBand(value: Float): Float =
-        value * 0.65f
-
-    AnimatedContent(
-        targetState = artworkUrl,
-        transitionSpec = {
-            fadeIn(tween(300)).togetherWith(fadeOut(tween(300)))
-        },
-        label = "ArtworkCrossfade"
-    ) { url ->
-        AsyncImage(
-            model = url,
-            contentDescription = "Artwork",
-            modifier = Modifier
-                .size(size)
-                .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
-                .graphicsLayer {
-                    clip = true
-                    shape = RoundedCornerShape(20.dp)
-
-                    scaleX = 1f - abs(offsetX) / 1600f
-                    scaleY = scaleX
-                    alpha = 1f - abs(offsetY) / 1500f
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { onTap() })
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = {
-                            dragX = 0f
-                            dragY = 0f
-                            thresholdHapticSent = false
-                            velocityTracker.resetTracking()
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            velocityTracker.addPosition(
-                                change.uptimeMillis,
-                                change.position
-                            )
-                            dragX = rubberBand(dragX + dragAmount.x)
-                            dragY = rubberBand(dragY + dragAmount.y)
-
-                            if (!thresholdHapticSent &&
-                                (abs(dragX) > swipeThresholdPx ||
-                                        abs(dragY) > dismissThresholdPx)
-                            ) {
-                                thresholdHapticSent = true
-                                haptic.performHapticFeedback(
-                                    HapticFeedbackType.TextHandleMove
-                                )
-                            }
-                        },
-                        onDragEnd = {
-                            scope.launch {
-                                val velocity = velocityTracker.calculateVelocity()
-
-                                when {
-                                    dragY > dismissThresholdPx || velocity.y > 2400f ->
-                                        onDismiss()
-
-                                    dragX < -swipeThresholdPx || velocity.x < -1500f ->
-                                        onSwipeNext()
-
-                                    dragX > swipeThresholdPx || velocity.x > 1500f ->
-                                        onSwipePrevious()
-                                }
-
-                                settleX.animateTo(-dragX)
-                                settleY.animateTo(-dragY)
-                                dragX = 0f
-                                dragY = 0f
-                                settleX.snapTo(0f)
-                                settleY.snapTo(0f)
-                            }
-                        }
-                    )
-                },
-            contentScale = ContentScale.Crop
-        )
-    }
-}
-
-/**
- * Audio-reactive glow container for artwork with configurable visual effects.
- * 
- * @param dominantColor The primary color extracted from artwork for glow tinting
- * @param visualization Real-time audio analysis data (bass, mid, treble, stereo, beat)
- * @param config Glow effect configuration - use presets or customize
- * @param modifier Modifier for the container (must use graphicsLayer { clip = false })
- * @param content The artwork content to wrap with glow effect
- */
-@Composable
-fun GlowingArtworkContainer(
-    modifier: Modifier = Modifier,
-    dominantColor: Color,
-    visualization: AudioVisualizationData,
-    config: GlowEffectConfig = GlowEffectConfig.LargeTablet,
-    content: @Composable () -> Unit
-) {
-    val density = LocalDensity.current
-
-    // Balanced animations: responsive but smooth
-    val bassGlow by animateFloatAsState(
-        targetValue = visualization.bass,
-        animationSpec = tween(75),
-        label = "BassGlow"
-    )
-    
-    val midGlow by animateFloatAsState(
-        targetValue = visualization.mid,
-        animationSpec = tween(70),
-        label = "MidGlow"
-    )
-    
-    val trebleGlow by animateFloatAsState(
-        targetValue = visualization.treble,
-        animationSpec = tween(60),
-        label = "TrebleGlow"
-    )
-    
-    val beatPulse by animateFloatAsState(
-        targetValue = visualization.beat,
-        animationSpec = tween(50),
-        label = "BeatPulse"
-    )
-    
-    val stereoBalance by animateFloatAsState(
-        targetValue = visualization.stereoBalance,
-        animationSpec = tween(120),
-        label = "StereoBalance"
-    )
-
-    Box(
-        modifier = modifier
-            .graphicsLayer { clip = false }
-            .drawBehind {
-                drawIntoCanvas { canvas ->
-                    // Calculate colors for different frequency bands using config
-                    val bassColor = dominantColor.copy(
-                        red = dominantColor.red * config.bassColorRedMultiplier,
-                        blue = dominantColor.blue * config.bassColorBlueMultiplier
-                    )
-
-                    val trebleColor = dominantColor.copy(
-                        red = (dominantColor.red + config.trebleColorBoost).coerceAtMost(1f),
-                        green = (dominantColor.green + config.trebleColorBoost).coerceAtMost(1f),
-                        blue = (dominantColor.blue + config.trebleColorBoost).coerceAtMost(1f)
-                    )
-
-                    // Calculate glow parameters using config
-                    val baseIntensity = (bassGlow * 0.5f + midGlow * 0.3f + trebleGlow * 0.2f)
-                    val glowAlpha =
-                        (config.minAlpha + baseIntensity * config.intensityAlphaRange + beatPulse * config.beatAlphaBoost)
-                            .coerceIn(0f, config.maxAlpha)
-
-                    // Calculate blur radius using config
-//                    val baseBlurRadius = size.minDimension * config.baseBlurMultiplier
-//                    val bassExpansion =
-//                        size.minDimension * config.bassExpansionMultiplier * bassGlow
-//                    val trebleTightness =
-//                        -size.minDimension * config.trebleTightnessMultiplier * trebleGlow
-//                    val beatExpansion =
-//                        size.minDimension * config.beatExpansionMultiplier * beatPulse
-                    val blurRadiusPx = WaveformUtils(config, size).calculateBlurRadius(bassGlow, trebleGlow, beatPulse)
-
-                    val cornerPx = with(density) { config.cornerRadius.toPx() }
-
-                    // Layer 1: Bass layer with stereo-based horizontal extension (tapered edges)
-                    WaveformUtils(config, size).drawBassLayerWithTaperedEdges(
-                        isThresholdPassed = bassGlow > config.bassRenderThreshold,
-                        canvas = canvas,
-                        bassGlow = bassGlow,
-                        stereoBalance = stereoBalance,
-                        bassColor = bassColor,
-                        glowAlpha = glowAlpha,
-                        blurRadiusPx = blurRadiusPx,
-                    )
-//                    if (bassGlow > config.bassRenderThreshold) {
-//
-//                        val horizontalExtension =  WaveformUtils().calculateHorizontalExtension(
-//                            stereoBalance = stereoBalance,
-//                            maxHorizontalExtension = size.width * config.bassHorizontalExtension
-//                        )
-//
-//                        // Draw bass as ellipse for pointed/tapered edges
-//                        val bassPaint = Paint().asFrameworkPaint().apply {
-//                            isAntiAlias = true
-//                            color = bassColor
-//                                .copy(alpha = glowAlpha * config.bassLayerAlpha * bassGlow)
-//                                .toArgb()
-//                            maskFilter = BlurMaskFilter(
-//                                blurRadiusPx * config.bassLayerBlurScale,
-//                                BlurMaskFilter.Blur.NORMAL
-//                            )
-//                        }
-//
-//                        // Draw as oval/ellipse for tapered horizontal edges
-//                        canvas.nativeCanvas.drawOval(
-//                            -horizontalExtension[0],
-//                            0f,
-//                            size.width + horizontalExtension[1],
-//                            size.height,
-//                            bassPaint
-//                        )
-//                    }
-
-                    // Layer 2: Mid layer (medium, dominant color)
-                    WaveformUtils(config, size).drawMidLayer(
-                        midGlow = midGlow,
-                        canvas = canvas,
-                        midColor = dominantColor,
-                        glowAlpha = glowAlpha,
-                        blurRadiusPx = blurRadiusPx,
-                        cornerPx = cornerPx
-                    )
-
-//                    if (midGlow > config.midRenderThreshold) {
-//                        val midPaint = Paint().asFrameworkPaint().apply {
-//                            isAntiAlias = true
-//                            color = midColor
-//                                .copy(alpha = glowAlpha * config.midLayerAlpha * midGlow)
-//                                .toArgb()
-//                            maskFilter = BlurMaskFilter(
-//                                blurRadiusPx * config.midLayerBlurScale,
-//                                BlurMaskFilter.Blur.NORMAL
-//                            )
-//                        }
-//
-//                        canvas.nativeCanvas.drawRoundRect(
-//                            0f,
-//                            0f,
-//                            size.width,
-//                            size.height,
-//                            cornerPx,
-//                            cornerPx,
-//                            midPaint
-//                        )
-//                    }
-
-                    // Layer 3: Treble layer (tight, bright)
-                    WaveformUtils(config, size).drawTrebleLayer(
-                        trebleGlow = trebleGlow,
-                        canvas = canvas,
-                        trebleColor = trebleColor,
-                        glowAlpha = glowAlpha,
-                        blurRadiusPx = blurRadiusPx,
-                        cornerPx = cornerPx,
-                        stereoBalance = stereoBalance
-                    )
-//                    if (trebleGlow > config.trebleRenderThreshold) {
-//                        val treblePaint = Paint().asFrameworkPaint().apply {
-//                            isAntiAlias = true
-//                            color = trebleColor
-//                                .copy(alpha = glowAlpha * config.trebleLayerAlpha * trebleGlow)
-//                                .toArgb()
-//                            maskFilter = BlurMaskFilter(
-//                                blurRadiusPx * config.trebleLayerBlurScale,
-//                                BlurMaskFilter.Blur.NORMAL
-//                            )
-//                        }
-//
-//                        val stereoOffsetX =
-//                            size.width * config.stereoBalanceTrebleScale * -stereoBalance
-//
-//                        canvas.nativeCanvas.drawRoundRect(
-//                            -stereoOffsetX,
-//                            0f,
-//                            size.width - stereoOffsetX,
-//                            size.height,
-//                            cornerPx,
-//                            cornerPx,
-//                            treblePaint
-//                        )
-//                    }
-
-                    // Layer 4: White beat flash (rendered on top for maximum impact)
-                    WaveformUtils(config, size).drawWhiteBeatFlash(
-                        beatPulse = beatPulse,
-                        canvas = canvas,
-                        cornerPx = cornerPx,
-                        blurRadiusPx = blurRadiusPx
-                    )
-//                    if (config.enableBeatFlash && beatPulse > config.beatFlashThreshold) {
-//                        val beatFlashPaint = Paint().asFrameworkPaint().apply {
-//                            isAntiAlias = true
-//                            // Pure white with beat-modulated alpha
-//                            color = Color.White
-//                                .copy(alpha = config.beatFlashAlpha * beatPulse)
-//                                .toArgb()
-//                            maskFilter = BlurMaskFilter(
-//                                blurRadiusPx * config.beatFlashBlurScale,
-//                                BlurMaskFilter.Blur.NORMAL
-//                            )
-//                        }
-//
-//                        canvas.nativeCanvas.drawRoundRect(
-//                            0f,
-//                            0f,
-//                            size.width,
-//                            size.height,
-//                            cornerPx,
-//                            cornerPx,
-//                            beatFlashPaint
-//                        )
-//                    }
-                }
-            }
-    ) {
-        content()
     }
 }
