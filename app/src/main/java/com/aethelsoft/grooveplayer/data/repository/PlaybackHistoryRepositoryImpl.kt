@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.data.repository
 import com.aethelsoft.grooveplayer.data.local.db.dao.AlbumDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
+import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
@@ -45,18 +46,30 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
         // Create/update album entity - link to primary artist
         val primaryArtist = artists.firstOrNull() ?: "Unknown Artist"
         val existingAlbum = albumDao.getAlbum(albumName, primaryArtist)
-        if (existingAlbum == null) {
-            albumDao.insertOrUpdate(
-                AlbumEntity(
-                    name = albumName,
-                    artist = primaryArtist,
-                    artworkUrl = song.artworkUrl
-                )
+        val albumEntity = if (existingAlbum == null) {
+            val newAlbum = AlbumEntity(
+                name = albumName,
+                artworkUrl = song.artworkUrl
             )
+            albumDao.insertOrUpdate(newAlbum)
+            // After first insert there is no album_artists relation yet, so fall back to name lookup
+            albumDao.getAlbum(albumName, primaryArtist) ?: albumDao.getAlbumByName(albumName) ?: newAlbum
         } else if (existingAlbum.artworkUrl == null && song.artworkUrl != null) {
-            // Update artwork if missing
-            albumDao.insertOrUpdate(
-                existingAlbum.copy(artworkUrl = song.artworkUrl)
+            val updated = existingAlbum.copy(artworkUrl = song.artworkUrl)
+            albumDao.insertOrUpdate(updated)
+            updated
+        } else {
+            existingAlbum
+        }
+
+        // Link album to all involved artists
+        artists.forEach { artistName ->
+            val artistEntity = artistDao.getArtist(artistName) ?: return@forEach
+            albumDao.insertAlbumArtistCrossRef(
+                AlbumArtistCrossRef(
+                    albumId = albumEntity.albumId,
+                    artistId = artistEntity.artistId
+                )
             )
         }
         

@@ -60,7 +60,9 @@ object UserMapper {
                 "SIMULATED" -> VisualizationMode.SIMULATED
                 "REAL_TIME" -> VisualizationMode.REAL_TIME
                 else -> VisualizationMode.REAL_TIME
-            }
+            },
+            showMiniPlayerOnStart = entity.showMiniPlayerOnStart,
+            excludedFolders = parseExcludedFolders(entity.excludedFolders)
         )
     }
     
@@ -83,8 +85,23 @@ object UserMapper {
                 VisualizationMode.OFF -> "OFF"
                 VisualizationMode.SIMULATED -> "SIMULATED"
                 VisualizationMode.REAL_TIME -> "REAL_TIME"
-            }
+            },
+            showMiniPlayerOnStart = domain.showMiniPlayerOnStart,
+            excludedFolders = excludedFoldersToString(domain.excludedFolders)
         )
+    }
+    
+    // Helper functions for excluded folder paths (delimiter "||" so paths with commas are safe)
+    private fun parseExcludedFolders(value: String): List<String> {
+        return if (value.isBlank()) {
+            emptyList()
+        } else {
+            value.split("||").map { it.trim() }.filter { it.isNotEmpty() }
+        }
+    }
+    
+    private fun excludedFoldersToString(list: List<String>): String {
+        return list.joinToString("||")
     }
     
     // Helper functions for List<Int> <-> String conversion for band levels

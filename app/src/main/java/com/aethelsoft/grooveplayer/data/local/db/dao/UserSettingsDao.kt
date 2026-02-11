@@ -39,7 +39,16 @@ interface UserSettingsDao {
     
     @Query("UPDATE user_settings SET visualizationMode = :mode WHERE id = 1")
     suspend fun updateVisualizationMode(mode: String)
-    
+
+    @Query("UPDATE user_settings SET shuffleEnabled = :shuffle, repeatMode = :repeat WHERE id = 1")
+    suspend fun updateRepeatAndShuffle(shuffle: Boolean, repeat: String)
+
+    @Query("UPDATE user_settings SET showMiniPlayerOnStart = :enabled WHERE id = 1")
+    suspend fun updateShowMiniPlayerOnStart(enabled: Boolean)
+
+    @Query("UPDATE user_settings SET excludedFolders = :paths WHERE id = 1")
+    suspend fun updateExcludedFolders(paths: String)
+
     @Query("UPDATE user_settings SET lastPlayedSongId = :songId, lastPlayedPosition = :position WHERE id = 1")
     suspend fun updateLastPlayedSong(songId: String?, position: Long)
     
@@ -73,7 +82,9 @@ interface UserSettingsDao {
             repeatMode = "OFF",
             queueSongIds = "",
             queueStartIndex = 0,
-            isEndlessQueue = false
+            isEndlessQueue = false,
+            showMiniPlayerOnStart = false,
+            excludedFolders = ""
         ))
     }
 }

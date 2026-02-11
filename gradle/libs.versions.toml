@@ -28,6 +28,7 @@ lottie = "6.4.0"
 composeTesting = "1.0.0-alpha09"
 uiText = "1.10.1"
 paging = "3.3.5"
+uiVersion = "1.10.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -79,6 +80,8 @@ androidx-compose-testing = { group = "androidx.xr.compose", name = "compose-test
 androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+ui = { group = "androidx.compose.ui", name = "ui", version.ref = "uiVersion" }
+jaudiotagger = { module = "net.jthink:jaudiotagger", version = "3.0.1" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

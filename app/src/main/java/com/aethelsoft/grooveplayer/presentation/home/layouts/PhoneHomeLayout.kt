@@ -21,7 +21,6 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 public fun PhoneHomeLayout(
-    state: UiState.Success<List<Song>>,
     viewModel: HomeViewModel,
     onNavigateToSongs: () -> Unit,
     onNavigateToRecentlyPlayed: () -> Unit,
@@ -41,7 +40,7 @@ public fun PhoneHomeLayout(
                 LastPlayedSectionComponent(
                     lastPlayedSongs = lastPlayedSongs,
                     currentSong = LocalPlayerViewModel.current?.currentSong?.collectAsState()?.value,
-                    allLibrarySongs = state.data.ifEmpty { emptyList() }
+                    allLibrarySongs = viewModel.songs
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }){
@@ -59,8 +58,8 @@ public fun PhoneHomeLayout(
         item {
             LibraryCardComponent(
                 title = "All Songs",
-                subtitle = if (state.data.isNotEmpty()) "${state.data.size} songs" else "Tap to browse",
-                artworks = state.data.map { item ->
+                subtitle = if (viewModel.songs.isNotEmpty()) "${viewModel.songs.size} songs" else "Tap to browse",
+                artworks = viewModel.songs.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
                             "Unknown"
@@ -114,6 +113,15 @@ public fun PhoneHomeLayout(
                 artworks = emptyList(),
                 emptyNoticeText = "No favorites yet",
                 onClick = onNavigateToFavoriteArtists
+            )
+        }
+        item {
+            LibraryCardComponent(
+                title = "Favorite Albums",
+                subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
+                artworks = emptyList(),
+                emptyNoticeText = "No favorites yet",
+                onClick = onNavigateToFavoriteAlbums
             )
         }
     }

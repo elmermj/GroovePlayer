@@ -17,5 +17,7 @@ data class UserSettings(
     val queueSongIds: List<String> = emptyList(), // Queue song IDs
     val queueStartIndex: Int = 0,          // Queue start index
     val isEndlessQueue: Boolean = false,   // Whether queue is endless
-    val visualizationMode: VisualizationMode = VisualizationMode.SIMULATED // OFF, SIMULATED, REAL_TIME
+    val visualizationMode: VisualizationMode = VisualizationMode.SIMULATED, // OFF, SIMULATED, REAL_TIME
+    val showMiniPlayerOnStart: Boolean = false,  // Whether to show mini player when app launches
+    val excludedFolders: List<String> = emptyList()  // Folders to ignore during music scanning
 )

@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.data.player
 
 import android.content.Context
 import android.media.AudioManager
+import android.media.MediaMetadataRetriever
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -148,6 +149,14 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 val uri = mediaItem?.localConfiguration?.uri?.toString()
                 val song = _queue.value.firstOrNull { it.uri == uri }
                 _currentSong.value = song
+                val mime = mediaItem?.localConfiguration?.mimeType
+                val isM4a = isM4AMimeType(mime) || (song != null && isM4A(song.uri))
+                // M4A + Equalizer causes severe distortion; release Equalizer only. Keep Visualizer for real-time viz.
+                if (isM4a) {
+                    releaseEqualizerOnly()
+                }
+                // Re-init: for M4A we init Visualizer only; for others we init both
+                initializeVisualizerIfNeeded(reason = "media_item_transition")
                 _duration.value = _currentSong.value?.durationMs ?: player.duration.coerceAtLeast(0L)
                 
                 // Record playback when song transitions
@@ -288,46 +297,99 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
     }
 
+    /** M4A + Equalizer/Visualizer causes severe distortion (e.g. Samsung Galaxy). Bypass effects for M4A. */
+    private fun isM4AMimeType(mime: String?): Boolean {
+        if (mime == null) return false
+        val lower = mime.lowercase()
+        return lower == "audio/mp4" || lower == "audio/x-m4a" || lower.contains("m4a") || lower == "audio/aac"
+    }
+
+    private fun isM4A(uriString: String): Boolean {
+        return try {
+            val uri = Uri.parse(uriString)
+            when (uri.scheme) {
+                "content" -> {
+                    val mime = ctx.contentResolver.getType(uri)
+                        ?: run {
+                            // Fallback: ContentResolver can return null for some system files (e.g. Samsung)
+                            try {
+                                MediaMetadataRetriever().use { retriever ->
+                                    retriever.setDataSource(ctx, uri)
+                                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                                }
+                            } catch (e: Exception) { null }
+                        }
+                    isM4AMimeType(mime)
+                }
+                "file" -> uri.lastPathSegment?.lowercase()?.endsWith(".m4a") == true
+                else -> false
+            }
+        } catch (e: Exception) { false }
+    }
+
+    private fun isCurrentTrackM4A(): Boolean {
+        val mime = player.currentMediaItem?.localConfiguration?.mimeType
+        if (isM4AMimeType(mime)) return true
+        return _currentSong.value?.let { isM4A(it.uri) } == true
+    }
+
+    /** Release Equalizer only (M4A bypass). Visualizer stays for real-time viz. */
+    private fun releaseEqualizerOnly() {
+        try {
+            equalizerManager.release()
+            android.util.Log.d("ExoPlayerManager", "Released Equalizer (M4A bypass)")
+        } catch (e: Exception) {
+            android.util.Log.e("ExoPlayerManager", "Error releasing equalizer", e)
+        }
+    }
+
     /**
-     * Initialize the Visualizer + Equalizer pipeline if we have a valid audioSessionId
-     * and haven't successfully initialized yet.
-     *
-     * This is idempotent and can be safely called from multiple places.
+     * Initialize the Visualizer + Equalizer pipeline if we have a valid audioSessionId.
+     * For M4A: Visualizer only (Equalizer causes distortion on some devices).
+     * For other formats: both Equalizer and Visualizer.
      */
     private fun initializeVisualizerIfNeeded(reason: String) {
-        // If we already have an enabled visualizer, nothing to do.
+        val isM4a = isCurrentTrackM4A()
+        if (isM4a) {
+            releaseEqualizerOnly()
+        }
+        // If we already have an enabled visualizer, only init Equalizer if switching from M4A to non-M4A
         val existing = visualizer
         if (existing != null && existing.enabled) {
-            android.util.Log.d("ExoPlayerManager", "Visualizer already initialized (reason=$reason)")
+            if (!isM4a) {
+                val sessionId = player.audioSessionId
+                if (sessionId != 0) {
+                    equalizerManager.initialize(sessionId)
+                    scope.launch(Dispatchers.IO) {
+                        kotlinx.coroutines.delay(100)
+                        equalizerRepository.loadSettings()
+                    }
+                }
+            }
             return
         }
 
         try {
             val sessionId = player.audioSessionId
-            android.util.Log.d("ExoPlayerManager", "Attempting to initialize Visualizer (reason=$reason) with session ID: $sessionId")
+            android.util.Log.d("ExoPlayerManager", "Attempting to initialize Visualizer (reason=$reason) with session ID: $sessionId, isM4A=$isM4a")
 
             if (sessionId == 0) {
-                // This often happens before playback starts; we'll retry on next call.
                 android.util.Log.w("ExoPlayerManager", "⚠️ Audio session ID is 0, deferring Visualizer initialization (reason=$reason)")
                 return
             }
 
-            // Initialize equalizer with the same audio session ID
-            val equalizerInitialized = equalizerManager.initialize(sessionId)
-            if (equalizerInitialized) {
-                android.util.Log.d("ExoPlayerManager", "✅ Equalizer initialized successfully (reason=$reason)")
-                // Load saved equalizer settings (defer to avoid blocking initialization)
-                scope.launch(Dispatchers.IO) {
-                    try {
-                        // Small delay to ensure database is ready
+            // Equalizer causes M4A distortion on some devices (e.g. Samsung); skip for M4A only
+            if (!isM4a) {
+                val equalizerInitialized = equalizerManager.initialize(sessionId)
+                if (equalizerInitialized) {
+                    android.util.Log.d("ExoPlayerManager", "✅ Equalizer initialized (reason=$reason)")
+                    scope.launch(Dispatchers.IO) {
                         kotlinx.coroutines.delay(100)
                         equalizerRepository.loadSettings()
-                    } catch (e: Exception) {
-                        android.util.Log.e("ExoPlayerManager", "Error loading equalizer settings: ${e.message}", e)
                     }
+                } else {
+                    android.util.Log.w("ExoPlayerManager", "⚠️ Equalizer init failed (reason=$reason)")
                 }
-            } else {
-                android.util.Log.w("ExoPlayerManager", "⚠️ Equalizer initialization failed (reason=$reason)")
             }
 
             visualizer = Visualizer(sessionId).apply {
@@ -595,9 +657,26 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
     }
     
+    private fun buildMediaItem(uri: Uri): MediaItem {
+        val mimeType = if (uri.scheme == "content") {
+            try {
+                ctx.contentResolver.getType(uri)
+                    ?: MediaMetadataRetriever().use { retriever ->
+                        retriever.setDataSource(ctx, uri)
+                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                    }
+            } catch (e: Exception) { null }
+        } else null
+        return if (mimeType != null && mimeType.startsWith("audio/")) {
+            MediaItem.Builder().setUri(uri).setMimeType(mimeType).build()
+        } else {
+            MediaItem.fromUri(uri)
+        }
+    }
+
     private suspend fun prepareFromSong(song: Song) {
         withContext(Dispatchers.Main) {
-            player.setMediaItem(MediaItem.fromUri(Uri.parse(song.uri)))
+            player.setMediaItem(buildMediaItem(Uri.parse(song.uri)))
             player.prepare()
         }
         _currentSong.value = song
@@ -613,7 +692,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         // All ExoPlayer operations MUST run on Main thread
         withContext(Dispatchers.Main) {
             player.clearMediaItems()
-            songs.forEach { s -> player.addMediaItem(MediaItem.fromUri(s.uri.toUri())) }
+            songs.forEach { s -> player.addMediaItem(buildMediaItem(s.uri.toUri())) }
             player.prepare()
             val idx = startIndex.coerceIn(0, songs.lastIndex.coerceAtLeast(0))
             player.seekTo(idx, 0)
@@ -694,7 +773,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         // Add to ExoPlayer - MUST run on Main thread
         withContext(Dispatchers.Main) {
             randomSongs.forEach { song ->
-                player.addMediaItem(MediaItem.fromUri(Uri.parse(song.uri)))
+                player.addMediaItem(buildMediaItem(Uri.parse(song.uri)))
             }
         }
         
@@ -730,16 +809,16 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun next() {
-        if (fadeTimerSeconds > 0 && _isPlaying.value) {
-            applyFadeOut()
-        }
+//        if (fadeTimerSeconds > 0 && _isPlaying.value) {
+//            applyFadeOut()
+//        }
         withContext(Dispatchers.Main) {
             player.seekToNext()
             player.play()
         }
-        if (fadeTimerSeconds > 0) {
-            applyFadeIn()
-        }
+//        if (fadeTimerSeconds > 0) {
+//            applyFadeIn()
+//        }
     }
 
     override suspend fun previous() {
@@ -754,16 +833,16 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 player.play()
             }
         } else {
-            if (fadeTimerSeconds > 0 && _isPlaying.value) {
-                applyFadeOut()
-            }
+//            if (fadeTimerSeconds > 0 && _isPlaying.value) {
+//                applyFadeOut()
+//            }
             withContext(Dispatchers.Main) {
                 player.seekToPrevious()
                 player.play()
             }
-            if (fadeTimerSeconds > 0) {
-                applyFadeIn()
-            }
+//            if (fadeTimerSeconds > 0) {
+//                applyFadeIn()
+//            }
         }
     }
     
@@ -779,7 +858,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             val originalVolume = player.volume
             val steps = 20 // Number of volume reduction steps
             val delayMs = (fadeTimerSeconds * 1000L) / steps
-            
+
             for (i in steps downTo 0) {
                 val newVolume = originalVolume * (i.toFloat() / steps)
                 player.volume = newVolume
@@ -825,6 +904,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         withContext(Dispatchers.Main) {
             player.shuffleModeEnabled = enable
         }
+        withContext(Dispatchers.IO) {
+            userRepository.updateRepeatAndShuffle(_shuffle.value, _repeat.value.name)
+        }
     }
 
     override suspend fun setRepeat(mode: RepeatMode) {
@@ -835,6 +917,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 RepeatMode.ONE -> ExoPlayer.REPEAT_MODE_ONE
                 RepeatMode.ALL -> ExoPlayer.REPEAT_MODE_ALL
             }
+        }
+        withContext(Dispatchers.IO) {
+            userRepository.updateRepeatAndShuffle(_shuffle.value, _repeat.value.name)
         }
     }
 

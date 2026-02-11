@@ -2,10 +2,13 @@ package com.aethelsoft.grooveplayer.data.repository
 
 import com.aethelsoft.grooveplayer.data.local.db.dao.AlbumDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.GenreDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
+import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
 import com.aethelsoft.grooveplayer.domain.repository.AlbumMetadata
 import com.aethelsoft.grooveplayer.domain.repository.ArtistMetadata
@@ -19,7 +22,8 @@ class SongMetadataRepositoryImpl @Inject constructor(
     private val songMetadataDao: SongMetadataDao,
     private val playbackHistoryDao: PlaybackHistoryDao,
     private val artistDao: ArtistDao,
-    private val albumDao: AlbumDao
+    private val albumDao: AlbumDao,
+    private val genreDao: GenreDao
 ) : SongMetadataRepository {
     
     override suspend fun getMetadata(songId: String): SongMetadata? {
@@ -39,7 +43,8 @@ class SongMetadataRepositoryImpl @Inject constructor(
         )
         songMetadataDao.insertOrUpdate(entity)
         
-        // Also update artist and album entities
+        // Also update artist, album, and genre entities
+
         // Ensure all artists are created
         metadata.artists.forEach { artistName ->
             val existing = artistDao.getArtist(artistName)
@@ -47,31 +52,58 @@ class SongMetadataRepositoryImpl @Inject constructor(
                 artistDao.insertOrUpdate(ArtistEntity(name = artistName))
             }
         }
-        
+
         // Determine album name - if missing, create "Single - {song title}"
-        val albumName = metadata.album?.takeIf { 
-            it.isNotBlank() && it != "Unknown Album" 
+        val albumName = metadata.album?.takeIf {
+            it.isNotBlank() && it != "Unknown Album"
         } ?: "Single - ${metadata.title}"
-        
-        // Create/update album entity - link to primary artist
+
+        // Create/update album entity - link to all artists for this album
         val primaryArtist = metadata.artists.firstOrNull() ?: "Unknown Artist"
-        val existingAlbum = albumDao.getAlbum(albumName, primaryArtist)
-        if (existingAlbum == null) {
-            albumDao.insertOrUpdate(
-                AlbumEntity(
-                    name = albumName,
-                    artist = primaryArtist
+        val existingAlbum = albumDao.getAlbum(albumName, primaryArtist) ?: albumDao.getAlbumByName(albumName)
+        val albumEntity = if (existingAlbum == null) {
+            val newAlbum = AlbumEntity(
+                name = albumName
+            )
+            albumDao.insertOrUpdate(newAlbum)
+            // Re-query to obtain generated ID (name is unique enough for our purposes here)
+            albumDao.getAlbumByName(albumName) ?: newAlbum
+        } else {
+            existingAlbum
+        }
+
+        // Link album to all involved artists
+        metadata.artists.forEach { artistName ->
+            val artistEntity = artistDao.getArtist(artistName) ?: return@forEach
+            albumDao.insertAlbumArtistCrossRef(
+                AlbumArtistCrossRef(
+                    albumId = albumEntity.albumId,
+                    artistId = artistEntity.artistId
                 )
             )
+        }
+
+        // Ensure all genres are created
+        metadata.genres.forEach { genreName ->
+            val trimmed = genreName.trim()
+            if (trimmed.isEmpty()) return@forEach
+            val existing = genreDao.getByName(trimmed)
+            if (existing == null) {
+                genreDao.insertOrUpdate(GenreEntity(name = trimmed))
+            }
         }
     }
     
     override suspend fun searchGenres(query: String): List<String> {
-        return playbackHistoryDao.searchGenres(query)
+        val fromHistory = playbackHistoryDao.searchGenres(query)
+        val fromGenres = genreDao.searchGenres(query)
+        return (fromHistory + fromGenres).distinct().sorted()
     }
     
     override suspend fun getAllGenres(): List<String> {
-        return playbackHistoryDao.getAllGenres()
+        val fromHistory = playbackHistoryDao.getAllGenres()
+        val fromGenres = genreDao.getAllGenres()
+        return (fromHistory + fromGenres).distinct().sorted()
     }
     
     override suspend fun searchArtists(query: String): List<String> {
@@ -100,17 +132,43 @@ class SongMetadataRepositoryImpl @Inject constructor(
     
     override suspend fun getAlbum(albumName: String, artistName: String): AlbumMetadata? {
         val entity = albumDao.getAlbum(albumName, artistName) ?: return null
-        return entity.toAlbumMetadata()
+        return AlbumMetadata(
+            name = entity.name,
+            artist = artistName,
+            artworkUrl = entity.artworkUrl,
+            year = entity.year
+        )
     }
     
     override suspend fun saveAlbum(album: AlbumMetadata) {
-        val entity = AlbumEntity(
+        // Ensure artist exists
+        val existingArtist = artistDao.getArtist(album.artist)
+        if (existingArtist == null) {
+            artistDao.insertOrUpdate(ArtistEntity(name = album.artist))
+        }
+        val artistEntity = artistDao.getArtist(album.artist)
+            ?: ArtistEntity(name = album.artist)
+
+        // Create or update album
+        val existingAlbum = albumDao.getAlbum(album.name, album.artist) ?: albumDao.getAlbumByName(album.name)
+        val albumEntity = existingAlbum?.copy(
+            artworkUrl = album.artworkUrl ?: existingAlbum.artworkUrl,
+            year = album.year ?: existingAlbum.year
+        ) ?: AlbumEntity(
             name = album.name,
-            artist = album.artist,
             artworkUrl = album.artworkUrl,
             year = album.year
         )
-        albumDao.insertOrUpdate(entity)
+        albumDao.insertOrUpdate(albumEntity)
+
+        // Re-fetch album with proper ID and link to artist
+        val finalAlbum = albumDao.getAlbum(album.name, album.artist) ?: albumDao.getAlbumByName(album.name) ?: albumEntity
+        albumDao.insertAlbumArtistCrossRef(
+            AlbumArtistCrossRef(
+                albumId = finalAlbum.albumId,
+                artistId = artistEntity.artistId
+            )
+        )
     }
     
     override suspend fun getArtist(artistName: String): ArtistMetadata? {
@@ -133,7 +191,7 @@ class SongMetadataRepositoryImpl @Inject constructor(
         val entity = albumDao.getLatestAlbumByArtist(artistName) ?: return null
         return AlbumMetadata(
             name = entity.name,
-            artist = entity.artist,
+            artist = artistName,
             artworkUrl = entity.artworkUrl,
             year = entity.year
         )
@@ -150,12 +208,5 @@ class SongMetadataRepositoryImpl @Inject constructor(
             useAlbumYear = useAlbumYear
         )
 
-    private fun AlbumEntity.toAlbumMetadata(): AlbumMetadata =
-        AlbumMetadata(
-            name = name,
-            artist = artist,
-            artworkUrl = artworkUrl,
-            year = year
-        )
 }
 

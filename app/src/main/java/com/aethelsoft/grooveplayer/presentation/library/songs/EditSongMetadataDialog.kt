@@ -1,5 +1,7 @@
 package com.aethelsoft.grooveplayer.presentation.library.songs
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -41,6 +44,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -54,6 +60,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.library.songs.metadata.EditSongMetadataViewModel
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import kotlinx.coroutines.launch
 
 @Composable
@@ -165,6 +175,29 @@ fun EditSongMetadataDialog(
                                 onUseAlbumYearChange = { viewModel.updateUseAlbumYear(it) }
                             )
                         }
+                        
+                        item {
+                            EditTrackNumberField(
+                                trackNumber = uiState.trackNumber,
+                                onTrackNumberChange = { viewModel.updateTrackNumber(it) }
+                            )
+                        }
+                        
+                        item {
+                            EditArtworkField(
+                                artworkBytes = uiState.artworkBytes,
+                                onArtworkChange = { bytes, mimeType -> viewModel.updateArtwork(bytes, mimeType) }
+                            )
+                        }
+                    }
+                    
+                    if (uiState.saveError != null) {
+                        Text(
+                            text = uiState.saveError!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                     
                     // Footer buttons
@@ -179,8 +212,10 @@ fun EditSongMetadataDialog(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
+                                if (uiState.isSaving) return@Button
                                 coroutineScope.launch {
-                                    viewModel.saveMetadata()
+                                    val ok = viewModel.saveMetadata()
+                                    if (!ok) return@launch
                                     val newAlbum = uiState.album?.let { newName ->
                                         val existing = song.album
                                         if (existing != null) {
@@ -211,7 +246,7 @@ fun EditSongMetadataDialog(
                                 }
                             }
                         ) {
-                            Text("Save")
+                            Text(if (uiState.isSaving) "Saving…" else "Save")
                         }
                     }
                 }
@@ -498,6 +533,95 @@ private fun EditAlbumField(
                             keyboardController?.hide()
                         }
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditTrackNumberField(
+    trackNumber: Int?,
+    onTrackNumberChange: (Int?) -> Unit
+) {
+    var trackText by remember { mutableStateOf(trackNumber?.toString() ?: "") }
+    LaunchedEffect(trackNumber) {
+        trackText = trackNumber?.toString() ?: ""
+    }
+    OutlinedTextField(
+        value = trackText,
+        onValueChange = {
+            trackText = it
+            onTrackNumberChange(it.toIntOrNull())
+        },
+        label = { Text("Track number") },
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        singleLine = true
+    )
+}
+
+@Composable
+private fun EditArtworkField(
+    artworkBytes: ByteArray?,
+    onArtworkChange: (ByteArray?, String?) -> Unit
+) {
+    val context = LocalContext.current
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            context.contentResolver.openInputStream(it)?.use { stream ->
+                val bytes = stream.readBytes()
+                val mimeType = context.contentResolver.getType(it) ?: "image/jpeg"
+                onArtworkChange(bytes, mimeType)
+            }
+        }
+    }
+    
+    Column {
+        Text(
+            text = "Artwork",
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+                    Image(
+                        painter = rememberAsyncImagePainter(
+                            ImageRequest.Builder(context).data(artworkBytes).build()
+                        ),
+                        contentDescription = "Album artwork",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = "No artwork",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { imagePicker.launch("image/*") }) {
+                    Text("Change artwork")
+                }
+                if (artworkBytes != null) {
+                    TextButton(onClick = { onArtworkChange(null, null) }) {
+                        Text("Remove artwork")
+                    }
                 }
             }
         }

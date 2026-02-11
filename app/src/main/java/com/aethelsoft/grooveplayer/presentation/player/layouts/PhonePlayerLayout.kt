@@ -53,8 +53,8 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.palette.graphics.Palette
+import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -118,7 +118,7 @@ fun PhonePlayerLayout(
 
 
     // Bluetooth ViewModel
-    val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    val bluetoothViewModel: BluetoothViewModel = rememberBluetoothViewModel()
     val (hasBluetoothPermissions, requestBluetoothPermissions) = rememberBluetoothPermissionState()
     val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
     val isScanning by bluetoothViewModel.isScanning.collectAsState()
@@ -330,10 +330,6 @@ fun PhonePlayerLayout(
 
             Spacer(modifier = Modifier.height(S_PADDING + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
         }
-        OverlayEffectComponentPhone(
-            modifier = Modifier.fillMaxSize(),
-            screenSize = configuration.containerSize
-        )
         androidx.compose.animation.AnimatedVisibility(
             visible = showQueue,
             enter = slideInHorizontally(
@@ -353,6 +349,10 @@ fun PhonePlayerLayout(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
         ) {
+            OverlayEffectComponentPhone(
+                modifier = Modifier.fillMaxSize(),
+                screenSize = configuration.containerSize
+            )
             Column(
                 modifier = Modifier
                     .height(maxArtworkHeight)

@@ -40,8 +40,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
+import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
@@ -50,7 +50,7 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
 @Composable
 fun BluetoothBottomSheet(
     onDismiss: () -> Unit,
-    viewModel: BluetoothViewModel = hiltViewModel()
+    viewModel: BluetoothViewModel = rememberBluetoothViewModel()
 ) {
     val context = LocalContext.current
     val enableBluetoothLauncher = rememberLauncherForActivityResult(

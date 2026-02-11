@@ -89,6 +89,7 @@ dependencies {
     implementation(libs.androidx.compose.testing)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.text)
+    implementation(libs.ui)
     kapt(libs.hilt.compiler)
 
     // Room (KSP OK)
@@ -104,6 +105,9 @@ dependencies {
     // Paging
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
+
+    // Audio tag editing (MP3, M4A, FLAC, OGG, etc.)
+    implementation(libs.jaudiotagger)
 
     // Misc
     implementation(libs.icons.lucide)

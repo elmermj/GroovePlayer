@@ -67,6 +67,12 @@ interface UserRepository {
         bandLevels: List<Int>
     )
     suspend fun updateVisualizationMode(mode: com.aethelsoft.grooveplayer.domain.model.VisualizationMode)
+    suspend fun updateRepeatAndShuffle(shuffle: Boolean, repeat: String)
+    suspend fun updateShowMiniPlayerOnStart(enabled: Boolean)
+    /**
+     * Replaces the list of folder paths excluded from music scanning.
+     */
+    suspend fun updateExcludedFolders(paths: List<String>)
     suspend fun updateLastPlayedSong(songId: String?, position: Long)
     suspend fun updatePlayerState(
         songId: String?,

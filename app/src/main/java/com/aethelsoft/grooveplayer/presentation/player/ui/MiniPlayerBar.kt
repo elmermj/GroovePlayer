@@ -43,6 +43,7 @@ import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
@@ -61,7 +62,7 @@ fun MiniPlayerBar(
     onMiniPlayerClicked: () -> Unit
 ) {
     val playerViewModel = rememberPlayerViewModel()
-    val bluetoothViewModel: BluetoothViewModel = hiltViewModel()
+    val bluetoothViewModel: BluetoothViewModel = rememberBluetoothViewModel()
     val connectedBtDevice by bluetoothViewModel.connectedDevice.collectAsState()
     val song by playerViewModel.currentSong.collectAsState()
     val isPlaying by playerViewModel.isPlaying.collectAsState()

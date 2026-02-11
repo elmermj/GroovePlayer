@@ -8,8 +8,11 @@ import androidx.compose.runtime.compositionLocalOf
  * without passing callbacks as parameters.
  */
 data class NavigationActions(
+    val currentRoute: String? = null,
+    val goBack: () -> Unit = {},
     val openFullPlayer: () -> Unit = {},
-    val closeFullPlayer: () -> Unit = {}
+    val closeFullPlayer: () -> Unit = {},
+    val openProfile: () -> Unit = {},
 )
 
 /**

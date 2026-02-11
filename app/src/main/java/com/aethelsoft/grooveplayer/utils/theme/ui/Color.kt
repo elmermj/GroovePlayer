@@ -21,3 +21,9 @@ val brandTertiaryColor = Color(0xFF828D6F)
 
 val volumeWarningColor = Color(0xFFFFB349)
 val volumeMaxColor = Color(0xFFFF4949)
+
+val SoftWhite = Color(0xFFDBDBDB)
+val SoftBlack = Color(0xFF212121)
+
+val InactivePrimary = Color(0xFF262626)
+val InactiveSecondary = Color(0xFF443E3E)

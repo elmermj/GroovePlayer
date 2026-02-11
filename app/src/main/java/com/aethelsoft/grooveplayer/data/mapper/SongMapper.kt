@@ -15,13 +15,14 @@ object SongMapper {
      * Converts MediaStore data model to domain model.
      */
     fun mediaStoreToDomain(data: MediaStoreSongData): Song {
-        val artistNames = ArtistParser.parseArtists(data.artist)
-        val primaryArtist = artistNames.firstOrNull() ?: data.artist
+        // Keep the original artist string for display and parsing,
+        // but use the primary artist for album IDs/grouping.
+        val primaryArtist = ArtistParser.getPrimaryArtist(data.artist)
 
         return Song(
             id = data.id,
             title = data.title,
-            artist = primaryArtist,
+            artist = data.artist,
             uri = data.uri,
             genre = data.genre,
             durationMs = data.durationMs,

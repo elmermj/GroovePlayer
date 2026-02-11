@@ -5,9 +5,13 @@ package com.aethelsoft.grooveplayer.presentation.common
  * Used across all ViewModels for consistent state management.
  */
 sealed class UiState<out T> {
-    object Loading : UiState<Nothing>()
+    object Idle : UiState<Nothing>()
+    data class Loading(val message: String?) : UiState<Nothing>()
     data class Success<T>(val data: T) : UiState<T>()
     data class Error(val message: String) : UiState<Nothing>()
+
+    val isIdle: Boolean
+        get() = this is Idle
     
     val isLoading: Boolean
         get() = this is Loading

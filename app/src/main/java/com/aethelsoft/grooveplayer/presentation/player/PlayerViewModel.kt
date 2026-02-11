@@ -21,6 +21,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.presentation.player.layouts.GlowEffectConfig
+import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -71,6 +72,11 @@ class PlayerViewModel @Inject constructor(
                 SharingStarted.Eagerly,
                 com.aethelsoft.grooveplayer.domain.model.VisualizationMode.SIMULATED
             )
+
+    val showMiniPlayerOnStart: StateFlow<Boolean> =
+        userRepository.observeUserSettings()
+            .map { it.showMiniPlayerOnStart }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _glowEffectConfig = MutableStateFlow<GlowEffectConfig>(GlowEffectConfig.Dramatic)
 

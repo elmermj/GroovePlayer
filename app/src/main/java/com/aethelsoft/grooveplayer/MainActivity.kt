@@ -31,11 +31,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.aethelsoft.grooveplayer.presentation.common.LocalBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
+import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
@@ -59,6 +61,7 @@ import kotlinx.coroutines.delay
 class MainActivity : ComponentActivity() {
 
     private val playerViewModel: PlayerViewModel by viewModels()
+    private val bluetoothViewModel: BluetoothViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,8 +69,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GroovePlayerTheme {
-                // Provide PlayerViewModel and Navigation to entire app via CompositionLocal
-                CompositionLocalProvider(LocalPlayerViewModel provides playerViewModel) {
+                // Provide shared ViewModels to entire app via CompositionLocal (single instance)
+                CompositionLocalProvider(
+                    LocalPlayerViewModel provides playerViewModel,
+                    LocalBluetoothViewModel provides bluetoothViewModel
+                ) {
                     GroovePlayerAppMain()
                 }
             }
@@ -82,6 +88,8 @@ fun GroovePlayerAppMain() {
     val navController = rememberNavController()
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
+    val showMiniPlayerOnStart by playerViewModel.showMiniPlayerOnStart.collectAsState()
+    var hasUserStartedPlayback by remember { mutableStateOf(false) }
     var pendingNavigation by remember { mutableStateOf<String?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
     
@@ -113,8 +121,9 @@ fun GroovePlayerAppMain() {
     // Also request when playback starts if permission not granted
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     LaunchedEffect(isPlaying) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && 
-            isPlaying && 
+        if (isPlaying) hasUserStartedPlayback = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            isPlaying &&
             !hasNotificationPermission) {
             requestNotificationPermission()
         }
@@ -163,6 +172,8 @@ fun GroovePlayerAppMain() {
     
     // Provide navigation actions to entire app
     val navigationActions = NavigationActions(
+        currentRoute = currentRoute,
+        goBack = { navController.popBackStack() },
         openFullPlayer = {
             if (!isNavigating && pendingNavigation == null) {
                 playerViewModel.setFullScreenPlayerOpen(true)
@@ -172,6 +183,9 @@ fun GroovePlayerAppMain() {
         closeFullPlayer = {
             playerViewModel.setFullScreenPlayerOpen(false)
             navController.popBackStack()
+        },
+        openProfile = {
+            navController.navigate(AppRoutes.PROFILE)
         }
     )
 
@@ -189,7 +203,7 @@ fun GroovePlayerAppMain() {
                     )
             ) {
                 AppNavHost(navController = navController)
-            if (currentSong != null) {
+            if (currentSong != null && (showMiniPlayerOnStart || hasUserStartedPlayback)) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter),

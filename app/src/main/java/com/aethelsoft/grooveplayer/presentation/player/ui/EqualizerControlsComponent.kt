@@ -28,13 +28,17 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledTextButton
 import kotlinx.coroutines.launch
 import android.util.Log
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
 import com.aethelsoft.grooveplayer.utils.M_PADDING
+import com.aethelsoft.grooveplayer.utils.S_PADDING
+import kotlinx.coroutines.CoroutineScope
 
 @Composable
 fun EqualizerControlsComponent(
     modifier: Modifier = Modifier,
-    viewModel: EqualizerViewModel = hiltViewModel()
+    viewModel: EqualizerViewModel = hiltViewModel(),
+    isSimplified: Boolean = false,
 ) {
     val equalizerState by viewModel.equalizerState.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
@@ -50,12 +54,37 @@ fun EqualizerControlsComponent(
         }
     }
     
+    if(isSimplified){
+        SimplifiedEqualizerControlsComponent(
+            modifier = modifier,
+            viewModel = viewModel,
+            equalizerState = equalizerState,
+            hasUnsavedChanges = hasUnsavedChanges,
+            scope = scope
+        )
+    } else {
+        FullEqualizerControlsComponent(
+            modifier = modifier,
+            viewModel = viewModel,
+            equalizerState = equalizerState,
+            hasUnsavedChanges = hasUnsavedChanges,
+            scope = scope
+        )
+    }
+}
+
+@Composable
+private fun SimplifiedEqualizerControlsComponent(
+    modifier: Modifier = Modifier,
+    viewModel: EqualizerViewModel,
+    equalizerState: EqualizerState,
+    hasUnsavedChanges: Boolean,
+    scope: CoroutineScope,
+){
     Column(
         modifier = modifier
-            .widthIn(max = 360.dp)
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Title and Enable Toggle
@@ -66,11 +95,11 @@ fun EqualizerControlsComponent(
         ) {
             Text(
                 "Equalizer",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
-            
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -100,9 +129,7 @@ fun EqualizerControlsComponent(
                 )
             }
         }
-        
-        Spacer(modifier = Modifier.height(M_PADDING))
-        
+
         if (!equalizerState.isAvailable) {
             // Equalizer not available
             Box(
@@ -166,11 +193,11 @@ fun EqualizerControlsComponent(
                                 Log.e("EqualizerControls", "Error resetting equalizer: ${e.message}", e)
                             }
                         }
-                    }
+                    },
+                    isSimplified = true
                 )
-                Spacer(modifier = Modifier.height(M_PADDING))
             }
-            
+
             // Frequency bands
             FrequencyBands(
                 equalizerState = equalizerState,
@@ -182,7 +209,174 @@ fun EqualizerControlsComponent(
             )
 
             // Save Settings Button
-            Spacer(modifier = Modifier.height(M_PADDING))
+            Spacer(modifier = Modifier.height(S_PADDING))
+            ToggledTextButton(
+                state = hasUnsavedChanges,
+                onClick = {
+                    scope.launch {
+                        try {
+                            viewModel.saveSettings()
+                        } catch (e: Exception) {
+                            Log.e("EqualizerControls", "Error saving settings: ${e.message}", e)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth(),
+                activeBackground = Color.White,
+                inactiveBackground = Color.White.copy(alpha = 0.3f),
+                activeTextColor = Color.Black,
+                inactiveTextColor = Color.White.copy(alpha = 0.6f),
+                text = "Save Settings",
+                enabled = hasUnsavedChanges,
+                shape = RoundedCornerShape(100.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun FullEqualizerControlsComponent(
+    modifier: Modifier = Modifier,
+    viewModel: EqualizerViewModel,
+    equalizerState: EqualizerState,
+    hasUnsavedChanges: Boolean,
+    scope: CoroutineScope,
+) {
+    Column(
+        modifier = modifier
+            .widthIn(max = 360.dp)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Title and Enable Toggle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Equalizer",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    if (equalizerState.isEnabled) "On" else "Off",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (equalizerState.isEnabled) Color.White else Color.White.copy(alpha = 0.6f)
+                )
+                Switch(
+                    checked = equalizerState.isEnabled,
+                    onCheckedChange = { enabled ->
+                        scope.launch {
+                            try {
+                                viewModel.setEnabled(enabled)
+                            } catch (e: Exception) {
+                                Log.e("EqualizerControls", "Error setting enabled state: ${e.message}", e)
+                            }
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color.White.copy(alpha = 0.5f),
+                        uncheckedThumbColor = Color.White.copy(alpha = 0.5f),
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(S_PADDING))
+
+        if (!equalizerState.isAvailable) {
+            // Equalizer not available
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "Equalizer not available",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        "Your device may not support audio effects",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        } else if (equalizerState.numberOfBands == 0) {
+            // No bands available
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Initializing equalizer...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            }
+        } else {
+            // Preset selector
+            if (equalizerState.availablePresets.isNotEmpty()) {
+                PresetSelector(
+                    presets = equalizerState.availablePresets,
+                    currentPreset = equalizerState.currentPreset,
+                    onPresetSelected = { preset ->
+                        scope.launch {
+                            try {
+                                viewModel.setPreset(preset)
+                            } catch (e: Exception) {
+                                Log.e("EqualizerControls", "Error setting preset: ${e.message}", e)
+                            }
+                        }
+                    },
+                    onReset = {
+                        scope.launch {
+                            try {
+                                viewModel.reset()
+                            } catch (e: Exception) {
+                                Log.e("EqualizerControls", "Error resetting equalizer: ${e.message}", e)
+                            }
+                        }
+                    },
+                    isSimplified = false
+                )
+                Spacer(modifier = Modifier.height(S_PADDING))
+            }
+
+            // Frequency bands
+            FrequencyBands(
+                equalizerState = equalizerState,
+                onBandLevelChanged = { band, level ->
+                    scope.launch {
+                        viewModel.setBandLevel(band, level)
+                    }
+                }
+            )
+
+            // Save Settings Button
+            Spacer(modifier = Modifier.height(S_PADDING))
             ToggledTextButton(
                 state = hasUnsavedChanges,
                 onClick = {
@@ -213,7 +407,8 @@ private fun PresetSelector(
     presets: List<String>,
     currentPreset: Int,
     onPresetSelected: (Int) -> Unit,
-    onReset: () -> Unit
+    onReset: () -> Unit,
+    isSimplified: Boolean,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -229,16 +424,38 @@ private fun PresetSelector(
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White
             )
-            TextButton(onClick = onReset) {
-                Text(
-                    "Reset",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodySmall
-                )
+            if (isSimplified){
+                Box(
+                    modifier = Modifier
+                        .clickable(
+                            onClick = onReset
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "Reset",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            } else {
+                TextButton(
+                    onClick = onReset,
+                    modifier = Modifier.background(Color.Red),
+                ) {
+                    Text(
+                        "Reset",
+                        color = Color.White.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
+
         }
-        
-        Spacer(modifier = Modifier.height(12.dp))
+
+        if(!isSimplified) {
+            Spacer(modifier = Modifier.height(S_PADDING))
+        }
         
         // Preset chips - horizontally scrollable
         val scrollState = rememberScrollState()
@@ -246,18 +463,20 @@ private fun PresetSelector(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(scrollState)
-                .background(Brush.horizontalGradient(
-                    listOf<Color>(
-                        Color.Black,
-                        Color.Transparent,
-                        Color.Transparent,
-                        Color.Transparent,
-                        Color.Transparent,
-                        Color.Transparent,
-                        Color.Transparent,
-                        Color.Black,
+                .background(
+                    Brush.horizontalGradient(
+                        listOf<Color>(
+                            Color.Black,
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Transparent,
+                            Color.Black,
+                        )
                     )
-                )),
+                ),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -322,7 +541,7 @@ private fun FrequencyBands(
             modifier = Modifier.fillMaxWidth()
         )
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(S_PADDING))
         
         Row(
             modifier = Modifier.fillMaxWidth(),

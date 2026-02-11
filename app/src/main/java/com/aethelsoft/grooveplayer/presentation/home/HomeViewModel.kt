@@ -11,16 +11,20 @@ import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteArtis
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteTracksUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetLastPlayedSongsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetRecentlyPlayedUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.home_category.InitializeLibraryIndexUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
+import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.utils.TimeframeUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.collections.emptyList
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -30,11 +34,9 @@ class HomeViewModel @Inject constructor(
     private val getFavoriteTracksUseCase: GetFavoriteTracksUseCase,
     private val getFavoriteArtistsUseCase: GetFavoriteArtistsUseCase,
     private val getFavoriteAlbumsUseCase: GetFavoriteAlbumsUseCase,
-    private val getLastPlayedSongsUseCase: GetLastPlayedSongsUseCase
-) : AndroidViewModel(application) {
-
-    private val _uiState = MutableStateFlow<UiState<List<Song>>>(UiState.Loading)
-    val uiState: StateFlow<UiState<List<Song>>> = _uiState.asStateFlow()
+    private val getLastPlayedSongsUseCase: GetLastPlayedSongsUseCase,
+    private val initializeLibraryIndexUseCase: InitializeLibraryIndexUseCase
+) : BaseViewModel(application) {
     
     // All playback history features are now reactive with Flows
     private val allTimeTimestamp = TimeframeUtils.getAllTimeTimestamp()
@@ -54,8 +56,19 @@ class HomeViewModel @Inject constructor(
     val lastPlayedSongs: StateFlow<List<Song>> = getLastPlayedSongsUseCase(allTimeTimestamp, 8)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
+    var songs: List<Song> = emptyList()
+
     init {
         loadSongs()
+
+        // Initialize artist/album/song/genre index in the background.
+        viewModelScope.launch {
+            try {
+                initializeLibraryIndexUseCase()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Failed to initialize library index", e)
+            }
+        }
         
         // Debug logging
         viewModelScope.launch {
@@ -77,19 +90,17 @@ class HomeViewModel @Inject constructor(
 
     fun loadSongs() {
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
+            setLoading()
             try {
-                val songs = getSongsUseCase()
-                _uiState.value = UiState.Success(songs)
+                songs = getSongsUseCase()
+                setSuccess(songs)
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(
-                    message = e.message ?: "Failed to load songs"
-                )
+                setError(e.message ?: "Failed to load songs")
             }
         }
     }
 
-    fun refresh() {
+    override fun refresh() {
         loadSongs()
         // No need to reload favorites - they're reactive Flows that auto-update!
     }

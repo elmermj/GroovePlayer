@@ -7,11 +7,15 @@ import android.provider.MediaStore
 import androidx.annotation.RequiresApi
 import com.aethelsoft.grooveplayer.data.local.mediastore.model.MediaStoreSongData
 import com.aethelsoft.grooveplayer.data.mapper.SongMapper
+import com.aethelsoft.grooveplayer.domain.model.FolderSizeEntry
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
+import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,8 +26,17 @@ import javax.inject.Singleton
  */
 @Singleton
 class MediaStoreRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val userRepository: UserRepository
 ) : MusicRepository {
+
+    override suspend fun getMusicFolderPaths(): List<String> = withContext(Dispatchers.IO) {
+        fetchMusicFolderPaths()
+    }
+
+    override suspend fun getStorageUsage(): StorageUsageData = withContext(Dispatchers.IO) {
+        fetchStorageUsage()
+    }
     
     override suspend fun getAllSongs(): List<Song> = withContext(Dispatchers.IO) {
         val songsData = fetchSongsFromMediaStore()
@@ -75,12 +88,14 @@ class MediaStoreRepository @Inject constructor(
      * @param limit max rows to return (Int.MAX_VALUE for all)
      */
     @RequiresApi(Build.VERSION_CODES.R)
-    private fun fetchSongsFromMediaStore(
+    private suspend fun fetchSongsFromMediaStore(
         selection: String? = null,
         selectionArgs: Array<String>? = null,
         offset: Int = 0,
         limit: Int = Int.MAX_VALUE
     ): List<MediaStoreSongData> {
+        val excludedSet = userRepository.getUserSettings().excludedFolders
+            .map { normalizePath(it) }.toSet()
         val songs = mutableListOf<MediaStoreSongData>()
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -120,11 +135,18 @@ class MediaStoreRepository @Inject constructor(
                     continue
                 }
                 if (songs.size >= limit) break
+                val dataPath = cursor.getString(dataColumn) ?: ""
+                val parentPath = if (dataPath.isNotEmpty()) {
+                    File(dataPath).parent?.let { normalizePath(it) } ?: ""
+                } else ""
+                if (parentPath.isNotEmpty() && excludedSet.contains(parentPath)) {
+                    index++
+                    continue
+                }
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(titleColumn) ?: "Unknown"
                 val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
                 val duration = cursor.getLong(durationColumn)
-                val data = cursor.getString(dataColumn) ?: ""
                 val album = cursor.getString(albumColumn) ?: "Unknown Album"
                 val albumId = cursor.getLong(albumIdColumn)
                 val genre = if (genreColumn >= 0) {
@@ -163,6 +185,81 @@ class MediaStoreRepository @Inject constructor(
         }
 
         return songs
+    }
+
+    /** Returns distinct folder paths that contain music (parent of MediaStore DATA paths). */
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun fetchMusicFolderPaths(): List<String> {
+        val folders = mutableSetOf<String>()
+        val projection = arrayOf(MediaStore.Audio.Media.DATA)
+        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            baseSelection,
+            null,
+            null
+        )?.use { cursor ->
+            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            while (cursor.moveToNext()) {
+                val path = cursor.getString(dataColumn) ?: continue
+                if (path.isEmpty()) continue
+                File(path).parent?.let { parent ->
+                    folders.add(normalizePath(parent))
+                }
+            }
+        }
+        return folders.toList().sorted()
+    }
+
+    private fun normalizePath(path: String): String =
+        path.trim().trimEnd('/', '\\')
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private suspend fun fetchStorageUsage(): StorageUsageData {
+        val excludedSet = userRepository.getUserSettings().excludedFolders
+            .map { normalizePath(it) }.toSet()
+        val folderSizes = mutableMapOf<String, Long>()
+        val projection = arrayOf(MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.SIZE)
+        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        context.contentResolver.query(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            baseSelection,
+            null,
+            null
+        )?.use { cursor ->
+            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+            while (cursor.moveToNext()) {
+                val path = cursor.getString(dataColumn) ?: continue
+                val size = cursor.getLong(sizeColumn).coerceAtLeast(0L)
+                if (path.isEmpty()) continue
+                val parentPath = File(path).parent?.let { normalizePath(it) } ?: continue
+                folderSizes[parentPath] = (folderSizes[parentPath] ?: 0L) + size
+            }
+        }
+        var includedBytes = 0L
+        var excludedBytes = 0L
+        val includedDetails = mutableListOf<FolderSizeEntry>()
+        val excludedDetails = mutableListOf<FolderSizeEntry>()
+        folderSizes.forEach { (path, bytes) ->
+            if (path in excludedSet) {
+                excludedBytes += bytes
+                excludedDetails.add(FolderSizeEntry(path, bytes))
+            } else {
+                includedBytes += bytes
+                includedDetails.add(FolderSizeEntry(path, bytes))
+            }
+        }
+        val totalBytes = includedBytes + excludedBytes
+        return StorageUsageData(
+            totalBytes = totalBytes,
+            includedBytes = includedBytes,
+            excludedBytes = excludedBytes,
+            includedFolderDetails = includedDetails.sortedByDescending { it.bytes },
+            excludedFolderDetails = excludedDetails.sortedByDescending { it.bytes }
+        )
     }
 }
 

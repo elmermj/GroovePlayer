@@ -36,7 +36,6 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LargeTabletHomeLayout(
-    state: UiState.Success<List<Song>>,
     viewModel: HomeViewModel,
     onNavigateToSongs: () -> Unit,
     onNavigateToRecentlyPlayed: () -> Unit,
@@ -66,7 +65,7 @@ fun LargeTabletHomeLayout(
                 LastPlayedSectionComponent(
                     lastPlayedSongs = lastPlayedSongs,
                     currentSong = LocalPlayerViewModel.current?.currentSong?.collectAsState()?.value,
-                    allLibrarySongs = state.data.ifEmpty { emptyList() }
+                    allLibrarySongs = viewModel.songs.ifEmpty { emptyList() }
                 )
             }
             item(span = { GridItemSpan(maxLineSpan) }){
@@ -86,8 +85,8 @@ fun LargeTabletHomeLayout(
         item(span = { GridItemSpan(2) }) {
             LibraryCardComponent(
                 title = "All Songs",
-                subtitle = if (state.data.isNotEmpty()) "${state.data.size} songs" else "Tap to browse",
-                artworks = state.data.map { item ->
+                subtitle = if (viewModel.songs.isNotEmpty()) "${viewModel.songs.size} songs" else "Tap to browse",
+                artworks = viewModel.songs.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
                             "Unknown"

@@ -46,6 +46,12 @@ object AppModule {
     fun provideAlbumDao(database: GroovePlayerDatabase) = database.albumDao()
     
     @Provides
+    fun provideSongDao(database: GroovePlayerDatabase) = database.songDao()
+    
+    @Provides
+    fun provideGenreDao(database: GroovePlayerDatabase) = database.genreDao()
+    
+    @Provides
     fun provideUserProfileDao(database: GroovePlayerDatabase) = database.userProfileDao()
     
     @Provides

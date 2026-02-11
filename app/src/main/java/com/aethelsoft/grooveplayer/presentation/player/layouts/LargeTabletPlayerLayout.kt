@@ -49,7 +49,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -77,6 +76,8 @@ import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
@@ -122,7 +123,7 @@ fun LargeTabletPlayerLayout(
         }
     
     // Bluetooth ViewModel
-    val bluetoothViewModel: com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel = hiltViewModel()
+    val bluetoothViewModel: BluetoothViewModel = rememberBluetoothViewModel()
     val (hasBluetoothPermissions, requestBluetoothPermissions) = rememberBluetoothPermissionState()
     val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
     val isScanning by bluetoothViewModel.isScanning.collectAsState()

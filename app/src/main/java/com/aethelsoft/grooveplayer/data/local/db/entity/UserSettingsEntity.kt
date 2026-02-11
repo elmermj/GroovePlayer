@@ -19,5 +19,7 @@ data class UserSettingsEntity(
     val queueSongIds: String = "",          // Queue song IDs as comma-separated string
     val queueStartIndex: Int = 0,           // Queue start index
     val isEndlessQueue: Boolean = false,    // Whether queue is endless
-    val visualizationMode: String = "SIMULATED" // "OFF", "SIMULATED", "REAL_TIME"
+    val visualizationMode: String = "SIMULATED", // "OFF", "SIMULATED", "REAL_TIME"
+    val showMiniPlayerOnStart: Boolean = false,
+    val excludedFolders: String = ""  // Delimiter-separated paths ("||") to ignore during scanning
 )

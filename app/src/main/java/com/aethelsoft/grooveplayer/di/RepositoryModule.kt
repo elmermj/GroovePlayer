@@ -3,10 +3,12 @@ package com.aethelsoft.grooveplayer.di
 import com.aethelsoft.grooveplayer.data.bluetooth.BluetoothRepositoryImpl
 import com.aethelsoft.grooveplayer.data.local.mediastore.MediaStoreRepository
 import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
+import com.aethelsoft.grooveplayer.data.repository.AudioTagRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.EqualizerRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
+import com.aethelsoft.grooveplayer.domain.repository.AudioTagRepository
 import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
@@ -43,6 +45,11 @@ abstract class RepositoryModule {
         impl: PlaybackHistoryRepositoryImpl
     ): PlaybackHistoryRepository
     
+    @Binds
+    abstract fun bindAudioTagRepository(
+        impl: AudioTagRepositoryImpl
+    ): AudioTagRepository
+
     @Binds
     abstract fun bindSongMetadataRepository(
         impl: SongMetadataRepositoryImpl

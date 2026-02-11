@@ -143,6 +143,26 @@ class UserRepositoryImpl @Inject constructor(
         userSettingsDao.updateFadeTimer(seconds)
     }
     
+    override suspend fun updateRepeatAndShuffle(shuffle: Boolean, repeat: String) {
+        if (userSettingsDao.getUserSettings() == null) {
+            userSettingsDao.insertUserSettings(
+                UserSettingsEntity(id = 1, shuffleEnabled = shuffle, repeatMode = repeat)
+            )
+        } else {
+            userSettingsDao.updateRepeatAndShuffle(shuffle, repeat)
+        }
+    }
+
+    override suspend fun updateShowMiniPlayerOnStart(enabled: Boolean) {
+        if (userSettingsDao.getUserSettings() == null) {
+            userSettingsDao.insertUserSettings(
+                UserSettingsEntity(id = 1, showMiniPlayerOnStart = enabled)
+            )
+        } else {
+            userSettingsDao.updateShowMiniPlayerOnStart(enabled)
+        }
+    }
+
     override suspend fun updateVisualizationMode(mode: com.aethelsoft.grooveplayer.domain.model.VisualizationMode) {
         // Ensure settings exist before updating
         if (userSettingsDao.getUserSettings() == null) {
@@ -281,7 +301,14 @@ class UserRepositoryImpl @Inject constructor(
             queueSongIds = emptyList(),
             queueStartIndex = 0,
             isEndlessQueue = false,
-            visualizationMode = com.aethelsoft.grooveplayer.domain.model.VisualizationMode.SIMULATED
+            visualizationMode = com.aethelsoft.grooveplayer.domain.model.VisualizationMode.SIMULATED,
+            showMiniPlayerOnStart = false,
+            excludedFolders = emptyList()
         )
+    }
+
+    override suspend fun updateExcludedFolders(paths: List<String>) {
+        val settings = getUserSettings()
+        saveUserSettings(settings.copy(excludedFolders = paths))
     }
 }

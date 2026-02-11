@@ -22,6 +22,7 @@ import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteTracks
 import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
+import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 
 /**
@@ -99,7 +100,7 @@ fun AppNavHost(
                 onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) },
                 onNavigateToSearch = { query ->
                     navController.navigate(AppRoutes.searchRoute(query))
-                }
+                },
             )
         }
         composable(
@@ -414,6 +415,39 @@ fun AppNavHost(
             FullPlayerScreen(
                 onClose = {
                     navController.popBackStack()
+                }
+            )
+        }
+        composable(
+            route = AppRoutes.PROFILE,
+            enterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> -fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            },
+            popExitTransition = {
+                slideOutHorizontally(
+                    targetOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            }
+        ) {
+            ProfileScreen(
+                onNavigateToSearch = { query ->
+                    navController.navigate(AppRoutes.searchRoute(query))
                 }
             )
         }

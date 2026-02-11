@@ -117,8 +117,8 @@ private fun PhoneSearchBarContent(
         }
     }
 
-    LaunchedEffect(isFocused, searchQuery, suggestions) {
-        val shouldShow = isFocused && searchQuery.isBlank() && suggestions.isNotEmpty()
+    LaunchedEffect(isFocused, searchQuery) {
+        val shouldShow = isFocused && searchQuery.isBlank()
         isExpanded = shouldShow
         onExpandedChange?.invoke(shouldShow)
     }
@@ -255,8 +255,8 @@ private fun TabletSearchBarContent(
     val focusRequester = remember { FocusRequester() }
     var textFieldBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
 
-    LaunchedEffect(isFocused, searchQuery, suggestions) {
-        val shouldShow = isFocused && searchQuery.isBlank() && suggestions.isNotEmpty()
+    LaunchedEffect(isFocused, searchQuery) {
+        val shouldShow = isFocused && searchQuery.isBlank()
         isExpanded = shouldShow
         onExpandedChange?.invoke(shouldShow)
     }

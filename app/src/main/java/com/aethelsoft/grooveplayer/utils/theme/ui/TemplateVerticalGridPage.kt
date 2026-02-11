@@ -43,9 +43,7 @@ fun TemplateVeritcalGridPage(
 
     /* ---------- INITIAL SPACER HEIGHT ---------- */
     val initialSpacerHeight =
-        APP_BAR_HEIGHT +
-                safeInsets.insets.asPaddingValues().calculateTopPadding() +
-                12.dp
+        APP_BAR_HEIGHT + safeInsets.insets.asPaddingValues().calculateTopPadding()
     val bottomSpacerHeight = safeInsets.insets.asPaddingValues().calculateBottomPadding()
 
     Column{
@@ -55,7 +53,6 @@ fun TemplateVeritcalGridPage(
             verticalArrangement = Arrangement.spacedBy(M_PADDING),
             columns = GridCells.Fixed(columns),
             modifier = Modifier.padding(
-                top = 20.dp,
                 start = M_PADDING,
                 end = M_PADDING
             )

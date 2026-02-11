@@ -16,6 +16,7 @@ object AppRoutes {
     const val SEARCH = "search/{query}"
     const val ALBUM_DETAIL = "album/{albumId}"
     const val ARTIST_DETAIL = "artist/{artistId}"
+    const val PROFILE = "profile"
     
     fun searchRoute(query: String) = "search/${Uri.encode(query)}"
     fun albumDetailRoute(albumId: String) = "album/${Uri.encode(albumId)}"

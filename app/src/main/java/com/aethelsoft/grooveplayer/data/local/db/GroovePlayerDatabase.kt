@@ -10,10 +10,15 @@ import com.aethelsoft.grooveplayer.data.local.db.dao.SearchHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserProfileDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserSettingsDao
+import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SearchHistoryEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserProfileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
@@ -24,11 +29,16 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         SongMetadataEntity::class,
         ArtistEntity::class,
         AlbumEntity::class,
+        GenreEntity::class,
+        SongEntity::class,
+        AlbumArtistCrossRef::class,
+        SongArtistCrossRef::class,
+        SongGenreCrossRef::class,
         UserProfileEntity::class,
         UserSettingsEntity::class,
         SearchHistoryEntity::class
     ],
-    version = 9,
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -37,6 +47,8 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
     abstract fun songMetadataDao(): SongMetadataDao
     abstract fun artistDao(): ArtistDao
     abstract fun albumDao(): AlbumDao
+    abstract fun songDao(): com.aethelsoft.grooveplayer.data.local.db.dao.SongDao
+    abstract fun genreDao(): com.aethelsoft.grooveplayer.data.local.db.dao.GenreDao
     abstract fun userProfileDao(): UserProfileDao
     abstract fun userSettingsDao(): UserSettingsDao
     abstract fun searchHistoryDao(): SearchHistoryDao

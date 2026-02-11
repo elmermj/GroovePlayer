@@ -66,7 +66,7 @@ interface PlaybackHistoryDao {
             COALESCE(MAX(a.artworkUrl), MAX(ph.artworkUrl)) as artworkUrl,
             COUNT(*) as playCount
         FROM playback_history ph
-        LEFT JOIN albums a ON a.name = ph.album AND a.artist = ph.artist
+        LEFT JOIN albums a ON a.name = ph.album
         WHERE ph.playedAt >= :sinceTimestamp
         GROUP BY ph.album, ph.artist
         ORDER BY playCount DESC
