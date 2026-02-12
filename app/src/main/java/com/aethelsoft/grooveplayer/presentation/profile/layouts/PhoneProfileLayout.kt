@@ -16,16 +16,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSectionComponent
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingRow
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ActionType
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -33,6 +32,7 @@ import com.aethelsoft.grooveplayer.utils.S_PADDING
 @Composable
 fun PhoneProfileLayout(
     viewModel: ProfileViewModel,
+    onNavigateToShare: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -61,6 +61,13 @@ fun PhoneProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Account",
             ) {
+                ProfileSettingRow(
+                    title = "Share Music",
+                    subtitle = "Share via Tap (NFC) or nearby device",
+                    actionType = ActionType.EXPANDABLE,
+                    onClick = onNavigateToShare
+                )
+                Spacer(Modifier.height(S_PADDING))
                 AccountSection(viewModel = viewModel)
             }
         }
@@ -77,13 +84,13 @@ fun PhoneProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Playback",
             ) {
-                var activeRowId by remember { mutableStateOf<String?>(null) }
+                val activeRowId by viewModel.activeRowId.collectAsState()
 
                 RepeatModeRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "repeat",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "repeat" else null
+                        viewModel.setActiveRowId(if (expanded) "repeat" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -92,7 +99,7 @@ fun PhoneProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "shuffle",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "shuffle" else null
+                        viewModel.setActiveRowId(if (expanded) "shuffle" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -101,7 +108,7 @@ fun PhoneProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "fade",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "fade" else null
+                        viewModel.setActiveRowId(if (expanded) "fade" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -110,7 +117,7 @@ fun PhoneProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "mini_player",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "mini_player" else null
+                        viewModel.setActiveRowId(if (expanded) "mini_player" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -119,7 +126,7 @@ fun PhoneProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "visualization",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "visualization" else null
+                        viewModel.setActiveRowId(if (expanded) "visualization" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -127,7 +134,7 @@ fun PhoneProfileLayout(
                 EqualizerRow(
                     isExpanded = activeRowId == "equalizer",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "equalizer" else null
+                        viewModel.setActiveRowId(if (expanded) "equalizer" else null)
                     }
                 )
             }
@@ -145,12 +152,12 @@ fun PhoneProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Storage",
             ) {
-                var storageActiveRowId by remember { mutableStateOf<String?>(null) }
+                val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
                 ExcludedFoldersRow(
                     viewModel = viewModel,
                     isExpanded = storageActiveRowId == "excluded_folders",
                     onExpandedChange = { expanded ->
-                        storageActiveRowId = if (expanded) "excluded_folders" else null
+                        viewModel.setStorageActiveRowId(if (expanded) "excluded_folders" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))

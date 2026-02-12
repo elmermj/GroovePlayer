@@ -36,7 +36,7 @@ fun SearchScreen(
     val artists by viewModel.artists.collectAsState()
     val albums by viewModel.albums.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) }
+    val selectedTab by viewModel.selectedTab.collectAsState()
     val scope = rememberCoroutineScope()
     
     LaunchedEffect(query) {
@@ -74,22 +74,22 @@ fun SearchScreen(
             ) {
                 Tab(
                     selected = selectedTab == 0,
-                    onClick = { selectedTab = 0 },
+                    onClick = { viewModel.setSelectedTab(0) },
                     text = { Text("All") }
                 )
                 Tab(
                     selected = selectedTab == 1,
-                    onClick = { selectedTab = 1 },
+                    onClick = { viewModel.setSelectedTab(1) },
                     text = { Text("Songs") }
                 )
                 Tab(
                     selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
+                    onClick = { viewModel.setSelectedTab(2) },
                     text = { Text("Albums") }
                 )
                 Tab(
                     selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
+                    onClick = { viewModel.setSelectedTab(3) },
                     text = { Text("Artists") }
                 )
             }

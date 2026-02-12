@@ -38,7 +38,9 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
 fun GradientAppBar(
     title: String,
     deviceType: DeviceType,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Override back action (e.g. close drawer). When null, uses navigation.goBack(). */
+    onBackClick: (() -> Unit)? = null,
 ){
     val horizontalPadding = when (deviceType) {
         DeviceType.PHONE -> S_PADDING
@@ -60,7 +62,7 @@ fun GradientAppBar(
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color.Black.copy(alpha = 0.95f * 1),
+                        Color.Black.copy(alpha = 0.85f * 1),
                         Color.Black.copy(alpha = 0.6f * 1),
                         Color.Transparent
                     )
@@ -68,7 +70,7 @@ fun GradientAppBar(
             )
             .padding(
                 top = 0.dp,
-                start = 0.dp,
+                start = horizontalPadding,
                 end = horizontalPadding,
                 bottom = 0.dp
             )
@@ -77,7 +79,7 @@ fun GradientAppBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
-                onClick = { navigation.goBack() }
+                onClick = { (onBackClick ?: { navigation.goBack() })() }
             ) {
                 Icon(
                     imageVector = XBack,
@@ -88,7 +90,7 @@ fun GradientAppBar(
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.W700,
                 color = Color.White,
             )
         }

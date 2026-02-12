@@ -12,7 +12,8 @@ import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
-    onNavigateToSearch: (String) -> Unit
+    onNavigateToSearch: (String) -> Unit,
+    onNavigateToShare: () -> Unit = {}
 ){
 
     /**
@@ -21,9 +22,9 @@ fun ProfileScreen(
      * for this screen (ProfileScreen) will never be called.
      */
     BasePageTemplate(
-        phoneLayout = { PhoneProfileLayout(viewModel) },
-        tabletLayout = { TabletProfileLayout(viewModel) },
-        largeTabletLayout = { LargeTabletProfileLayout(viewModel) },
+        phoneLayout = { PhoneProfileLayout(viewModel, onNavigateToShare) },
+        tabletLayout = { TabletProfileLayout(viewModel, onNavigateToShare) },
+        largeTabletLayout = { LargeTabletProfileLayout(viewModel, onNavigateToShare) },
         onNavigateToSearch = onNavigateToSearch,
         viewModel = viewModel,
         isSearchEnabled = false,

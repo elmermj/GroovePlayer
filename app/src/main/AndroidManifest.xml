@@ -31,6 +31,16 @@
     <!-- Android 13+ notification permission -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Share via Tap (NFC) and nearby device -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
     <application
         android:name=".GroovePlayerApp"
         android:allowBackup="true"
@@ -61,6 +71,12 @@
             android:name=".services.MusicPlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!--  Share transfer (NFC / nearby) Foreground Service  -->
+        <service
+            android:name=".services.ShareTransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
     </application>
 

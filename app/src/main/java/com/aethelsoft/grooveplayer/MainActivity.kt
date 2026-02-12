@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -27,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -35,10 +37,13 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
+import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelsoft.grooveplayer.data.share.NfcShareDiscovery
+import com.aethelsoft.grooveplayer.presentation.share.ShareNfcReceiver
 import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
@@ -66,6 +71,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleNfcIntent(intent)
 
         setContent {
             GroovePlayerTheme {
@@ -78,6 +84,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleNfcIntent(intent)
+    }
+
+    private fun handleNfcIntent(intent: android.content.Intent?) {
+        if (intent == null) return
+        if (android.nfc.NfcAdapter.ACTION_NDEF_DISCOVERED != intent.action &&
+            android.nfc.NfcAdapter.ACTION_TAG_DISCOVERED != intent.action
+        ) return
+        val nfc = NfcShareDiscovery(this)
+        val info = nfc.readSessionFromIntent(intent)
+        info?.let { ShareNfcReceiver.tryEmit(it) }
     }
 }
 
@@ -186,10 +207,34 @@ fun GroovePlayerAppMain() {
         },
         openProfile = {
             navController.navigate(AppRoutes.PROFILE)
+        },
+        openShare = {
+            navController.navigate(AppRoutes.SHARE_OPTIONS)
+        },
+        openShareWithSongs = { songs ->
+            ShareIntentHolder.setSongs(songs)
+            navController.navigate(AppRoutes.SHARE_OPTIONS)
+        },
+        openShareViaNfcWithSongs = { songs ->
+            ShareIntentHolder.setSongs(songs)
+            navController.navigate(AppRoutes.SHARE_VIA_NFC)
+        },
+        openShareViaNearbyWithSongs = { songs ->
+            ShareIntentHolder.setSongs(songs)
+            navController.navigate(AppRoutes.SHARE_VIA_NEARBY)
         }
     )
 
     CompositionLocalProvider(LocalNavigation provides navigationActions) {
+        // Handle system back: pop nav stack, or exit app when at start destination.
+        // Screen-level BackHandlers (drawer, search) are composed inside destinations and take priority.
+        val activity = LocalContext.current as? ComponentActivity
+        BackHandler {
+            if (!navController.popBackStack()) {
+                activity?.finish()
+            }
+        }
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
         ) { innerPadding ->

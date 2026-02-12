@@ -17,7 +17,11 @@ object AppRoutes {
     const val ALBUM_DETAIL = "album/{albumId}"
     const val ARTIST_DETAIL = "artist/{artistId}"
     const val PROFILE = "profile"
-    
+    const val SHARE_OPTIONS = "share_options"
+    const val SHARE_VIA_NFC = "share_via_nfc"
+    const val SHARE_VIA_NEARBY = "share_via_nearby"
+    const val RECEIVE_APPROVAL = "receive_approval"
+
     fun searchRoute(query: String) = "search/${Uri.encode(query)}"
     fun albumDetailRoute(albumId: String) = "album/${Uri.encode(albumId)}"
     fun artistDetailRoute(artistId: String) = "artist/${Uri.encode(artistId)}"

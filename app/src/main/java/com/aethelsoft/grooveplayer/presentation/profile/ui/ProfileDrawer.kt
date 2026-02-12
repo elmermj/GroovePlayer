@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +32,7 @@ import com.aethelsoft.grooveplayer.utils.M_PADDING
 fun ProfileDrawer(
     isOpen: Boolean,
     onClose: () -> Unit,
+    onNavigateToShare: () -> Unit = {},
     deviceType: DeviceType,
 ) {
     val drawerWidth = when (deviceType) {
@@ -37,16 +40,14 @@ fun ProfileDrawer(
         DeviceType.LARGE_TABLET -> 420.dp
         else -> 0.dp
     }
-    AnimatedVisibility(
-        visible = isOpen,
-        enter = fadeIn(animationSpec = tween(300)),
-        exit = fadeOut(animationSpec = tween(300)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
+    // Wrap in Box so scrim and drawer overlay each other (not stack vertically).
+    // Transparent area outside the panel is clickable to close; panel consumes taps so they don't close.
+    Box(modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(
+            visible = isOpen,
+            enter = fadeIn(animationSpec = tween(300)),
+            exit = fadeOut(animationSpec = tween(300)),
         ) {
-            // Scrim
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -54,32 +55,43 @@ fun ProfileDrawer(
                     .clickable { onClose() }
             )
         }
-    }
-    AnimatedVisibility(
-        visible = isOpen,
-        enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
-            initialOffsetX = { fullWidth -> -fullWidth },
-            animationSpec = tween(300)
-        ),
-        exit = fadeOut(animationSpec = tween(300)) + slideOutHorizontally(
-            targetOffsetX = { fullWidth -> -fullWidth },
-            animationSpec = tween(300)
-        )
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
+        AnimatedVisibility(
+            visible = isOpen,
+            enter = fadeIn(animationSpec = tween(300)) + slideInHorizontally(
+                initialOffsetX = { fullWidth -> -fullWidth },
+                animationSpec = tween(300)
+            ),
+            exit = fadeOut(animationSpec = tween(300)) + slideOutHorizontally(
+                targetOffsetX = { fullWidth -> -fullWidth },
+                animationSpec = tween(300)
+            )
         ) {
-
-            // Right-side drawer content
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .width(drawerWidth)
-                    .align(Alignment.CenterStart)
-                    .background(Color.Black)
+                    .fillMaxSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { onClose() }
             ) {
-                ProfileDrawerContent(deviceType = deviceType)
+                // Left-side drawer content - consumes taps so panel taps don't close
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(drawerWidth)
+                        .align(Alignment.CenterStart)
+                        .background(Color.Black)
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { /* consume - don't close when tapping panel */ }
+                ) {
+                    ProfileDrawerContent(
+                        deviceType = deviceType,
+                        onNavigateToShare = onNavigateToShare,
+                        onClose = onClose
+                    )
+                }
             }
         }
     }

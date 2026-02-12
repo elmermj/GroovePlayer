@@ -6,6 +6,7 @@ import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
 import com.aethelsoft.grooveplayer.data.repository.AudioTagRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.EqualizerRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
 import com.aethelsoft.grooveplayer.domain.repository.AudioTagRepository
@@ -14,6 +15,7 @@ import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
+import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadataRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.Binds
@@ -69,6 +71,11 @@ abstract class RepositoryModule {
     abstract fun bindEqualizerRepository(
         impl: EqualizerRepositoryImpl
     ): EqualizerRepository
+
+    @Binds
+    abstract fun bindShareRepository(
+        impl: ShareRepositoryImpl
+    ): ShareRepository
     
     @Binds
     abstract fun bindSearchRepository(

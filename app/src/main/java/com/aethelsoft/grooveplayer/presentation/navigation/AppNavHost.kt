@@ -24,6 +24,10 @@ import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
+import com.aethelsoft.grooveplayer.presentation.share.ReceiveApprovalScreen
+import com.aethelsoft.grooveplayer.presentation.share.ShareOptionsScreen
+import com.aethelsoft.grooveplayer.presentation.share.ShareViaNfcScreen
+import com.aethelsoft.grooveplayer.presentation.share.ShareViaNearbyScreen
 
 /**
  * Main navigation host for the app.
@@ -448,7 +452,42 @@ fun AppNavHost(
             ProfileScreen(
                 onNavigateToSearch = { query ->
                     navController.navigate(AppRoutes.searchRoute(query))
+                },
+                onNavigateToShare = {
+                    navController.navigate(AppRoutes.SHARE_OPTIONS)
                 }
+            )
+        }
+        composable(route = AppRoutes.SHARE_OPTIONS) {
+            ShareOptionsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onShareViaNfc = { navController.navigate(AppRoutes.SHARE_VIA_NFC) },
+                onShareViaNearby = { navController.navigate(AppRoutes.SHARE_VIA_NEARBY) }
+            )
+        }
+        composable(route = AppRoutes.SHARE_VIA_NFC) {
+            ShareViaNfcScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOfferReceived = {
+                    navController.navigate(AppRoutes.RECEIVE_APPROVAL) {
+                        popUpTo(AppRoutes.SHARE_VIA_NFC) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(route = AppRoutes.SHARE_VIA_NEARBY) {
+            ShareViaNearbyScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOfferReceived = {
+                    navController.navigate(AppRoutes.RECEIVE_APPROVAL) {
+                        popUpTo(AppRoutes.SHARE_VIA_NEARBY) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(route = AppRoutes.RECEIVE_APPROVAL) {
+            ReceiveApprovalScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }

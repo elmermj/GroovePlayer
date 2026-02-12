@@ -57,9 +57,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.graphics.Brush
 import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.SearchSuggestion
 import com.aethelsoft.grooveplayer.presentation.home.ui.PermissionRequiredComponent
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileDrawer
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.search.SearchBarViewModel
 import com.aethelsoft.grooveplayer.utils.DeviceType
@@ -115,6 +117,7 @@ fun BasePageTemplate(
     var isSearchExpanded by remember { mutableStateOf(false) }
     var requestDismissSearchKey by remember { mutableStateOf(0) }
     var searchTextFieldBounds by remember { mutableStateOf<Rect?>(null) }
+    var isProfileDrawerOpen by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val searchBarViewModel: SearchBarViewModel = hiltViewModel()
     val suggestions by searchBarViewModel.suggestions.collectAsState()
@@ -214,32 +217,81 @@ fun BasePageTemplate(
          *
          **/
         if (useSearchBar) {
-            XAppBar(
-                title = pageTitle,
-                appBarAlpha = appBarAlpha,
-                deviceType = deviceType,
-                onNavigateToSearch = onNavigateToSearch,
-                isSearchExpanded = isSearchExpanded,
-                onSearchExpandedChange = { isSearchExpanded = it },
-                requestDismissSearchKey = requestDismissSearchKey,
-                onTextFieldPosition = { searchTextFieldBounds = it },
-                searchBarViewModel = searchBarViewModel,
-                isSearchEnabled = isSearchEnabled,
-            )
+            val navigation = rememberNavigationActions()
+            Column {
+                Box(
+                    modifier = Modifier
+                        .height(
+                            WindowInsets.statusBars.asPaddingValues()
+                                .calculateTopPadding() + (M_PADDING)
+                        )
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black,
+                                    Color.Black.copy(alpha = 0.85f * 1),
+                                )
+                            )
+                        )
+                )
+                XAppBar(
+                    title = pageTitle,
+                    appBarAlpha = appBarAlpha,
+                    deviceType = deviceType,
+                    onNavigateToSearch = onNavigateToSearch,
+                    isSearchExpanded = isSearchExpanded,
+                    onSearchExpandedChange = { isSearchExpanded = it },
+                    requestDismissSearchKey = requestDismissSearchKey,
+                    onTextFieldPosition = { searchTextFieldBounds = it },
+                    searchBarViewModel = searchBarViewModel,
+                    onProfileDrawerOpen = { isProfileDrawerOpen = true },
+                )
+            }
+
+            // Profile drawer overlay for tablet/large tablet - rendered at root Box level
+            // so it can fill the screen and overlay everything (not constrained by Column layout)
+            if (deviceType != DeviceType.PHONE) {
+                BackHandler(enabled = isProfileDrawerOpen) {
+                    isProfileDrawerOpen = false
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(999f)
+                ) {
+                    ProfileDrawer(
+                        isOpen = isProfileDrawerOpen,
+                        onClose = { isProfileDrawerOpen = false },
+                        onNavigateToShare = {
+                            isProfileDrawerOpen = false
+                            navigation.openShare()
+                        },
+                        deviceType = deviceType,
+                    )
+                }
+            }
         } else {
             Column() {
                 Box(
                     modifier = Modifier
                         .height(
-                            WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + (M_PADDING * 2)
+                            WindowInsets.statusBars.asPaddingValues()
+                                .calculateTopPadding() + (M_PADDING)
                         )
                         .width(if (deviceType == DeviceType.TABLET) 360.dp else 420.dp)
-                        .background(Color.Black)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black,
+                                    Color.Black.copy(alpha = 0.85f * 1),
+                                )
+                            )
+                        )
                 )
                 GradientAppBar(
-                    title = "Profile",
+                    title = pageTitle,
                     deviceType = deviceType,
-                    modifier = Modifier
                 )
             }
         }

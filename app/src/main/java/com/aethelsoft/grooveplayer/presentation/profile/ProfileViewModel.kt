@@ -48,6 +48,20 @@ class ProfileViewModel @Inject constructor(
     private val _isStorageLoading = MutableStateFlow(false)
     val isStorageLoading: StateFlow<Boolean> = _isStorageLoading.asStateFlow()
 
+    private val _activeRowId = MutableStateFlow<String?>(null)
+    val activeRowId: StateFlow<String?> = _activeRowId.asStateFlow()
+
+    private val _storageActiveRowId = MutableStateFlow<String?>(null)
+    val storageActiveRowId: StateFlow<String?> = _storageActiveRowId.asStateFlow()
+
+    fun setActiveRowId(id: String?) {
+        _activeRowId.value = id
+    }
+
+    fun setStorageActiveRowId(id: String?) {
+        _storageActiveRowId.value = id
+    }
+
     val userProfile: StateFlow<UserProfile?> =
         getUserProfileUseCase()
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)

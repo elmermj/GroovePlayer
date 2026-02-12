@@ -142,7 +142,7 @@ private fun PhoneSearchBarContent(
                 }
                 focusRequester.requestFocus()
             },
-        contentAlignment = Alignment.CenterEnd
+        contentAlignment = Alignment.TopEnd
     ) {
         val maxWidth = maxWidth.coerceAtMost(360.dp)
         val density = LocalDensity.current
@@ -211,7 +211,7 @@ private fun PhoneSearchBarContent(
             
             if (shouldShowIconOnly) {
                 Box(
-                    modifier = Modifier.size(48.dp).align(Alignment.CenterEnd)
+                    modifier = Modifier.size(48.dp).align(Alignment.TopEnd)
                 ) {
                     IconButton(
                         onClick = {

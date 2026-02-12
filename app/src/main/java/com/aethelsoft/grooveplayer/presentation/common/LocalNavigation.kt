@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.presentation.common
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
+import com.aethelsoft.grooveplayer.domain.model.Song
 
 /**
  * Navigation actions that can be accessed from anywhere in the app
@@ -13,6 +14,13 @@ data class NavigationActions(
     val openFullPlayer: () -> Unit = {},
     val closeFullPlayer: () -> Unit = {},
     val openProfile: () -> Unit = {},
+    val openShare: () -> Unit = {},
+    /** Prepares songs and navigates to Share options screen (user picks NFC or Nearby). */
+    val openShareWithSongs: (List<Song>) -> Unit = {},
+    /** Prepares songs and navigates to Share via NFC (Tap). */
+    val openShareViaNfcWithSongs: (List<Song>) -> Unit = {},
+    /** Prepares songs and navigates to Share with nearby device. */
+    val openShareViaNearbyWithSongs: (List<Song>) -> Unit = {},
 )
 
 /**

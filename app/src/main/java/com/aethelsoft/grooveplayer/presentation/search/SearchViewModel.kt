@@ -43,6 +43,13 @@ class SearchViewModel @Inject constructor(
     
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _selectedTab = MutableStateFlow(0)
+    val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
+
+    fun setSelectedTab(index: Int) {
+        _selectedTab.value = index
+    }
     
     fun search(query: String) {
         if (query.isBlank()) {

@@ -65,6 +65,7 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 @Composable
 fun LargeTabletProfileLayout(
     viewModel: ProfileViewModel,
+    onNavigateToShare: () -> Unit = {}
 ){
 
     LazyColumn(
@@ -94,6 +95,13 @@ fun LargeTabletProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Account",
             ) {
+                ProfileSettingRow(
+                    title = "Share Music",
+                    subtitle = "Share via Tap (NFC) or nearby device",
+                    actionType = ActionType.EXPANDABLE,
+                    onClick = onNavigateToShare
+                )
+                Spacer(Modifier.height(S_PADDING))
                 AccountSection(viewModel = viewModel)
             }
         }
@@ -110,13 +118,13 @@ fun LargeTabletProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Playback",
             ) {
-                var activeRowId by remember { mutableStateOf<String?>(null) }
+                val activeRowId by viewModel.activeRowId.collectAsState()
 
                 RepeatModeRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "repeat",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "repeat" else null
+                        viewModel.setActiveRowId(if (expanded) "repeat" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -125,7 +133,7 @@ fun LargeTabletProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "shuffle",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "shuffle" else null
+                        viewModel.setActiveRowId(if (expanded) "shuffle" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -134,7 +142,7 @@ fun LargeTabletProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "fade",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "fade" else null
+                        viewModel.setActiveRowId(if (expanded) "fade" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -143,7 +151,7 @@ fun LargeTabletProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "mini_player",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "mini_player" else null
+                        viewModel.setActiveRowId(if (expanded) "mini_player" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -152,7 +160,7 @@ fun LargeTabletProfileLayout(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "visualization",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "visualization" else null
+                        viewModel.setActiveRowId(if (expanded) "visualization" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -160,7 +168,7 @@ fun LargeTabletProfileLayout(
                 EqualizerRow(
                     isExpanded = activeRowId == "equalizer",
                     onExpandedChange = { expanded ->
-                        activeRowId = if (expanded) "equalizer" else null
+                        viewModel.setActiveRowId(if (expanded) "equalizer" else null)
                     }
                 )
             }
@@ -178,12 +186,12 @@ fun LargeTabletProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Storage",
             ) {
-                var storageActiveRowId by remember { mutableStateOf<String?>(null) }
+                val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
                 ExcludedFoldersRow(
                     viewModel = viewModel,
                     isExpanded = storageActiveRowId == "excluded_folders",
                     onExpandedChange = { expanded ->
-                        storageActiveRowId = if (expanded) "excluded_folders" else null
+                        viewModel.setStorageActiveRowId(if (expanded) "excluded_folders" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
@@ -191,7 +199,7 @@ fun LargeTabletProfileLayout(
                     viewModel = viewModel,
                     isExpanded = storageActiveRowId == "storage_usage",
                     onExpandedChange = { expanded ->
-                        storageActiveRowId = if (expanded) "storage_usage" else null
+                        viewModel.setStorageActiveRowId(if (expanded) "storage_usage" else null)
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))

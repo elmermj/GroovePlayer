@@ -27,3 +27,5 @@ val SoftBlack = Color(0xFF212121)
 
 val InactivePrimary = Color(0xFF262626)
 val InactiveSecondary = Color(0xFF443E3E)
+
+val HighlightPrimary = Color(0xFF1F1F1F)

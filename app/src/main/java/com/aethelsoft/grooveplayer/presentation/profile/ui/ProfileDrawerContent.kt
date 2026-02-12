@@ -38,6 +38,8 @@ import com.aethelsoft.grooveplayer.utils.M_PADDING
 @Composable
 fun ProfileDrawerContent(
     deviceType: DeviceType,
+    onNavigateToShare: () -> Unit = {},
+    onClose: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     // TODO: Wire layouts to viewModel when profile state is implemented.
@@ -57,9 +59,9 @@ fun ProfileDrawerContent(
 
     Box() {
         if(deviceType == DeviceType.LARGE_TABLET){
-            LargeTabletProfileLayout(viewModel)
+            LargeTabletProfileLayout(viewModel, onNavigateToShare)
         } else {
-            TabletProfileLayout(viewModel)
+            TabletProfileLayout(viewModel, onNavigateToShare)
         }
         Column() {
             Box(
@@ -73,7 +75,8 @@ fun ProfileDrawerContent(
             GradientAppBar(
                 title = "Profile",
                 deviceType = deviceType,
-                modifier = Modifier
+                modifier = Modifier,
+                onBackClick = onClose
             )
         }
     }
