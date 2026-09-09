@@ -23,6 +23,7 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <!-- Foreground playback -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -38,6 +39,12 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Nearby Connections API (P2P transfer without WiFi infrastructure) -->
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <!-- Nearby Connections API requires both location permissions on all API levels -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- Nearby Connections API requires ACCESS_COARSE_LOCATION even on API 34+ -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
 
@@ -75,6 +82,12 @@
         <!--  Share transfer (NFC / nearby) Foreground Service  -->
         <service
             android:name=".services.ShareTransferService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!--  Nearby P2P transfer Foreground Service  -->
+        <service
+            android:name=".services.NearbyTransferService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 

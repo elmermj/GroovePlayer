@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -135,17 +136,17 @@ private fun PhoneSearchBarContent(
     
     BoxWithConstraints(
         modifier = modifier
-            .then(if (shouldShowIconOnly) Modifier.width(48.dp) else Modifier.widthIn(max = 360.dp))
+            // Match Profile IconButton size when collapsed so Row CenterVertically aligns all chrome.
+            .then(if (shouldShowIconOnly) Modifier.size(48.dp) else Modifier.widthIn(max = 360.dp))
             .clickable(enabled = !isFocused) {
                 if (shouldShowIconOnly) {
                     onExpandedChange?.invoke(true)
                 }
                 focusRequester.requestFocus()
             },
-        contentAlignment = Alignment.TopEnd
+        contentAlignment = Alignment.CenterEnd
     ) {
         val maxWidth = maxWidth.coerceAtMost(360.dp)
-        val density = LocalDensity.current
         val animatedWidth by animateDpAsState(
             targetValue = when {
                 shouldShowIconOnly -> 48.dp
@@ -156,7 +157,12 @@ private fun PhoneSearchBarContent(
             animationSpec = tween(durationMillis = 300)
         )
         
-        Box(modifier = Modifier.width(animatedWidth)) {
+        Box(
+            modifier = Modifier
+                .width(animatedWidth)
+                .then(if (shouldShowIconOnly) Modifier.fillMaxHeight() else Modifier),
+            contentAlignment = Alignment.CenterEnd
+        ) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -179,13 +185,13 @@ private fun PhoneSearchBarContent(
                             }
                         }
                     },
-                placeholder = { Text("Search", color = Color.White.copy(alpha = 0.6f)) },
+                placeholder = { Text("Search", color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
                 leadingIcon = {
-                    Icon(XSearch, contentDescription = "Search", tint = Color.White.copy(alpha = 0.6f))
+                    Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = GrooveTheme.colors.onSurface,
+                    unfocusedTextColor = GrooveTheme.colors.onSurface,
                     focusedBorderColor = Color.Transparent,
                     unfocusedBorderColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,
@@ -210,25 +216,21 @@ private fun PhoneSearchBarContent(
             )
             
             if (shouldShowIconOnly) {
-                Box(
-                    modifier = Modifier.size(48.dp).align(Alignment.TopEnd)
-                ) {
-                    IconButton(
-                        onClick = {
-                            onExpandedChange?.invoke(true)
-                            scope.launch {
-                                kotlinx.coroutines.delay(400)
-                                try {
-                                    focusRequester.requestFocus()
-                                } catch (e: Exception) {
-                                    android.util.Log.e("SearchBar", "Error requesting focus: ${e.message}", e)
-                                }
+                IconButton(
+                    onClick = {
+                        onExpandedChange?.invoke(true)
+                        scope.launch {
+                            kotlinx.coroutines.delay(400)
+                            try {
+                                focusRequester.requestFocus()
+                            } catch (e: Exception) {
+                                android.util.Log.e("SearchBar", "Error requesting focus: ${e.message}", e)
                             }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Icon(XSearch, contentDescription = "Search", tint = Color.White.copy(alpha = 0.6f))
-                    }
+                        }
+                    },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
                 }
             }
         }
@@ -306,13 +308,13 @@ private fun TabletSearchBarContent(
                         isExpanded = false
                     }
                 },
-            placeholder = { Text("Search", color = Color.White.copy(alpha = 0.6f)) },
+            placeholder = { Text("Search", color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
             leadingIcon = {
-                Icon(XSearch, contentDescription = "Search", tint = Color.White.copy(alpha = 0.6f))
+                Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
             },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
+                focusedTextColor = GrooveTheme.colors.onSurface,
+                unfocusedTextColor = GrooveTheme.colors.onSurface,
                 focusedBorderColor = Color.Transparent,
                 unfocusedBorderColor = Color.Transparent,
                 focusedContainerColor = Color.Transparent,

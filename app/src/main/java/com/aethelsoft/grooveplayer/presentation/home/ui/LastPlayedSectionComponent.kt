@@ -18,6 +18,7 @@ import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
 fun LastPlayedSectionComponent(
@@ -43,7 +44,8 @@ fun LastPlayedSectionComponent(
         ){
             Text(
                 text = "Where you left off",
-                style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                color = GrooveTheme.colors.onSurface,
             )
         }
 

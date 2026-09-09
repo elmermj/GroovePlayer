@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkPlaceholder
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
 fun LibraryCardComponent(
@@ -34,6 +37,8 @@ fun LibraryCardComponent(
             .filter { it.isNotBlank() && it != "Unknown" }
             .distinct()
     }
+    val colors = GrooveTheme.colors
+    val typography = GrooveTheme.typography
 
     Card(
         modifier = Modifier
@@ -48,9 +53,11 @@ fun LibraryCardComponent(
 
                 // No data
                 0 -> {
-                    Text(
-                        text = emptyNoticeText,
-                        modifier = Modifier.align(Alignment.Center)
+                    MediaArtworkPlaceholder(
+                        modifier = Modifier.fillMaxSize(),
+                        kind = MediaArtworkKind.SONG,
+                        cornerRadius = 0.dp,
+                        contentDescription = emptyNoticeText,
                     )
                 }
 
@@ -79,7 +86,7 @@ fun LibraryCardComponent(
                         Brush.verticalGradient(
                             colors = listOf(
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.7f)
+                                colors.canvas.copy(alpha = 0.7f)
                             )
                         )
                     )
@@ -94,15 +101,15 @@ fun LibraryCardComponent(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    style = typography.cardTitle.toTextStyle(),
+                    color = colors.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
+                    style = typography.cardSubtitle.toTextStyle(),
+                    color = colors.onSurface.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

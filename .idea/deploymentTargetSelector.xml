@@ -6,11 +6,11 @@
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
       <SelectionState runConfigName="MainActivity">
-        <option name="selectionMode" value="DIALOG" />
-        <DropdownSelection timestamp="2026-02-03T21:00:32.063324Z">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DropdownSelection timestamp="2026-07-29T09:08:24.761366Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=RR2XC0049KN" />
+              <DeviceId pluginId="Default" identifier="serial=192.168.100.230:39423;connection=e2564c80" />
             </handle>
           </Target>
         </DropdownSelection>
@@ -18,12 +18,12 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="PhysicalDevice" identifier="serial=RRCW703TE3K" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=RR2XC0049KN" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="PhysicalDevice" identifier="serial=RR2XC0049KN" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=RRGL10C9R9N" />
               </handle>
             </Target>
           </targets>

@@ -41,7 +41,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.*
@@ -68,8 +67,12 @@ import kotlin.math.sin
 
 /* ───────────────────────── CONSTANTS ───────────────────────── */
 
-private const val BASE_ANGLE = 270f      // 12 o’clock
-private const val DEGREE_SPACING = 20f   // per item
+/** Top of the left-half ellipse (12 o'clock in screen space with y = cy - sin·r). */
+private const val BASE_ANGLE = 90f
+/** Max icons visible along the left semicircle at once. */
+private const val MAX_VISIBLE = 7
+/** Even spacing so 7 icons span 90° → 270° (top → bottom). */
+private const val DEGREE_SPACING = 180f / (MAX_VISIBLE - 1) // 30°
 
 /* ───────────────────────── MAIN COMPOSABLE ───────────────────────── */
 
@@ -103,7 +106,6 @@ fun BluetoothEllipticalLazyScroll(
     val colorMix = remember { Animatable(0f) }
     val colorMixFail = remember { Animatable(0f) }
     var isInteracting by remember { mutableStateOf(false) }
-    var hitLimit by remember { mutableStateOf(false) }
 
     val isConnecting = connectingDeviceAddress != null
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
@@ -143,42 +145,28 @@ fun BluetoothEllipticalLazyScroll(
         }
     }
 
-    /* ───── ELLIPSE GEOMETRY ───── */
-    val radiusDp = maxHeight * 0.42f
-    val radiusPx = with(density) { radiusDp.toPx() }
-
     val p = 0.55f
     val q = 1.0f
 
-    val panelWidthPx = with(density) { (360.dp + 32.dp).toPx() }
-    val centerXPx = panelWidthPx
-    val centerYPx = with(density) { (maxHeight * 0.5f).toPx() }
-
-    /* ───── SCROLL LIMITS ───── */
-    val angleSpanFromTop = BASE_ANGLE - 180f
-    val minOffset = -(angleSpanFromTop / DEGREE_SPACING)
-    val maxOffset = (availableDevices.size - 1) - (angleSpanFromTop / DEGREE_SPACING)
-
-    /* ───── SCROLL POSITION ───── */
+    /* ───── SCROLL POSITION (endless / repeating) ───── */
     var scrollOffset by remember { mutableFloatStateOf(0f) }
+    val deviceCount = availableDevices.size
 
-    val overshoot = 0.15f
+    /* Reset to top (index 0 at apex) when the device list identity changes. */
+    LaunchedEffect(deviceCount) {
+        scrollOffset = 0f
+    }
 
-    /* ───── SCROLL HANDLER ───── */
+    /* ───── SCROLL HANDLER — endless, no hard limits ───── */
     val scrollState = rememberScrollableState { delta ->
+        if (deviceCount == 0) return@rememberScrollableState 0f
         if (!isInteracting) isInteracting = true
-        val nextOffset = scrollOffset + delta * 0.01f
-
-        hitLimit = nextOffset < minOffset - overshoot || nextOffset > maxOffset + overshoot
-
-        scrollOffset = when {
-            nextOffset < minOffset ->
-                minOffset + (nextOffset - minOffset) * 0.35f
-            nextOffset > maxOffset ->
-                maxOffset + (nextOffset - maxOffset) * 0.35f
-            else -> nextOffset
+        scrollOffset -= delta * 0.01f
+        // Keep offset bounded to avoid float drift while preserving endless feel.
+        val wrap = deviceCount.toFloat()
+        if (scrollOffset > wrap || scrollOffset < -wrap) {
+            scrollOffset %= wrap
         }
-
         delta
     }
 
@@ -189,20 +177,11 @@ fun BluetoothEllipticalLazyScroll(
         }
     }
 
-    /* ───── SCALE UP ON LIMIT ───── */
-    LaunchedEffect(hitLimit) {
-        if (hitLimit) {
-            shaderScale.animateTo(1.15f, tween(150))
-        }
-    }
-
     /* ───── IDLE SHRINK ───── */
     LaunchedEffect(scrollState.isScrollInProgress) {
         if (!scrollState.isScrollInProgress) {
-            if (!scrollState.isScrollInProgress) {
-                shaderScale.animateTo(0.7f, tween(150, easing = FastOutSlowInEasing))
-                isInteracting = false
-            }
+            shaderScale.animateTo(0.7f, tween(150, easing = FastOutSlowInEasing))
+            isInteracting = false
         }
     }
 
@@ -299,15 +278,22 @@ fun BluetoothEllipticalLazyScroll(
     }
 
     /* ───── UI ───── */
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .scrollable(
                 state = scrollState,
                 orientation = Orientation.Vertical
             )
-            .clipToBounds()
     ) {
+        val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        // Keep icon centers inside bounds so the top/bottom items are not clipped.
+        val itemHalfPx = with(density) { 52.dp.toPx() }
+        val radiusPx = ((heightPx / 2f) - itemHalfPx).coerceAtLeast(1f)
+        val centerXPx = widthPx
+        val centerYPx = heightPx / 2f
+
         EllipticalGradientBackground(
             center = Offset(centerXPx, centerYPx),
             radiusX = radiusPx,
@@ -406,45 +392,56 @@ fun BluetoothEllipticalLazyScroll(
             }
         }
 
-        availableDevices.forEachIndexed { index, device ->
-            val virtualIndex = index - scrollOffset
-            val angleDeg = BASE_ANGLE - virtualIndex * DEGREE_SPACING
-            if (angleDeg !in 90f..270f) return@forEachIndexed
+        if (deviceCount > 0) {
+            // Cover a window around the scroll offset; modulo maps into the real list (endless).
+            val windowStart = kotlin.math.floor(scrollOffset - MAX_VISIBLE).toInt() - 1
+            val windowEnd = kotlin.math.ceil(scrollOffset + MAX_VISIBLE).toInt() + 1
+            for (virtualI in windowStart..windowEnd) {
+                val device = availableDevices[Math.floorMod(virtualI, deviceCount)]
+                val slot = virtualI - scrollOffset
+                val angleDeg = BASE_ANGLE + slot * DEGREE_SPACING
+                // Left semicircle only — at most MAX_VISIBLE icons with DEGREE_SPACING.
+                if (angleDeg < BASE_ANGLE - 0.5f || angleDeg > BASE_ANGLE + 180f + 0.5f) continue
+                if (angleDeg !in 90f..270f) continue
 
-            val pos = ellipsePoint(
-                angleDeg = angleDeg,
-                center = Offset(centerXPx, centerYPx),
-                radius = radiusPx,
-                p = p,
-                q = q
-            )
+                val pos = ellipsePoint(
+                    angleDeg = angleDeg,
+                    center = Offset(centerXPx, centerYPx),
+                    radius = radiusPx,
+                    p = p,
+                    q = q
+                )
 
-            val (scale, alpha) = xToScaleAlpha(
-                x = pos.x,
-                minX = centerXPx - p * radiusPx,
-                maxX = centerXPx
-            )
+                val (scale, alpha) = xToScaleAlpha(
+                    x = pos.x,
+                    minX = centerXPx - p * radiusPx,
+                    maxX = centerXPx
+                )
 
-            val isConnectingThis = connectingDeviceAddress == device.address
+                val isConnectingThis = connectingDeviceAddress == device.address
+                val itemSize = if (deviceType == DeviceType.PHONE) 96.dp else 120.dp
+                val itemHalf = itemSize / 2
 
-            BluetoothDeviceCircle(
-                device = device,
-                isConnected = connectedDevice?.address == device.address,
-                isConnecting = isConnectingThis,
-                onClick = {
-                    onDeviceClick(device)
-                },
-                modifier = Modifier
-                    .offset(
-                        x = with(density) { pos.x.toDp() - 40.dp },
-                        y = with(density) { pos.y.toDp() - 40.dp }
-                    )
-                    .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        this.alpha = alpha
-                    }
-            )
+                BluetoothDeviceCircle(
+                    device = device,
+                    isConnected = connectedDevice?.address == device.address,
+                    isConnecting = isConnectingThis,
+                    compact = deviceType == DeviceType.PHONE,
+                    onClick = {
+                        onDeviceClick(device)
+                    },
+                    modifier = Modifier
+                        .offset(
+                            x = with(density) { pos.x.toDp() - itemHalf },
+                            y = with(density) { pos.y.toDp() - itemHalf }
+                        )
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            this.alpha = alpha
+                        }
+                )
+            }
         }
     }
 }
@@ -457,7 +454,8 @@ private fun BluetoothDeviceCircle(
     isConnected: Boolean,
     isConnecting: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val type = BluetoothHelpers.detectBluetoothDeviceType(device.name)
     val pulseAlpha by rememberInfiniteTransition(label = "circlePulse").animateFloat(
@@ -469,17 +467,21 @@ private fun BluetoothDeviceCircle(
         ),
         label = "circlePulse"
     )
+    val columnSize = if (compact) 96.dp else 120.dp
+    val circleSize = if (compact) 56.dp else 72.dp
+    val iconSize = if (compact) 28.dp else 36.dp
+    val labelWidth = if (compact) 56.dp else 72.dp
 
     Column(
         modifier = modifier
-            .size(120.dp)
+            .size(columnSize)
             .clickable(enabled = !isConnecting, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(circleSize)
                 .clip(CircleShape)
                 .background(
                     when {
@@ -507,7 +509,7 @@ private fun BluetoothDeviceCircle(
                     isConnecting -> Color(0xFF2196F3).copy(alpha = pulseAlpha)
                     else -> Color(0xFF1A1A1A)
                 },
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
 
@@ -520,10 +522,10 @@ private fun BluetoothDeviceCircle(
             },
             textStyle = MaterialTheme.typography.labelSmall.copy(
                 color = Color.White,
-                fontSize = 12.sp,
+                fontSize = if (compact) 10.sp else 12.sp,
                 textAlign = TextAlign.Center
             ),
-            modifier = Modifier.width(72.dp).basicMarquee()
+            modifier = Modifier.width(labelWidth).basicMarquee()
         )
     }
 }

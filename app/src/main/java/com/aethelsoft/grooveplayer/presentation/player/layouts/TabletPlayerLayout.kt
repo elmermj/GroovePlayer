@@ -24,8 +24,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -61,8 +64,10 @@ import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.presentation.player.PlayerSongDetailsSheetState
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
@@ -71,15 +76,19 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.GlowingArtworkContainer
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDetails
 import com.aethelsoft.grooveplayer.presentation.player.ui.extractDominantColor
+import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.presentation.common.navigationBarsInset
 import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
@@ -99,9 +108,10 @@ fun TabletPlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
-    bg: Color = Color.Black,
+    bg: Color? = null,
     onClose: () -> Unit
 ) {
+    val pageBackground = bg ?: GrooveTheme.colors.canvas
     var showQueue by remember { mutableStateOf(false) }
     var showEqualizer by remember { mutableStateOf(false) }
     var showBluetoothSheet by remember { mutableStateOf(false) }
@@ -109,6 +119,9 @@ fun TabletPlayerLayout(
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val visualizationMode by playerViewModel.visualizationMode.collectAsState()
     val glowEffectConfig by playerViewModel.glowEffectConfig.collectAsState()
+    val songDetailsSheetState by playerViewModel.songDetailsSheetState.collectAsState()
+    val overlaysBlockingPullUp = showQueue || showBluetoothSheet || showEqualizer
+    val bottomSafeInset = navigationBarsInset()
 
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
@@ -157,9 +170,6 @@ fun TabletPlayerLayout(
     val screenWidth = configuration.containerSize.width.dp
     val maxArtworkHeight = minOf(screenHeight * 0.4f, screenWidth * 0.5f)
     val context = LocalContext.current
-    val xContentWindowInsets = contentWindowInsets
-    val safeInsets = remember(contentWindowInsets) { MutableWindowInsets(xContentWindowInsets) }
-
     var dominantColor by remember { mutableStateOf(Color.White) }
 
     LaunchedEffect(song?.artworkUrl) {
@@ -191,15 +201,28 @@ fun TabletPlayerLayout(
         }
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(bg)
+            .background(pageBackground)
+            .statusBarsPadding()
             .padding(
-                top = 32.dp,
-                bottom = 32.dp,
-                start = 32.dp,
-                end = 32.dp
+                start = M_PADDING * 2,
+                end = M_PADDING * 2,
+                bottom = M_PADDING * 2 + bottomSafeInset,
+            )
+            .detectPullUpToSongDetails(
+                enabled = !overlaysBlockingPullUp &&
+                    (songDetailsSheetState == PlayerSongDetailsSheetState.Hidden ||
+                        songDetailsSheetState == PlayerSongDetailsSheetState.Peek),
+                sheetState = songDetailsSheetState,
+                onOpenPeek = {
+                    playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Peek)
+                },
+                onExpandDetails = {
+                    playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Expanded)
+                },
             ),
         horizontalArrangement = Arrangement.spacedBy(48.dp)
     ) {
@@ -211,32 +234,37 @@ fun TabletPlayerLayout(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(APP_BAR_HEIGHT),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
                     Icon(XBack, contentDescription = "Close")
                 }
-                ToggledIconButton(
-                    state = showBluetoothSheet,
-                    onClick = {
-                        if (!showBluetoothSheet) {
-                            // If opening bluetooth sheet, close queue first
-                            if (showQueue) {
-                                showQueue = false
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlayerShareButton(song = song)
+                    ToggledIconButton(
+                        state = showBluetoothSheet,
+                        onClick = {
+                            if (!showBluetoothSheet) {
+                                // If opening bluetooth sheet, close queue first
+                                if (showQueue) {
+                                    showQueue = false
+                                }
                             }
-                        }
-                        showBluetoothSheet = !showBluetoothSheet
-                    },
-                    activeBackground = Color.White,
-                    inactiveBackground = Color.Transparent,
-                ) {
-                    BTIndicatorIconComponent(
-                        connectedDeviceName = connectedDevice?.name,
-                        isConnected = connectedDevice != null,
-                        tint = if(showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
-                    )
+                            showBluetoothSheet = !showBluetoothSheet
+                        },
+                        activeBackground = Color.White,
+                        inactiveBackground = Color.Transparent,
+                    ) {
+                        BTIndicatorIconComponent(
+                            connectedDeviceName = connectedDevice?.name,
+                            isConnected = connectedDevice != null,
+                            tint = if (showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
+                        )
+                    }
                 }
             }
             val density = LocalDensity.current
@@ -438,12 +466,14 @@ fun TabletPlayerLayout(
             Spacer(modifier = Modifier.height(L_PADDING))
             Text(
                 song?.title ?: "",
-                style = MaterialTheme.typography.headlineLarge,
+                style = GrooveTheme.typography.playerSongTitle.toTextStyle(),
+                color = GrooveTheme.colors.onSurface,
                 textAlign = TextAlign.Center
             )
             Text(
                 song?.artist ?: "",
-                style = MaterialTheme.typography.headlineSmall,
+                style = GrooveTheme.typography.playerSongArtist.toTextStyle(),
+                color = GrooveTheme.colors.muted,
                 textAlign = TextAlign.Center
             )
 
@@ -492,7 +522,7 @@ fun TabletPlayerLayout(
                             modifier = Modifier
                                 .align(alignment = Alignment.CenterStart)
                                 .width(180.dp),
-                            backgroundColor = bg,
+                            backgroundColor = pageBackground,
                         )
                         PlayerControls(
                             modifier = Modifier.align(alignment = Alignment.Center),
@@ -571,6 +601,8 @@ fun TabletPlayerLayout(
             }
             Spacer(modifier = Modifier.height(S_PADDING))
         }
+    }
+
     }
 }
 

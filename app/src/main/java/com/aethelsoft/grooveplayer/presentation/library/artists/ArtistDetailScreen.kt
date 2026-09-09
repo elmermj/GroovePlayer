@@ -4,15 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -24,11 +19,14 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
+import com.aethelsoft.grooveplayer.utils.M_PADDING
+import com.aethelsoft.grooveplayer.utils.XS_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArtistDetailScreen(
     artistId: String,
@@ -42,24 +40,15 @@ fun ArtistDetailScreen(
     val songsPagingItems: LazyPagingItems<Song> = viewModel.songsPagingFlow.collectAsLazyPagingItems()
     val playerViewModel = rememberPlayerViewModel()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(text = artistId) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(XBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
+    GrooveScreen(
+        title = artistId,
+        onBackClick = onNavigateBack,
+        contentPadding = PaddingValues.Zero,
+    ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = M_PADDING, vertical = M_PADDING),
+            verticalArrangement = Arrangement.spacedBy(XS_PADDING),
         ) {
             items(
                 count = songsPagingItems.itemCount,
@@ -82,22 +71,37 @@ fun ArtistDetailScreen(
                 when {
                     refresh is LoadState.Loading -> {
                         item {
-                            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(color = SoftWhite)
                             }
                         }
                     }
                     append is LoadState.Loading -> {
                         item {
-                            Box(Modifier.padding(16.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(M_PADDING),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(color = SoftWhite)
                             }
                         }
                     }
                     refresh is LoadState.NotLoading && songsPagingItems.itemCount == 0 -> {
                         item {
-                            Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-                                Text("No songs for this artist")
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                GrooveMutedText("No songs for this artist")
                             }
                         }
                     }
@@ -106,4 +110,3 @@ fun ArtistDetailScreen(
         }
     }
 }
-

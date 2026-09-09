@@ -48,21 +48,22 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.Artist
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.rememberNavigationActions
+import com.aethelsoft.grooveplayer.utils.DefaultSPadding
 import com.aethelsoft.grooveplayer.utils.S_PADDING
-import com.aethelsoft.grooveplayer.utils.theme.icons.XAlbum
-import com.aethelsoft.grooveplayer.utils.theme.icons.XArtist
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCircle
 import com.aethelsoft.grooveplayer.utils.theme.icons.XEdit
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
-import com.aethelsoft.grooveplayer.utils.theme.icons.XMusic
 import com.aethelsoft.grooveplayer.utils.theme.icons.XNFC
 import com.aethelsoft.grooveplayer.utils.theme.icons.XWifiSync
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.HighlightPrimary
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 
 /**
  * Options configuration for GeneralItemComponent.
@@ -100,8 +101,8 @@ fun GeneralItemComponent(
     artworkUrl: String?,
     metaText: String? = null,
     onClick: () -> Unit,
-    padding: Dp = S_PADDING,
-    defaultIcon: ImageVector,
+    padding: Dp = DefaultSPadding,
+    artworkKind: MediaArtworkKind = MediaArtworkKind.SONG,
     contentDescription: String? = null,
     optionsConfig: ItemOptionsConfig? = null,
     selectionConfig: ItemSelectionConfig? = null,
@@ -161,7 +162,7 @@ fun GeneralItemComponent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(GrooveTheme.radii.cardShape)
             .background(backgroundColor)
             .graphicsLayer {
                 rotationX = stepRotationX
@@ -184,37 +185,25 @@ fun GeneralItemComponent(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (artworkUrl == null) {
-                    Box(modifier = Modifier.size(56.dp)) {
-                        Icon(
-                            defaultIcon,
-                            contentDescription = contentDescription,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .background(Color.White)
-                        )
-                    }
-                } else {
-                    AsyncImage(
-                        model = artworkUrl,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(S_PADDING))
-                    )
-                }
+                MediaArtwork(
+                    url = artworkUrl,
+                    kind = artworkKind,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(56.dp),
+                    cornerRadius = S_PADDING,
+                )
                 Box(modifier = Modifier.width(S_PADDING))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
+                        style = GrooveTheme.typography.menuSongTitle.toTextStyle(),
+                        color = GrooveTheme.colors.onSurface,
                     )
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
+                            color = SoftWhite,
                         )
                     }
                 }
@@ -227,13 +216,13 @@ fun GeneralItemComponent(
                     Text(
                         text = metaText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = SoftWhite,
                     )
                 }
                 when {
                     selectionConfig != null && selectionConfig.isSelectionMode -> {
                         Box(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(48.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             AnimatedContent(
@@ -246,7 +235,7 @@ fun GeneralItemComponent(
                                 Icon(
                                     imageVector = if (selected) XCheckCircle else XCircle,
                                     contentDescription = if (selected) "Selected" else "Unselected",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = SoftWhite,
                                 )
                             }
                         }
@@ -258,7 +247,7 @@ fun GeneralItemComponent(
                             Icon(
                                 XMore,
                                 contentDescription = "More options",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = SoftWhite,
                             )
                         }
                     }
@@ -365,7 +354,7 @@ fun SongItemComponent(
     onClick: () -> Unit,
     onEditMetadata: (Song) -> Unit = {},
     onLongPress: (Song) -> Unit = {},
-    padding: Dp = S_PADDING,
+    padding: Dp = DefaultSPadding,
     selectionConfig: ItemSelectionConfig? = null,
     secondaryContent: (@Composable () -> Unit)? = null
 ) {
@@ -377,7 +366,7 @@ fun SongItemComponent(
         metaText = formatDuration(song.durationMs),
         onClick = onClick,
         padding = padding,
-        defaultIcon = XMusic,
+        artworkKind = MediaArtworkKind.SONG,
         contentDescription = "${song.title} by ${song.artist}",
         optionsConfig = ItemOptionsConfig(
             onEditMetadata = { onEditMetadata(song) },
@@ -397,7 +386,7 @@ fun SongItemComponent(
 fun AlbumItemComponent(
     album: Album,
     onClick: () -> Unit,
-    padding: Dp = S_PADDING,
+    padding: Dp = DefaultSPadding,
     optionsConfig: ItemOptionsConfig? = null,
     selectionConfig: ItemSelectionConfig? = null,
 ) {
@@ -410,7 +399,7 @@ fun AlbumItemComponent(
         metaText = null,
         onClick = onClick,
         padding = padding,
-        defaultIcon = XAlbum,
+        artworkKind = MediaArtworkKind.ALBUM,
         contentDescription = "${album.name} by ${album.artist}",
         optionsConfig = optionsConfig ?: if (songsToShare.isNotEmpty()) {
             ItemOptionsConfig(
@@ -429,7 +418,7 @@ fun AlbumItemComponent(
 fun ArtistItemComponent(
     artist: Artist,
     onClick: () -> Unit,
-    padding: Dp = S_PADDING,
+    padding: Dp = DefaultSPadding,
     optionsConfig: ItemOptionsConfig? = null,
     selectionConfig: ItemSelectionConfig? = null,
 ) {
@@ -440,7 +429,7 @@ fun ArtistItemComponent(
         metaText = null,
         onClick = onClick,
         padding = padding,
-        defaultIcon = XArtist,
+        artworkKind = MediaArtworkKind.ARTIST,
         contentDescription = artist.name,
         optionsConfig = optionsConfig,
         selectionConfig = selectionConfig

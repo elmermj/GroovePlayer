@@ -6,44 +6,39 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.data.share.NfcShareDiscovery
 import com.aethelsoft.grooveplayer.data.share.ShareProtocol
 import com.aethelsoft.grooveplayer.domain.model.ShareSessionInfo
+import com.aethelsoft.grooveplayer.presentation.common.GrooveCardSubtitle
+import com.aethelsoft.grooveplayer.presentation.common.GrooveCardTitle
+import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
+import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
+import com.aethelsoft.grooveplayer.utils.M_PADDING
+import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.getLocalIpAddress
-import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareViaNfcScreen(
     onNavigateBack: () -> Unit,
@@ -96,81 +91,53 @@ fun ShareViaNfcScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            TopAppBar(
-                title = { Text("Share via Tap") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(XBack, contentDescription = "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black,
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White
-                )
-            )
-            if (isSender) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Spacer(modifier = Modifier.height(48.dp))
-                    Text(
-                        text = if (isBeamSupported) "Hold phones back to back" else "Waiting for receiver",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = if (isBeamSupported) {
-                            "Tap to connect — transfer uses Wi‑Fi"
-                        } else {
-                            "Find this device in the list on the receiver's phone"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                    CircularProgressIndicator(color = Color.White)
-                }
-            } else {
-                if (isBeamSupported) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.height(48.dp))
-                        Text(
-                            text = "Tap sender's phone",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Hold your phone against the sender's phone to connect",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.height(32.dp))
-                        CircularProgressIndicator(color = Color.White)
-                    }
+    GrooveScreen(
+        title = "Share via Tap",
+        onBackClick = onNavigateBack,
+    ) {
+        when {
+            isSender -> WaitingBlock(
+                title = if (isBeamSupported) "Hold phones back to back" else "Waiting for receiver",
+                subtitle = if (isBeamSupported) {
+                    "Tap to connect — transfer uses Wi‑Fi"
                 } else {
-                    ShareViaNfcNearbyDeviceList(
-                        viewModel = viewModel,
-                        onDeviceSelected = { info ->
-                            viewModel.connectAndReceiveOffer(info)
-                            onOfferReceived()
-                        }
-                    )
+                    "Find this device in the list on the receiver's phone"
+                },
+            )
+            isBeamSupported -> WaitingBlock(
+                title = "Tap sender's phone",
+                subtitle = "Hold your phone against the sender's phone to connect",
+            )
+            else -> ShareViaNfcNearbyDeviceList(
+                viewModel = viewModel,
+                onDeviceSelected = { info ->
+                    viewModel.connectAndReceiveOffer(info)
+                    onOfferReceived()
                 }
-            }
+            )
         }
+    }
+}
+
+@Composable
+private fun WaitingBlock(
+    title: String,
+    subtitle: String,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+        )
+        Spacer(modifier = Modifier.height(S_PADDING))
+        GrooveMutedText(text = subtitle)
+        Spacer(modifier = Modifier.height(M_PADDING * 2))
+        CircularProgressIndicator(color = SoftWhite)
     }
 }
 
@@ -187,47 +154,24 @@ private fun ShareViaNfcNearbyDeviceList(
 
     if (devices.isEmpty()) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = Color.White)
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Searching for nearby devices...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray
-                )
+                CircularProgressIndicator(color = SoftWhite)
+                Spacer(modifier = Modifier.height(S_PADDING))
+                GrooveMutedText("Searching for nearby devices…")
             }
         }
     } else {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(S_PADDING),
         ) {
             items(devices) { info ->
-                Card(
-                    onClick = { onDeviceSelected(info) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = info.deviceName,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "${info.host}:${info.port}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
-                        )
-                    }
+                GrooveSurfaceCard(onClick = { onDeviceSelected(info) }) {
+                    GrooveCardTitle(info.deviceName)
+                    GrooveCardSubtitle("${info.host}:${info.port}")
                 }
             }
         }

@@ -13,6 +13,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetLastPlayedSon
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetRecentlyPlayedUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.InitializeLibraryIndexUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
+import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.utils.TimeframeUtils
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,7 +37,8 @@ class HomeViewModel @Inject constructor(
     private val getFavoriteArtistsUseCase: GetFavoriteArtistsUseCase,
     private val getFavoriteAlbumsUseCase: GetFavoriteAlbumsUseCase,
     private val getLastPlayedSongsUseCase: GetLastPlayedSongsUseCase,
-    private val initializeLibraryIndexUseCase: InitializeLibraryIndexUseCase
+    private val initializeLibraryIndexUseCase: InitializeLibraryIndexUseCase,
+    private val musicRepository: MusicRepository,
 ) : BaseViewModel(application) {
     
     // All playback history features are now reactive with Flows
@@ -67,6 +70,13 @@ class HomeViewModel @Inject constructor(
                 initializeLibraryIndexUseCase()
             } catch (e: Exception) {
                 android.util.Log.e("HomeViewModel", "Failed to initialize library index", e)
+            }
+        }
+
+        // Reload home song snapshot after excluded-folder catalog refresh.
+        viewModelScope.launch {
+            musicRepository.catalogGeneration.drop(1).collect {
+                loadSongs()
             }
         }
         

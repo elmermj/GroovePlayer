@@ -10,6 +10,8 @@ import com.aethelsoft.grooveplayer.domain.model.ShareableItem
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
+import com.aethelsoft.grooveplayer.utils.helpers.NearbyDeviceCapability
+import com.aethelsoft.grooveplayer.utils.helpers.NearbyDeviceCapabilityHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
@@ -24,10 +26,14 @@ class ShareViewModel @Inject constructor(
     application: Application,
     private val shareRepository: ShareRepository,
     private val musicRepository: MusicRepository,
-    private val nsdShareDiscovery: NsdShareDiscovery
+    private val nsdShareDiscovery: NsdShareDiscovery,
+    private val capabilityHelper: NearbyDeviceCapabilityHelper,
 ) : AndroidViewModel(application) {
 
     val transferState: StateFlow<ShareTransferState> = shareRepository.transferState
+
+    val deviceCapability: StateFlow<NearbyDeviceCapability> =
+        MutableStateFlow(capabilityHelper.analyze()).asStateFlow()
 
     private val _songsToShare = MutableStateFlow<List<Song>>(emptyList())
     val songsToShare: StateFlow<List<Song>> = _songsToShare.asStateFlow()

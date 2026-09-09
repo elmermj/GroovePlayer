@@ -1,6 +1,5 @@
 package com.aethelsoft.grooveplayer.presentation.profile.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
@@ -10,10 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import com.aethelsoft.grooveplayer.utils.theme.ui.InactivePrimary
-import com.aethelsoft.grooveplayer.utils.theme.ui.InactiveSecondary
-import com.aethelsoft.grooveplayer.utils.theme.ui.SoftBlack
-import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
 fun ProfileSettingsButton(
@@ -22,38 +18,38 @@ fun ProfileSettingsButton(
     title: String,
     isInverse: Boolean = false,
     isActive: Boolean = true,
-    textStyle: TextStyle = MaterialTheme.typography.labelLarge,
+    textStyle: TextStyle = GrooveTheme.typography.buttonLabel.toTextStyle(),
     textColor: Color? = null,
-){
+) {
+    val colors = GrooveTheme.colors
     val containerColor = if (isActive) {
-        if (isInverse) SoftBlack else SoftWhite
+        if (isInverse) colors.surface else colors.accent
     } else {
-        InactiveSecondary
+        colors.inactiveContainer
     }
 
     val contentColor = if (isActive) {
-        if (isInverse) SoftWhite else SoftBlack
+        if (isInverse) colors.muted else colors.onAccent
     } else {
-        InactivePrimary
+        colors.inactive
     }
 
     val resolvedTextColor = textColor ?: contentColor
-    
+
     Button(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = ButtonColors(
             containerColor = containerColor,
             contentColor = contentColor,
-            disabledContainerColor = InactiveSecondary,
-            disabledContentColor = InactivePrimary
+            disabledContainerColor = colors.inactiveContainer,
+            disabledContentColor = colors.inactive,
         )
     ) {
         Text(
             text = title,
             style = textStyle,
-            color = resolvedTextColor
+            color = resolvedTextColor,
         )
     }
 }

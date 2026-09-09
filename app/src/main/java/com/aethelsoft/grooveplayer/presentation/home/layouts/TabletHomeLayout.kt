@@ -17,6 +17,7 @@ import com.aethelsoft.grooveplayer.presentation.home.ui.LastPlayedSectionCompone
 import com.aethelsoft.grooveplayer.presentation.home.ui.LibraryCardComponent
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -50,7 +51,8 @@ fun TabletHomeLayout(
                 ){
                     Text(
                         text = "Discover More",
-                        style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                        style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                        color = GrooveTheme.colors.onSurface,
                     )
                 }
             }

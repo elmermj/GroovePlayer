@@ -21,6 +21,7 @@ data class NavigationActions(
     val openShareViaNfcWithSongs: (List<Song>) -> Unit = {},
     /** Prepares songs and navigates to Share with nearby device. */
     val openShareViaNearbyWithSongs: (List<Song>) -> Unit = {},
+    val openUiStyling: () -> Unit = {},
 )
 
 /**

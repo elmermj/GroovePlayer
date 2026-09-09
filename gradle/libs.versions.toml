@@ -25,10 +25,12 @@ constraintlayout = "2.2.1"
 foundation = "1.10.1"
 uiUnit = "1.10.1"
 lottie = "6.4.0"
-composeTesting = "1.0.0-alpha09"
 uiText = "1.10.1"
 paging = "3.3.5"
 uiVersion = "1.10.2"
+runtime = "1.10.2"
+playServicesNearby = "19.3.0"
+androidxUi = "1.11.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -76,13 +78,15 @@ androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", versi
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 androidx-compose-ui-unit = { group = "androidx.compose.ui", name = "ui-unit", version.ref = "uiUnit" }
-androidx-compose-testing = { group = "androidx.xr.compose", name = "compose-testing", version.ref = "composeTesting" }
 androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 ui = { group = "androidx.compose.ui", name = "ui", version.ref = "uiVersion" }
 jaudiotagger = { module = "net.jthink:jaudiotagger", version = "3.0.1" }
-
+androidx-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+play-services-nearby = { module = "com.google.android.gms:play-services-nearby", version = "19.0.0" }
+gms-play-services-nearby = { group = "com.google.android.gms", name = "play-services-nearby", version.ref = "playServicesNearby" }
+androidx-compose-ui-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "androidxUi" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

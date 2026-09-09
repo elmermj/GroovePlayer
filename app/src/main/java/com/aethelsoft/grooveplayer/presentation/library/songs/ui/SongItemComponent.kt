@@ -26,20 +26,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.utils.DefaultSPadding
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 
 @Composable
 fun SongItemComponent(
     song: Song,
     onClick: () -> Unit,
     onMoreClick: () -> Unit = {},
-    padding: Dp = S_PADDING
+    padding: Dp = DefaultSPadding
 ) {
     var showOptionsMenu by remember { mutableStateOf(false) }
 
@@ -56,26 +61,26 @@ fun SongItemComponent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model = song.artworkUrl,
+            MediaArtwork(
+                url = song.artworkUrl,
+                kind = MediaArtworkKind.SONG,
                 contentDescription = null,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(RoundedCornerShape(S_PADDING))
+                modifier = Modifier.size(56.dp),
+                cornerRadius = S_PADDING,
             )
             Box(modifier = Modifier.width(S_PADDING))
             Column(modifier = Modifier.weight(1f)) {
                 Row {
                     Text(
                         text = song.title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
+                        style = GrooveTheme.typography.menuSongTitle.toTextStyle(),
+                        color = GrooveTheme.colors.onSurface,
                     )
                 }
                 Text(
                     text = song.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
+                    color = SoftWhite,
                 )
             }
             Row(
@@ -84,8 +89,8 @@ fun SongItemComponent(
             ) {
                 Text(
                     text = formatDuration(song.durationMs),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = GrooveTheme.typography.menuSongAlbum.toTextStyle(),
+                    color = SoftWhite,
                 )
                 Box {
                     IconButton(
@@ -97,7 +102,7 @@ fun SongItemComponent(
                         Icon(
                             XMore,
                             contentDescription = "More options",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = SoftWhite,
                         )
                     }
                     DropdownMenu(

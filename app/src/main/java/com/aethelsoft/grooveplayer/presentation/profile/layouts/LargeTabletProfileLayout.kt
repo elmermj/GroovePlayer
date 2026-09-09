@@ -1,7 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.profile.layouts
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
@@ -9,20 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.foundation.lazy.LazyColumn
@@ -47,31 +41,53 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
+import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ActionType
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileRowIcon
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSectionComponent
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingRow
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingsButton
-import com.aethelsoft.grooveplayer.domain.model.FolderSizeEntry
-import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
-import com.aethelsoft.grooveplayer.utils.StorageFormatUtils
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileStorageSection
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAccountType
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAppVersion
+import com.aethelsoft.grooveplayer.utils.theme.icons.XCopyright
+import com.aethelsoft.grooveplayer.utils.theme.icons.XCrossFade
+import com.aethelsoft.grooveplayer.utils.theme.icons.XEqualizer
+import com.aethelsoft.grooveplayer.utils.theme.icons.XMiniPlayer
+import com.aethelsoft.grooveplayer.utils.theme.icons.XNotifications
+import com.aethelsoft.grooveplayer.utils.theme.icons.XPrivacyPolicy
+import com.aethelsoft.grooveplayer.utils.theme.icons.XRecentUpdates
+import com.aethelsoft.grooveplayer.utils.theme.icons.XRepeatMode
+import com.aethelsoft.grooveplayer.utils.theme.icons.XUiStyle
+import com.aethelsoft.grooveplayer.utils.theme.icons.XShareMusic
+import com.aethelsoft.grooveplayer.utils.theme.icons.XShuffleMode
+import com.aethelsoft.grooveplayer.utils.theme.icons.XVisualization
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun LargeTabletProfileLayout(
     viewModel: ProfileViewModel,
-    onNavigateToShare: () -> Unit = {}
+    onNavigateToShare: () -> Unit = {},
+    onNavigateToUiStyling: () -> Unit = {},
 ){
-
+    val canvas = GrooveTheme.colors.canvas
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(canvas)
             .padding(horizontal = M_PADDING)
     ) {
         item {
@@ -79,10 +95,8 @@ fun LargeTabletProfileLayout(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(420.dp)
-                    .background(Color.Black)
-                    .height(
-                        APP_BAR_HEIGHT + WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + M_PADDING
-                    )
+                    .background(canvas)
+                    .height(topBarContentInset())
             )
         }
         item {
@@ -95,11 +109,30 @@ fun LargeTabletProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Account",
             ) {
+                val activeRowId by viewModel.activeRowId.collectAsState()
+
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XShareMusic) },
                     title = "Share Music",
                     subtitle = "Share via Tap (NFC) or nearby device",
                     actionType = ActionType.EXPANDABLE,
                     onClick = onNavigateToShare
+                )
+                Spacer(Modifier.height(S_PADDING))
+                ProfileSettingRow(
+                    icon = { ProfileRowIcon(XUiStyle) },
+                    title = "UI Customisation",
+                    subtitle = "Customize colors, type, spacing, and more",
+                    actionType = ActionType.LINK,
+                    onClick = onNavigateToUiStyling,
+                )
+                Spacer(Modifier.height(S_PADDING))
+                NotificationsRow(
+                    viewModel = viewModel,
+                    isExpanded = activeRowId == "notifications",
+                    onExpandedChange = { expanded ->
+                        viewModel.setActiveRowId(if (expanded) "notifications" else null)
+                    }
                 )
                 Spacer(Modifier.height(S_PADDING))
                 AccountSection(viewModel = viewModel)
@@ -180,41 +213,11 @@ fun LargeTabletProfileLayout(
              *
              * - Excluded folders.
              * - Storage usage.
-             * - A button for consolidating specific folders which contain music files into a specific folder.
+             * - Consolidate music folders.
              * - Clear cache.
              */
-            ProfileSectionComponent(
-                sectionTitle = "Storage",
-            ) {
-                val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
-                ExcludedFoldersRow(
-                    viewModel = viewModel,
-                    isExpanded = storageActiveRowId == "excluded_folders",
-                    onExpandedChange = { expanded ->
-                        viewModel.setStorageActiveRowId(if (expanded) "excluded_folders" else null)
-                    }
-                )
-                Spacer(Modifier.height(S_PADDING))
-                StorageUsageRow(
-                    viewModel = viewModel,
-                    isExpanded = storageActiveRowId == "storage_usage",
-                    onExpandedChange = { expanded ->
-                        viewModel.setStorageActiveRowId(if (expanded) "storage_usage" else null)
-                    }
-                )
-                Spacer(Modifier.height(S_PADDING))
-                ProfileSettingRow(
-                    title = "Consolidate music folders",
-                    subtitle = "Move scattered music into a single location"
-                )
-                Spacer(Modifier.height(S_PADDING))
-                ProfileSettingRow(
-                    title = "Clear cache",
-                    subtitle = "Remove temporary data"
-                )
-            }
+            ProfileStorageSection(viewModel = viewModel)
         }
-
         item {
             /** xdev
              * About section
@@ -228,21 +231,25 @@ fun LargeTabletProfileLayout(
                 sectionTitle = "About",
             ) {
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XAppVersion) },
                     title = "App version",
                     subtitle = "See current version"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XRecentUpdates) },
                     title = "Recent updates",
                     subtitle = "What’s new in GroovePlayer"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XCopyright) },
                     title = "Copyright & licenses",
                     subtitle = "Legal information"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XPrivacyPolicy) },
                     title = "Privacy policy",
                     subtitle = "How your data is handled"
                 )
@@ -251,288 +258,10 @@ fun LargeTabletProfileLayout(
         item {
             Spacer(
                 modifier = Modifier
-                    .height(M_PADDING + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 240.dp)
+                    .height(M_PADDING + grooveBottomContentInset(includeMiniPlayer = true) + 134.dp)
                     .width(420.dp)
             )
         }
-    }
-}
-
-@Composable
-fun ExcludedFoldersRow(
-    viewModel: ProfileViewModel,
-    isExpanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-) {
-    LaunchedEffect(isExpanded) {
-        if (isExpanded) viewModel.loadFolderSuggestions()
-    }
-    ProfileSettingRow(
-        title = "Excluded folders",
-        subtitle = "Manage folders that are ignored during scanning",
-        actionType = ActionType.EXPANDABLE,
-        isSecondaryVisible = isExpanded,
-        onSecondaryVisibleChange = onExpandedChange,
-        secondaryContent = {
-            ExcludedFoldersContent(viewModel = viewModel)
-        }
-    )
-}
-
-@Composable
-private fun StorageUsageRow(
-    viewModel: ProfileViewModel,
-    isExpanded: Boolean,
-    onExpandedChange: (Boolean) -> Unit,
-) {
-    LaunchedEffect(isExpanded) {
-        if (isExpanded) viewModel.loadStorageUsage()
-    }
-    ProfileSettingRow(
-        title = "Storage usage",
-        subtitle = "View how much space music uses (included vs excluded)",
-        actionType = ActionType.EXPANDABLE,
-        isSecondaryVisible = isExpanded,
-        onSecondaryVisibleChange = onExpandedChange,
-        secondaryContent = {
-            StorageUsageContent(viewModel = viewModel)
-        }
-    )
-}
-
-@Composable
-private fun StorageUsageContent(viewModel: ProfileViewModel) {
-    val storageUsage by viewModel.storageUsage.collectAsState()
-    val isStorageLoading by viewModel.isStorageLoading.collectAsState()
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(S_PADDING)
-    ) {
-        if (isStorageLoading) {
-            LinearProgressIndicator(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp))
-            )
-            Text(
-                text = "Calculating storage…",
-                style = MaterialTheme.typography.bodySmall,
-                color = SoftWhite
-            )
-        } else {
-            val data = storageUsage
-            if (data == null) {
-                Text(
-                    text = "Could not load storage data.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SoftWhite
-                )
-            } else {
-                val total = data.totalBytes.coerceAtLeast(1L)
-                val includedFraction = data.includedBytes.toFloat() / total
-
-                Text(
-                    text = "Total: ${StorageFormatUtils.formatBytes(data.totalBytes, total)}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White
-                )
-                LinearProgressIndicator(
-                    progress = { includedFraction },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = Color.White.copy(alpha = 0.9f),
-                    trackColor = Color.White.copy(alpha = 0.2f)
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Included: ${StorageFormatUtils.formatBytes(data.includedBytes, total)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SoftWhite
-                    )
-                    Text(
-                        text = "Excluded: ${StorageFormatUtils.formatBytes(data.excludedBytes, total)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = SoftWhite
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Included folders",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White
-                )
-                StorageFolderBulletList(
-                    entries = data.includedFolderDetails,
-                    totalBytes = total
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = "Excluded folders",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White
-                )
-                StorageFolderBulletList(
-                    entries = data.excludedFolderDetails,
-                    totalBytes = total
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StorageFolderBulletList(
-    entries: List<FolderSizeEntry>,
-    totalBytes: Long,
-) {
-    if (entries.isEmpty()) {
-        Text(
-            text = "• None",
-            style = MaterialTheme.typography.bodySmall,
-            color = SoftWhite
-        )
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            entries.forEach { entry ->
-                val displayName = entry.path.substringAfterLast('/', entry.path).ifEmpty { entry.path }
-                Text(
-                    text = "• $displayName — ${StorageFormatUtils.formatBytes(entry.bytes, totalBytes)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = SoftWhite,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExcludedFoldersContent(viewModel: ProfileViewModel) {
-    val folderSuggestions by viewModel.folderSuggestions.collectAsState()
-    val excludedFolders by viewModel.excludedFolders.collectAsState()
-    val suggestionsToShow = folderSuggestions.filter { it !in excludedFolders }
-    val columnsCount = when {
-        suggestionsToShow.isEmpty() -> 1
-        suggestionsToShow.size == 1 -> 1
-        suggestionsToShow.size == 2 -> 2
-        else -> 3
-    }
-    val rows = suggestionsToShow.chunked(columnsCount)
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(S_PADDING)
-    ) {
-        Text(
-            text = "Suggestions",
-            style = MaterialTheme.typography.labelLarge,
-            color = Color.White
-        )
-        if (rows.isEmpty()) {
-            Text(
-                text = "No folders with music found, or all are excluded.",
-                style = MaterialTheme.typography.bodySmall,
-                color = SoftWhite
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                rows.forEach { rowItems ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        rowItems.forEach { path ->
-                            Box(modifier = Modifier.weight(1f)) {
-                                FolderSuggestionChip(
-                                    path = path,
-                                    onClick = { viewModel.excludeFolder(path) }
-                                )
-                            }
-                        }
-                        repeat(columnsCount - rowItems.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Excluded",
-            style = MaterialTheme.typography.labelLarge,
-            color = Color.White
-        )
-        if (excludedFolders.isEmpty()) {
-            Text(
-                text = "No excluded folders.",
-                style = MaterialTheme.typography.bodySmall,
-                color = SoftWhite
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                excludedFolders.forEach { path ->
-                    ExcludedFolderItem(
-                        path = path,
-                        onInclude = { viewModel.includeFolder(path) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun FolderSuggestionChip(
-    path: String,
-    onClick: () -> Unit,
-) {
-    val displayName = path.substringAfterLast('/', path).ifEmpty { path }
-    Text(
-        text = displayName,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color.White,
-        maxLines = 1,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.12f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp)
-    )
-}
-
-@Composable
-private fun ExcludedFolderItem(
-    path: String,
-    onInclude: () -> Unit,
-) {
-    val displayName = path.substringAfterLast('/', path).ifEmpty { path }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(
-                onClick = onInclude,
-            )
-            .background(Color.White.copy(alpha = 0.08f))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = displayName,
-            style = MaterialTheme.typography.bodySmall,
-            color = SoftWhite,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
     }
 }
 
@@ -542,6 +271,7 @@ fun AccountSection(viewModel: ProfileViewModel) {
     val tier = profile?.privilegeTier ?: com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.FREE
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XAccountType) },
         title = "Account type",
         subtitle = when (tier) {
             com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.FREE -> "Free"
@@ -580,6 +310,7 @@ fun RepeatModeRow(
     val currentRepeat by playerViewModel.repeat.collectAsState()
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XRepeatMode) },
         actionType = ActionType.EXPANDABLE,
         title = "Repeat mode",
         subtitle = "Toggle repeat mode",
@@ -623,6 +354,7 @@ fun ShuffleModeRow(
     val isEnabled by playerViewModel.shuffle.collectAsState()
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XShuffleMode) },
         actionType = ActionType.EXPANDABLE,
         title = "Shuffle mode",
         subtitle = "Toggle shuffle mode",
@@ -667,6 +399,7 @@ fun CrossFadeModeRow(
     var sliderValue = fadeSeconds.toFloat()
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XCrossFade) },
         actionType = ActionType.EXPANDABLE,
         title = "Cross-fade mode",
         subtitle = "Enable and set duration for smooth transitions between songs",
@@ -712,6 +445,7 @@ fun MiniPlayerOnStartRow(
     val isEnabled by viewModel.isMiniPlayerOnStartEnabled.collectAsState()
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XMiniPlayer) },
         title = "Show mini player on app start",
         subtitle = "Toggle mini player visibility at launch",
         actionType = ActionType.EXPANDABLE,
@@ -746,6 +480,82 @@ fun MiniPlayerOnStartRow(
 }
 
 @Composable
+fun NotificationsRow(
+    viewModel: ProfileViewModel,
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+) {
+    val preferenceEnabled by viewModel.isNotificationsEnabled.collectAsState()
+    val (hasPermission, requestPermission) = rememberNotificationPermissionState()
+    val context = LocalContext.current
+    val isEffectivelyEnabled = preferenceEnabled && hasPermission
+    val statusText = when {
+        isEffectivelyEnabled -> "Enabled"
+        preferenceEnabled && !hasPermission -> "Permission required"
+        else -> "Disabled"
+    }
+
+    ProfileSettingRow(
+        icon = { ProfileRowIcon(XNotifications) },
+        title = "Notifications",
+        subtitle = "Playback and transfer alerts · $statusText",
+        actionType = ActionType.EXPANDABLE,
+        isSecondaryVisible = isExpanded,
+        onSecondaryVisibleChange = onExpandedChange,
+        secondaryContent = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(S_PADDING)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = SoftWhite
+                    )
+                    Switch(
+                        checked = isEffectivelyEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                viewModel.setNotificationsEnabled(true)
+                                if (!hasPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    requestPermission()
+                                }
+                            } else {
+                                viewModel.setNotificationsEnabled(false)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Color.White.copy(alpha = 0.6f),
+                            uncheckedThumbColor = Color.White.copy(alpha = 0.4f),
+                            uncheckedTrackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+                if (preferenceEnabled && !hasPermission) {
+                    ProfileSettingsButton(
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        title = "Open system settings",
+                        isActive = false,
+                    )
+                }
+            }
+        }
+    )
+}
+
+@Composable
 fun VisualizationModeRow(
     viewModel: ProfileViewModel,
     isExpanded: Boolean,
@@ -755,6 +565,7 @@ fun VisualizationModeRow(
     val mode = settings.visualizationMode
 
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XVisualization) },
         actionType = ActionType.EXPANDABLE,
         title = "Default visualization mode",
         subtitle = "Choose how the visualizer looks by default",
@@ -796,6 +607,7 @@ fun EqualizerRow(
     onExpandedChange: (Boolean) -> Unit,
 ) {
     ProfileSettingRow(
+        icon = { ProfileRowIcon(XEqualizer) },
         actionType = ActionType.EXPANDABLE,
         title = "Equalizer",
         subtitle = "Preset & advanced settings",

@@ -23,8 +23,13 @@ import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyP
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
+import com.aethelsoft.grooveplayer.presentation.profile.UiStylingScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 import com.aethelsoft.grooveplayer.presentation.share.ReceiveApprovalScreen
+import com.aethelsoft.grooveplayer.presentation.transfer.DeviceDiscoveryScreen
+import com.aethelsoft.grooveplayer.presentation.transfer.TransferProgressScreen
+import com.aethelsoft.grooveplayer.presentation.transfer.TransferStatusScreen
+import com.aethelsoft.grooveplayer.presentation.share.ShareConfirmationScreen
 import com.aethelsoft.grooveplayer.presentation.share.ShareOptionsScreen
 import com.aethelsoft.grooveplayer.presentation.share.ShareViaNfcScreen
 import com.aethelsoft.grooveplayer.presentation.share.ShareViaNearbyScreen
@@ -455,14 +460,37 @@ fun AppNavHost(
                 },
                 onNavigateToShare = {
                     navController.navigate(AppRoutes.SHARE_OPTIONS)
-                }
+                },
+                onNavigateToUiStyling = {
+                    navController.navigate(AppRoutes.UI_STYLING)
+                },
+            )
+        }
+        composable(route = AppRoutes.UI_STYLING) {
+            UiStylingScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(route = AppRoutes.SHARE_OPTIONS) {
             ShareOptionsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onShareViaNfc = { navController.navigate(AppRoutes.SHARE_VIA_NFC) },
-                onShareViaNearby = { navController.navigate(AppRoutes.SHARE_VIA_NEARBY) }
+                onShareViaNfc = { navController.navigate(AppRoutes.shareConfirmationRoute("nfc")) },
+                onShareViaNearby = { navController.navigate(AppRoutes.shareConfirmationRoute("nearby")) },
+                onShareViaNearbyP2P = { navController.navigate(AppRoutes.nearbyDiscoveryRoute(isSender = true)) },
+                onReceiveViaNfc = { navController.navigate(AppRoutes.SHARE_VIA_NFC) },
+                onReceiveViaNearby = { navController.navigate(AppRoutes.SHARE_VIA_NEARBY) },
+                onReceiveViaNearbyP2P = { navController.navigate(AppRoutes.nearbyDiscoveryRoute(isSender = false)) },
+                onNavigateToTransferStatus = { navController.navigate(AppRoutes.TRANSFER_STATUS) }
+            )
+        }
+        composable(
+            route = AppRoutes.SHARE_CONFIRMATION,
+            arguments = listOf(navArgument("shareMethod") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val shareMethod = backStackEntry.arguments?.getString("shareMethod") ?: "nfc"
+            ShareConfirmationScreen(
+                shareMethod = shareMethod,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         composable(route = AppRoutes.SHARE_VIA_NFC) {
@@ -485,8 +513,37 @@ fun AppNavHost(
                 }
             )
         }
+        composable(
+            route = "${AppRoutes.NEARBY_DISCOVERY}?isSender={isSender}",
+            arguments = listOf(navArgument("isSender") { type = NavType.BoolType; defaultValue = true })
+        ) { backStackEntry ->
+            val isSender = backStackEntry.arguments?.getBoolean("isSender") ?: true
+            DeviceDiscoveryScreen(
+                isSender = isSender,
+                onNavigateBack = { navController.popBackStack() },
+                onDeviceSelected = { _, _ -> },
+                onNavigateToTransferProgress = {
+                    navController.navigate(AppRoutes.TRANSFER_PROGRESS) {
+                        popUpTo(AppRoutes.NEARBY_DISCOVERY) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(route = AppRoutes.TRANSFER_PROGRESS) {
+            TransferProgressScreen(
+                onNavigateBack = {
+                    com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder.clear()
+                    navController.popBackStack()
+                }
+            )
+        }
         composable(route = AppRoutes.RECEIVE_APPROVAL) {
             ReceiveApprovalScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = AppRoutes.TRANSFER_STATUS) {
+            TransferStatusScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

@@ -6,12 +6,16 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun rememberAudioPermissionState(): Pair<Boolean, () -> Unit> {
@@ -144,32 +148,25 @@ fun rememberBluetoothPermissionState(): Pair<Boolean, () -> Unit> {
 @Composable
 fun rememberNotificationPermissionState(): Pair<Boolean, () -> Unit> {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var hasPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                // Check both permission and notification manager state
-                val hasRuntimePermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-                
-                // Also check if notifications are actually enabled in system settings
-                val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
-                val notificationsEnabled = notificationManager?.areNotificationsEnabled() ?: true
-                
-                hasRuntimePermission && notificationsEnabled
-            } else {
-                // Android 12 and below - notifications are always enabled
-                true
+        mutableStateOf(checkNotificationPermission(context))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasPermission = checkNotificationPermission(context)
             }
-        )
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Re-check both permission and notification manager state
             val notificationManager = context.getSystemService(android.app.NotificationManager::class.java)
             val notificationsEnabled = notificationManager?.areNotificationsEnabled() ?: true
             isGranted && notificationsEnabled
@@ -182,7 +179,6 @@ fun rememberNotificationPermissionState(): Pair<Boolean, () -> Unit> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // Android 12 and below don't need permission request
     }
 
     return Pair(hasPermission, requestPermission)

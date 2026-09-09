@@ -1,34 +1,21 @@
 package com.aethelsoft.grooveplayer.presentation.profile.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.presentation.common.GradientAppBar
-import com.aethelsoft.grooveplayer.presentation.common.XAppBar
 import com.aethelsoft.grooveplayer.presentation.common.rememberSearchBarViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.layouts.LargeTabletProfileLayout
-import com.aethelsoft.grooveplayer.presentation.profile.layouts.PhoneProfileLayout
 import com.aethelsoft.grooveplayer.presentation.profile.layouts.TabletProfileLayout
 import com.aethelsoft.grooveplayer.presentation.search.SearchBarViewModel
 import com.aethelsoft.grooveplayer.utils.DeviceType
-import com.aethelsoft.grooveplayer.utils.M_PADDING
 
 
 /**
@@ -39,11 +26,17 @@ import com.aethelsoft.grooveplayer.utils.M_PADDING
 fun ProfileDrawerContent(
     deviceType: DeviceType,
     onNavigateToShare: () -> Unit = {},
+    onNavigateToUiStyling: () -> Unit = {},
     onClose: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
-    // TODO: Wire layouts to viewModel when profile state is implemented.
-    // Only for Large Tablets and Tablets layouts
+    // Closing the drawer confirms draft excluded-folder changes.
+    // (Drawer ViewModel is retained on the host route, so onCleared alone is not enough.)
+    DisposableEffect(viewModel) {
+        onDispose {
+            viewModel.commitPendingExcludedFolders()
+        }
+    }
 
     val listState = rememberLazyListState()
     val appBarAlpha by remember {
@@ -56,29 +49,18 @@ fun ProfileDrawerContent(
 
     val searchViewModel: SearchBarViewModel = rememberSearchBarViewModel()
 
-
-    Box() {
-        if(deviceType == DeviceType.LARGE_TABLET){
-            LargeTabletProfileLayout(viewModel, onNavigateToShare)
+    Box {
+        if (deviceType == DeviceType.LARGE_TABLET) {
+            LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling)
         } else {
-            TabletProfileLayout(viewModel, onNavigateToShare)
+            TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling)
         }
-        Column() {
-            Box(
-                modifier = Modifier
-                    .height(
-                        WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + (M_PADDING * 2)
-                    )
-                    .width(if (deviceType == DeviceType.TABLET) 360.dp else 420.dp)
-                    .background(Color.Black)
-            )
-            GradientAppBar(
-                title = "Profile",
-                deviceType = deviceType,
-                modifier = Modifier,
-                onBackClick = onClose
-            )
-        }
+        // GradientAppBar owns statusBarsPadding + APP_BAR_HEIGHT (same as Home / Profile route).
+        GradientAppBar(
+            title = "Profile",
+            deviceType = deviceType,
+            modifier = Modifier,
+            onBackClick = onClose,
+        )
     }
-
 }

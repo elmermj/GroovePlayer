@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.domain.repository
 
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
+import kotlinx.coroutines.flow.StateFlow
 
 interface MusicRepository {
     suspend fun getAllSongs(): List<Song>
@@ -23,6 +24,14 @@ interface MusicRepository {
      * Returns storage usage breakdown for music: included vs excluded folders.
      */
     suspend fun getStorageUsage(): StorageUsageData
+
+    /**
+     * Increments whenever the music catalog should be reloaded (e.g. after
+     * excluded-folder changes are committed).
+     */
+    val catalogGeneration: StateFlow<Long>
+
+    fun bumpCatalogGeneration()
 }
 
 

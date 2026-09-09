@@ -1,9 +1,11 @@
 package com.aethelsoft.grooveplayer.presentation.library.songs
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.aethelsoft.grooveplayer.data.paging.SongsPagingSource
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
@@ -20,13 +23,18 @@ class SongsViewModel @Inject constructor(
     private val musicRepository: MusicRepository
 ) : ViewModel() {
 
-    val songsPagingFlow: Flow<PagingData<Song>> = Pager(
-        config = PagingConfig(
-            pageSize = 50,
-            enablePlaceholders = false
-        ),
-        pagingSourceFactory = { SongsPagingSource(musicRepository) }
-    ).flow
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val songsPagingFlow: Flow<PagingData<Song>> = musicRepository.catalogGeneration
+        .flatMapLatest {
+            Pager(
+                config = PagingConfig(
+                    pageSize = 50,
+                    enablePlaceholders = false
+                ),
+                pagingSourceFactory = { SongsPagingSource(musicRepository) }
+            ).flow
+        }
+        .cachedIn(viewModelScope)
 
     private val _selectedSongForEdit = MutableStateFlow<Song?>(null)
     val selectedSongForEdit: StateFlow<Song?> = _selectedSongForEdit.asStateFlow()
@@ -83,5 +91,3 @@ class SongsViewModel @Inject constructor(
         return allSongs.filter { it.id in ids }
     }
 }
-
-

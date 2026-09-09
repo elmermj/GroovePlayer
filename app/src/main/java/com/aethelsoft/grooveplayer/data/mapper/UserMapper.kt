@@ -62,7 +62,10 @@ object UserMapper {
                 else -> VisualizationMode.REAL_TIME
             },
             showMiniPlayerOnStart = entity.showMiniPlayerOnStart,
-            excludedFolders = parseExcludedFolders(entity.excludedFolders)
+            notificationsEnabled = entity.notificationsEnabled,
+            excludedFolders = parseExcludedFolders(entity.excludedFolders),
+            uiStyleId = entity.uiStyleId,
+            uiStyleOverrides = entity.uiStyleOverrides,
         )
     }
     
@@ -87,7 +90,10 @@ object UserMapper {
                 VisualizationMode.REAL_TIME -> "REAL_TIME"
             },
             showMiniPlayerOnStart = domain.showMiniPlayerOnStart,
-            excludedFolders = excludedFoldersToString(domain.excludedFolders)
+            notificationsEnabled = domain.notificationsEnabled,
+            excludedFolders = excludedFoldersToString(domain.excludedFolders),
+            uiStyleId = domain.uiStyleId,
+            uiStyleOverrides = domain.uiStyleOverrides,
         )
     }
     

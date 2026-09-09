@@ -86,10 +86,12 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.testing)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.ui)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.gms.play.services.nearby)
+    implementation(libs.androidx.compose.ui.ui)
     kapt(libs.hilt.compiler)
 
     // Room (KSP OK)
@@ -108,6 +110,9 @@ dependencies {
 
     // Audio tag editing (MP3, M4A, FLAC, OGG, etc.)
     implementation(libs.jaudiotagger)
+
+    // Nearby Connections (P2P transfer without internet)
+    implementation(libs.play.services.nearby)
 
     // Misc
     implementation(libs.icons.lucide)

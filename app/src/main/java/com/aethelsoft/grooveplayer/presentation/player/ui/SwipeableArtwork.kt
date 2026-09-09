@@ -24,13 +24,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -82,9 +82,11 @@ fun SwipeableArtwork(
         },
         label = "ArtworkCrossfade"
     ) { url ->
-        AsyncImage(
-            model = url,
+        MediaArtwork(
+            url = url,
+            kind = MediaArtworkKind.SONG,
             contentDescription = "Artwork",
+            cornerRadius = 20.dp,
             modifier = Modifier
                 .size(size)
                 .offset { IntOffset(offsetX.toInt(), offsetY.toInt()) }
@@ -151,7 +153,6 @@ fun SwipeableArtwork(
                         }
                     )
                 },
-            contentScale = ContentScale.Crop
         )
     }
 }

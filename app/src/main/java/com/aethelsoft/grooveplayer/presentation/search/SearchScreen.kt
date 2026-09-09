@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,12 +16,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil3.compose.AsyncImage
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.library.ui.AlbumItemComponent
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +41,7 @@ fun SearchScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val selectedTab by viewModel.selectedTab.collectAsState()
     val scope = rememberCoroutineScope()
+    val canvas = GrooveTheme.colors.canvas
     
     LaunchedEffect(query) {
         viewModel.search(query)
@@ -53,11 +57,11 @@ fun SearchScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Black
+                    containerColor = canvas
                 )
             )
         },
-        containerColor = Color.Black
+        containerColor = canvas
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -67,7 +71,7 @@ fun SearchScreen(
             // Tabs
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = Color.Black,
+                containerColor = canvas,
                 indicator = { tabPositions ->
                     TabRowDefaults.PrimaryIndicator()
                 }
@@ -310,6 +314,7 @@ fun SearchScreen(
                     }
                 }
             }
+            Box() { }
         }
     }
 }
@@ -348,23 +353,14 @@ private fun SearchAlbumItem(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(S_PADDING))
-                    .background(Color.White.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
             ) {
-                if (artworkUrl != null) {
-                    AsyncImage(
-                        model = artworkUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Text(
-                        text = albumName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White.copy(alpha = 0.5f)
-                    )
-                }
+                MediaArtwork(
+                    url = artworkUrl,
+                    kind = MediaArtworkKind.ALBUM,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = S_PADDING,
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -414,23 +410,14 @@ private fun SearchArtistItem(
             Box(
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(S_PADDING))
-                    .background(Color.White.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
             ) {
-                if (artworkUrl != null) {
-                    AsyncImage(
-                        model = artworkUrl,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Text(
-                        text = artistName.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White.copy(alpha = 0.5f)
-                    )
-                }
+                MediaArtwork(
+                    url = artworkUrl,
+                    kind = MediaArtworkKind.ARTIST,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    cornerRadius = S_PADDING,
+                )
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(

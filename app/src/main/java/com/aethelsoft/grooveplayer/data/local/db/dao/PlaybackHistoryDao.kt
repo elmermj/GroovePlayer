@@ -98,6 +98,9 @@ interface PlaybackHistoryDao {
     
     @Query("DELETE FROM playback_history WHERE playedAt < :beforeTimestamp")
     suspend fun deleteOldHistory(beforeTimestamp: Long)
+
+    @Query("DELETE FROM playback_history WHERE songId IN (:songIds)")
+    suspend fun deleteBySongIds(songIds: List<String>)
     
     @Query("SELECT COUNT(*) FROM playback_history")
     suspend fun getTotalPlaybackCount(): Int

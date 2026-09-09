@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 
 @Composable
@@ -33,8 +34,10 @@ fun ProfileDrawer(
     isOpen: Boolean,
     onClose: () -> Unit,
     onNavigateToShare: () -> Unit = {},
+    onNavigateToUiStyling: () -> Unit = {},
     deviceType: DeviceType,
 ) {
+    val canvas = GrooveTheme.colors.canvas
     val drawerWidth = when (deviceType) {
         DeviceType.TABLET -> 360.dp
         DeviceType.LARGE_TABLET -> 420.dp
@@ -51,7 +54,7 @@ fun ProfileDrawer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
+                    .background(canvas.copy(alpha = 0.4f))
                     .clickable { onClose() }
             )
         }
@@ -80,7 +83,7 @@ fun ProfileDrawer(
                         .fillMaxHeight()
                         .width(drawerWidth)
                         .align(Alignment.CenterStart)
-                        .background(Color.Black)
+                        .background(canvas)
                         .clickable(
                             indication = null,
                             interactionSource = remember { MutableInteractionSource() }
@@ -89,6 +92,7 @@ fun ProfileDrawer(
                     ProfileDrawerContent(
                         deviceType = deviceType,
                         onNavigateToShare = onNavigateToShare,
+                        onNavigateToUiStyling = onNavigateToUiStyling,
                         onClose = onClose
                     )
                 }

@@ -441,7 +441,6 @@ private fun PresetSelector(
             } else {
                 TextButton(
                     onClick = onReset,
-                    modifier = Modifier.background(Color.Red),
                 ) {
                     Text(
                         "Reset",

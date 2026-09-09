@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
@@ -15,21 +14,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+/** Minimum accessible touch target for icon toggles. */
+private val MinToggleHitTarget = 48.dp
+
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun <T> ToggledIconButton(
     state: T,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 24.dp,
+    /** Visual diameter of the circular chrome; never below [MinToggleHitTarget]. */
+    size: Dp = MinToggleHitTarget,
     activeBackground: Color = Color.Transparent,
     inactiveBackground: Color = Color.Transparent,
     iconContent: @Composable (T) -> Unit
 ) {
+    val hitSize = maxOf(size, MinToggleHitTarget)
+
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(size)
+            .size(hitSize)
             .clip(CircleShape)
             .background(
                 if (state == true) activeBackground else inactiveBackground

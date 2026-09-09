@@ -692,17 +692,27 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         // All ExoPlayer operations MUST run on Main thread
         withContext(Dispatchers.Main) {
             player.clearMediaItems()
-            songs.forEach { s -> player.addMediaItem(buildMediaItem(s.uri.toUri())) }
-            player.prepare()
-            val idx = startIndex.coerceIn(0, songs.lastIndex.coerceAtLeast(0))
-            player.seekTo(idx, 0)
-            player.playWhenReady = autoPlay
+            if (songs.isEmpty()) {
+                player.stop()
+                player.playWhenReady = false
+                serviceManager.stopService()
+            } else {
+                songs.forEach { s -> player.addMediaItem(buildMediaItem(s.uri.toUri())) }
+                player.prepare()
+                val idx = startIndex.coerceIn(0, songs.lastIndex)
+                player.seekTo(idx, 0)
+                player.playWhenReady = autoPlay
+            }
         }
         
-        val idx = startIndex.coerceIn(0, songs.lastIndex.coerceAtLeast(0))
-        val song = songs.getOrNull(idx)
+        val song = if (songs.isEmpty()) {
+            null
+        } else {
+            songs.getOrNull(startIndex.coerceIn(0, songs.lastIndex))
+        }
         _currentSong.value = song
         _duration.value = song?.durationMs ?: 0L
+        _position.value = 0L
         
         // Record playback immediately when queue is set (force=true for manual selection)
         // Only record if auto-playing
@@ -715,11 +725,11 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             try {
                 userRepository.updatePlayerState(
                     songId = song?.id,
-                    position = player.currentPosition,
+                    position = if (songs.isEmpty()) 0L else player.currentPosition,
                     shuffle = _shuffle.value,
                     repeat = _repeat.value.name,
                     queueSongIds = songs.map { it.id },
-                    queueStartIndex = idx,
+                    queueStartIndex = if (songs.isEmpty()) 0 else startIndex.coerceIn(0, songs.lastIndex),
                     isEndlessQueue = isEndlessQueue
                 )
             } catch (e: Exception) {

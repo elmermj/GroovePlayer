@@ -4,18 +4,21 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -33,7 +36,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.aethelsoft.grooveplayer.presentation.common.AppThemeViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalBluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.common.LocalBottomBarSecondaryContent
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
@@ -48,8 +53,36 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.ui.GroovePlayerTheme
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+
+private sealed interface BottomBarState {
+    data object None : BottomBarState
+    data object Confirmation : BottomBarState
+    data object MiniPlayer : BottomBarState
+
+    companion object {
+        fun resolve(
+            currentRoute: String?,
+            hasSecondaryContent: Boolean,
+            hasCurrentSong: Boolean,
+            showMiniPlayerOnStart: Boolean,
+            hasUserStartedPlayback: Boolean,
+            isFullScreenPlayerOpened: Boolean,
+        ): BottomBarState = when {
+            // Screens with their own bottom bar or full-screen flows - MainActivity shows nothing
+            currentRoute?.startsWith("share_confirmation") == true -> None
+            currentRoute?.startsWith("nearby_discovery") == true -> None
+            currentRoute == AppRoutes.TRANSFER_PROGRESS -> None
+            // Screens that set secondary content (e.g. SongsScreen selection mode)
+            hasSecondaryContent -> Confirmation
+            // Show mini player when playing and not in full-screen
+            hasCurrentSong && (showMiniPlayerOnStart || hasUserStartedPlayback) && !isFullScreenPlayerOpened -> MiniPlayer
+            else -> None
+        }
+    }
+}
 
 /**
  * This application will be a cross-platform app to gain as many users as possible.
@@ -67,6 +100,7 @@ class MainActivity : ComponentActivity() {
 
     private val playerViewModel: PlayerViewModel by viewModels()
     private val bluetoothViewModel: BluetoothViewModel by viewModels()
+    private val appThemeViewModel: AppThemeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,7 +108,8 @@ class MainActivity : ComponentActivity() {
         handleNfcIntent(intent)
 
         setContent {
-            GroovePlayerTheme {
+            val grooveStyle by appThemeViewModel.style.collectAsState()
+            GroovePlayerTheme(style = grooveStyle) {
                 // Provide shared ViewModels to entire app via CompositionLocal (single instance)
                 CompositionLocalProvider(
                     LocalPlayerViewModel provides playerViewModel,
@@ -110,6 +145,7 @@ fun GroovePlayerAppMain() {
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
     val showMiniPlayerOnStart by playerViewModel.showMiniPlayerOnStart.collectAsState()
+    val notificationsEnabled by playerViewModel.notificationsEnabled.collectAsState()
     var hasUserStartedPlayback by remember { mutableStateOf(false) }
     var pendingNavigation by remember { mutableStateOf<String?>(null) }
     var isNavigating by remember { mutableStateOf(false) }
@@ -119,33 +155,48 @@ fun GroovePlayerAppMain() {
     // Request RECORD_AUDIO permission for the visualizer
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
     
-    // Request notification permission on first launch
+    // Request notification permission on first launch when the user preference allows it
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !hasNotificationPermission) {
+        if (notificationsEnabled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasNotificationPermission
+        ) {
             // Small delay to let UI settle, then request permission
             delay(500)
             requestNotificationPermission()
         }
-        
+
         // Ask for RECORD_AUDIO shortly after launch so the visualizer can use
         // real waveform data instead of the fallback template.
         if (!hasRecordAudioPermission) {
             delay(800)
             requestRecordAudioPermission()
         }
-        
+
         // Restore last played song and position
         delay(1000) // Wait for app to initialize
         playerViewModel.restoreLastPlayedSong()
     }
-    
-    // Also request when playback starts if permission not granted
+
+    // Re-request when the user re-enables notifications from profile
+    LaunchedEffect(notificationsEnabled) {
+        if (notificationsEnabled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !hasNotificationPermission
+        ) {
+            requestNotificationPermission()
+        }
+    }
+
+    // Also request when playback starts if permission not granted and preference allows it
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     LaunchedEffect(isPlaying) {
         if (isPlaying) hasUserStartedPlayback = true
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        if (notificationsEnabled &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             isPlaying &&
-            !hasNotificationPermission) {
+            !hasNotificationPermission
+        ) {
             requestNotificationPermission()
         }
         // Also request RECORD_AUDIO when playback starts if not yet granted,
@@ -217,18 +268,36 @@ fun GroovePlayerAppMain() {
         },
         openShareViaNfcWithSongs = { songs ->
             ShareIntentHolder.setSongs(songs)
-            navController.navigate(AppRoutes.SHARE_VIA_NFC)
+            navController.navigate(AppRoutes.shareConfirmationRoute("nfc"))
         },
         openShareViaNearbyWithSongs = { songs ->
             ShareIntentHolder.setSongs(songs)
-            navController.navigate(AppRoutes.SHARE_VIA_NEARBY)
-        }
+            navController.navigate(AppRoutes.nearbyDiscoveryRoute(isSender = true))
+        },
+        openUiStyling = {
+            navController.navigate(AppRoutes.UI_STYLING)
+        },
     )
 
-    CompositionLocalProvider(LocalNavigation provides navigationActions) {
+    val secondaryBottomContent = remember { mutableStateOf<(@Composable () -> Unit)?>(null) }
+
+    // Clear confirmation/options bar when navigating away from screens that use it.
+    // Screens set content via SideEffect/LaunchedEffect and clear via DisposableEffect on leave.
+    LaunchedEffect(currentRoute) {
+        val usesConfirmationBar = currentRoute == AppRoutes.SONGS ||
+            currentRoute?.startsWith("share_confirmation") == true
+        if (!usesConfirmationBar) {
+            secondaryBottomContent.value = null
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalNavigation provides navigationActions,
+        LocalBottomBarSecondaryContent provides secondaryBottomContent
+    ) {
         // Handle system back: pop nav stack, or exit app when at start destination.
         // Screen-level BackHandlers (drawer, search) are composed inside destinations and take priority.
-        val activity = LocalContext.current as? ComponentActivity
+        val activity = LocalActivity.current as? ComponentActivity
         BackHandler {
             if (!navController.popBackStack()) {
                 activity?.finish()
@@ -237,6 +306,7 @@ fun GroovePlayerAppMain() {
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
+            containerColor = GrooveTheme.colors.canvas,
         ) { innerPadding ->
             Box(
                 modifier = Modifier
@@ -248,46 +318,49 @@ fun GroovePlayerAppMain() {
                     )
             ) {
                 AppNavHost(navController = navController)
-            if (currentSong != null && (showMiniPlayerOnStart || hasUserStartedPlayback)) {
+                val bottomBarState = BottomBarState.resolve(
+                    currentRoute = currentRoute,
+                    hasSecondaryContent = secondaryBottomContent.value != null,
+                    hasCurrentSong = currentSong != null,
+                    showMiniPlayerOnStart = showMiniPlayerOnStart,
+                    hasUserStartedPlayback = hasUserStartedPlayback,
+                    isFullScreenPlayerOpened = isFullScreenPlayerOpened,
+                )
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter),
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AnimatedVisibility(
-                        visible = !isFullScreenPlayerOpened,
-                        enter = fadeIn(
-                            animationSpec = tween(durationMillis = 250, delayMillis = 350)
-                        ) + slideInVertically(
-                            initialOffsetY = { fullHeight -> fullHeight },
-                            animationSpec = tween(durationMillis = 350, delayMillis = 350)
-                        ),
-                        exit = fadeOut(
-                            animationSpec = tween(durationMillis = 200)
-                        ) + slideOutVertically(
-                            targetOffsetY = { fullHeight -> fullHeight },
-                            animationSpec = tween(durationMillis = 300, delayMillis = 100)
-                        )
-                    ) {
-                        MiniPlayerBar(
-                            onMiniPlayerClicked = {
-                                // Prevent multiple rapid clicks from triggering multiple navigations
-                                if (isNavigating || pendingNavigation != null) return@MiniPlayerBar
-                                
-                                if (isFullScreenPlayerOpened) {
-                                    playerViewModel.setFullScreenPlayerOpen(false)
-                                    navController.popBackStack()
-                                } else {
-                                    // Set state first to trigger mini player exit, then navigate after delay
+                    AnimatedContent(
+                        targetState = bottomBarState,
+                        transitionSpec = {
+                            (fadeIn(animationSpec = tween(250, delayMillis = 100)) + slideInVertically(
+                                initialOffsetY = { fullHeight -> fullHeight },
+                                animationSpec = tween(350, delayMillis = 100)
+                            )) togetherWith (fadeOut(animationSpec = tween(200)) + slideOutVertically(
+                                targetOffsetY = { fullHeight -> fullHeight },
+                                animationSpec = tween(300, delayMillis = 100)
+                            ))
+                        },
+                        label = "BottomBar"
+                    ) { state ->
+                        when (state) {
+                            BottomBarState.Confirmation -> Box(modifier = Modifier.fillMaxWidth()) {
+                                secondaryBottomContent.value?.invoke()
+                            }
+                            BottomBarState.MiniPlayer -> MiniPlayerBar(
+                                onMiniPlayerClicked = {
+                                    if (isNavigating || pendingNavigation != null) return@MiniPlayerBar
                                     playerViewModel.setFullScreenPlayerOpen(true)
                                     pendingNavigation = AppRoutes.FULL_PLAYER
                                 }
-                            }
-                        )
+                            )
+                            BottomBarState.None -> { /* empty, allows exit transition from previous state */ }
+                        }
                     }
                 }
             }
         }
-    }
     }
 }

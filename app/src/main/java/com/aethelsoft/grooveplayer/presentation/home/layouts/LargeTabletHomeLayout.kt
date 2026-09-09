@@ -32,6 +32,7 @@ import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.ui.TemplateVeritcalGridPage
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -75,7 +76,8 @@ fun LargeTabletHomeLayout(
                 ){
                     Text(
                         text = "Discover More",
-                        style = androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                        style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                        color = GrooveTheme.colors.onSurface,
                     )
                 }
             }

@@ -2,14 +2,23 @@ package com.aethelsoft.grooveplayer.presentation.player
 
 import android.util.Log
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.presentation.common.topAnchoredMiniPlayerInset
 import com.aethelsoft.grooveplayer.presentation.player.layouts.LargeTabletPlayerLayout
 import com.aethelsoft.grooveplayer.presentation.player.layouts.PhonePlayerLayout
 import com.aethelsoft.grooveplayer.presentation.player.layouts.TabletPlayerLayout
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerDetailsMiniPlayerOverlay
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerSongDetailsSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.genreColor
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
@@ -27,7 +36,10 @@ fun FullPlayerScreen(
     val shuffle by playerViewModel.shuffle.collectAsState()
     val repeat by playerViewModel.repeat.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
+    val songDetailsSheetState by playerViewModel.songDetailsSheetState.collectAsState()
     val deviceType = rememberDeviceType()
+    val density = LocalDensity.current
+    val expandedTopInsetPx = with(density) { topAnchoredMiniPlayerInset().toPx() }
 
     // Set the state when screen is displayed, but only if not already open
     LaunchedEffect(Unit) {
@@ -36,46 +48,71 @@ fun FullPlayerScreen(
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Hidden)
+        }
+    }
+
     Log.d("FullPlayerScreen SongDetails", "Title : ${song?.title} | Artist : ${song?.artist} | Genre : ${song?.genre} | Album : ${song?.album}")
     val bg by animateColorAsState(genreColor(song?.genre), label = "")
 
-    when (deviceType) {
-        DeviceType.PHONE -> {
-            PhonePlayerLayout(
-                song = song,
-                pos = pos,
-                dur = dur,
-                isPlaying = isPlaying,
-                shuffle = shuffle,
-                repeat = repeat,
-                playerViewModel = playerViewModel,
-                onClose = onClose
-            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        when (deviceType) {
+            DeviceType.PHONE -> {
+                PhonePlayerLayout(
+                    song = song,
+                    pos = pos,
+                    dur = dur,
+                    isPlaying = isPlaying,
+                    shuffle = shuffle,
+                    repeat = repeat,
+                    playerViewModel = playerViewModel,
+                    onClose = onClose
+                )
+            }
+            DeviceType.TABLET -> {
+                TabletPlayerLayout(
+                    song = song,
+                    pos = pos,
+                    dur = dur,
+                    isPlaying = isPlaying,
+                    shuffle = shuffle,
+                    repeat = repeat,
+                    playerViewModel = playerViewModel,
+                    onClose = onClose
+                )
+            }
+            DeviceType.LARGE_TABLET -> {
+                LargeTabletPlayerLayout(
+                    song = song,
+                    pos = pos,
+                    dur = dur,
+                    isPlaying = isPlaying,
+                    shuffle = shuffle,
+                    repeat = repeat,
+                    playerViewModel = playerViewModel,
+                    onClose = onClose
+                )
+            }
         }
-        DeviceType.TABLET -> {
-            TabletPlayerLayout(
-                song = song,
-                pos = pos,
-                dur = dur,
-                isPlaying = isPlaying,
-                shuffle = shuffle,
-                repeat = repeat,
-                playerViewModel = playerViewModel,
-                onClose = onClose
-            )
-        }
-        DeviceType.LARGE_TABLET -> {
-            LargeTabletPlayerLayout(
-                song = song,
-                pos = pos,
-                dur = dur,
-                isPlaying = isPlaying,
-                shuffle = shuffle,
-                repeat = repeat,
-                playerViewModel = playerViewModel,
-                onClose = onClose
-            )
-        }
+
+        // Full-screen overlay above all player layouts.
+        PlayerSongDetailsSheet(
+            state = songDetailsSheetState,
+            song = song,
+            onStateChange = { playerViewModel.setSongDetailsSheetState(it) },
+            expandedTopInsetPx = expandedTopInsetPx,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        PlayerDetailsMiniPlayerOverlay(
+            visible = songDetailsSheetState == PlayerSongDetailsSheetState.Expanded,
+            onCollapseToPlayer = {
+                playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Hidden)
+            },
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
     }
 }
 

@@ -58,6 +58,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkPlaceholder
 import com.aethelsoft.grooveplayer.presentation.library.songs.metadata.EditSongMetadataViewModel
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
 import androidx.compose.foundation.Image
@@ -607,10 +609,11 @@ private fun EditArtworkField(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Text(
-                        text = "No artwork",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    MediaArtworkPlaceholder(
+                        modifier = Modifier.fillMaxSize(),
+                        kind = MediaArtworkKind.ALBUM,
+                        cornerRadius = 8.dp,
+                        contentDescription = "No artwork",
                     )
                 }
             }

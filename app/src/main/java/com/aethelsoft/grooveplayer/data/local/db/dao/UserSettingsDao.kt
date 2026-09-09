@@ -46,8 +46,14 @@ interface UserSettingsDao {
     @Query("UPDATE user_settings SET showMiniPlayerOnStart = :enabled WHERE id = 1")
     suspend fun updateShowMiniPlayerOnStart(enabled: Boolean)
 
+    @Query("UPDATE user_settings SET notificationsEnabled = :enabled WHERE id = 1")
+    suspend fun updateNotificationsEnabled(enabled: Boolean)
+
     @Query("UPDATE user_settings SET excludedFolders = :paths WHERE id = 1")
     suspend fun updateExcludedFolders(paths: String)
+
+    @Query("UPDATE user_settings SET uiStyleId = :styleId, uiStyleOverrides = :overrides WHERE id = 1")
+    suspend fun updateUiStyle(styleId: String, overrides: String)
 
     @Query("UPDATE user_settings SET lastPlayedSongId = :songId, lastPlayedPosition = :position WHERE id = 1")
     suspend fun updateLastPlayedSong(songId: String?, position: Long)
@@ -84,7 +90,10 @@ interface UserSettingsDao {
             queueStartIndex = 0,
             isEndlessQueue = false,
             showMiniPlayerOnStart = false,
-            excludedFolders = ""
+            notificationsEnabled = true,
+            excludedFolders = "",
+            uiStyleId = "default",
+            uiStyleOverrides = "",
         ))
     }
 }

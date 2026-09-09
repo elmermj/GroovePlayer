@@ -27,7 +27,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,10 +40,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -53,25 +50,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.graphics.Brush
-import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.SearchSuggestion
 import com.aethelsoft.grooveplayer.presentation.home.ui.PermissionRequiredComponent
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileDrawer
-import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.search.SearchBarViewModel
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
-import com.aethelsoft.grooveplayer.utils.theme.icons.XAlbum
-import com.aethelsoft.grooveplayer.utils.theme.icons.XArtist
-import com.aethelsoft.grooveplayer.utils.theme.icons.XMusic
 import com.aethelsoft.grooveplayer.utils.theme.icons.XSearch
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -127,7 +115,7 @@ fun BasePageTemplate(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0E0E0E))
+            .background(GrooveTheme.colors.canvas)
             .padding()
     ) {
         if (isSearchExpanded) {
@@ -135,7 +123,7 @@ fun BasePageTemplate(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(997f)
-                    .background(Color.Black.copy(alpha = 0.6f))
+                    .background(GrooveTheme.colors.canvas.copy(alpha = 0.6f))
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -205,7 +193,7 @@ fun BasePageTemplate(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(baseBackgroundColor),
+                            .background(GrooveTheme.colors.canvas),
                     )
                 }
             }
@@ -218,36 +206,19 @@ fun BasePageTemplate(
          **/
         if (useSearchBar) {
             val navigation = rememberNavigationActions()
-            Column {
-                Box(
-                    modifier = Modifier
-                        .height(
-                            WindowInsets.statusBars.asPaddingValues()
-                                .calculateTopPadding() + (M_PADDING)
-                        )
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black,
-                                    Color.Black.copy(alpha = 0.85f * 1),
-                                )
-                            )
-                        )
-                )
-                XAppBar(
-                    title = pageTitle,
-                    appBarAlpha = appBarAlpha,
-                    deviceType = deviceType,
-                    onNavigateToSearch = onNavigateToSearch,
-                    isSearchExpanded = isSearchExpanded,
-                    onSearchExpandedChange = { isSearchExpanded = it },
-                    requestDismissSearchKey = requestDismissSearchKey,
-                    onTextFieldPosition = { searchTextFieldBounds = it },
-                    searchBarViewModel = searchBarViewModel,
-                    onProfileDrawerOpen = { isProfileDrawerOpen = true },
-                )
-            }
+            // App bar owns statusBarsPadding + APP_BAR_HEIGHT (see grooveTopBarContainer).
+            XAppBar(
+                title = pageTitle,
+                appBarAlpha = appBarAlpha,
+                deviceType = deviceType,
+                onNavigateToSearch = onNavigateToSearch,
+                isSearchExpanded = isSearchExpanded,
+                onSearchExpandedChange = { isSearchExpanded = it },
+                requestDismissSearchKey = requestDismissSearchKey,
+                onTextFieldPosition = { searchTextFieldBounds = it },
+                searchBarViewModel = searchBarViewModel,
+                onProfileDrawerOpen = { isProfileDrawerOpen = true },
+            )
 
             // Profile drawer overlay for tablet/large tablet - rendered at root Box level
             // so it can fill the screen and overlay everything (not constrained by Column layout)
@@ -267,33 +238,19 @@ fun BasePageTemplate(
                             isProfileDrawerOpen = false
                             navigation.openShare()
                         },
+                        onNavigateToUiStyling = {
+                            isProfileDrawerOpen = false
+                            navigation.openUiStyling()
+                        },
                         deviceType = deviceType,
                     )
                 }
             }
         } else {
-            Column() {
-                Box(
-                    modifier = Modifier
-                        .height(
-                            WindowInsets.statusBars.asPaddingValues()
-                                .calculateTopPadding() + (M_PADDING)
-                        )
-                        .width(if (deviceType == DeviceType.TABLET) 360.dp else 420.dp)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.Black,
-                                    Color.Black.copy(alpha = 0.85f * 1),
-                                )
-                            )
-                        )
-                )
-                GradientAppBar(
-                    title = pageTitle,
-                    deviceType = deviceType,
-                )
-            }
+            GradientAppBar(
+                title = pageTitle,
+                deviceType = deviceType,
+            )
         }
 
         // Search suggestions dropdown - rendered at HomeScreen level to avoid layout constraints
@@ -391,7 +348,7 @@ private fun SearchSuggestionDropDown(
                 .heightIn(max = maxDropdownHeight)
                 .zIndex(1000f), // Ensure it's on top
             colors = CardDefaults.cardColors(
-                containerColor = Color.Black.copy(alpha = 0.95f)
+                containerColor = GrooveTheme.colors.canvas.copy(alpha = 0.95f)
             ),
             shape = RoundedCornerShape(8.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -457,27 +414,18 @@ private fun SearchSuggestionItem(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Artwork or placeholder
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.White.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (artworkUrl != null) {
-                AsyncImage(
-                    model = artworkUrl,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Icon(
-                    getPlaceholderIcon(suggestion = suggestion),
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.5f)
-                )
-            }
-        }
+        MediaArtwork(
+            url = artworkUrl,
+            kind = when (suggestion) {
+                is SearchSuggestion.AlbumSuggestion -> MediaArtworkKind.ALBUM
+                is SearchSuggestion.ArtistSuggestion -> MediaArtworkKind.ARTIST
+                else -> MediaArtworkKind.SONG
+            },
+            iconOverride = if (suggestion is SearchSuggestion.QuerySuggestion) XSearch else null,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            cornerRadius = 4.dp,
+        )
 
         // Text content
         Column(modifier = Modifier.weight(1f)) {
@@ -494,25 +442,6 @@ private fun SearchSuggestionItem(
                     color = Color.White.copy(alpha = 0.6f)
                 )
             }
-        }
-    }
-}
-
-private fun getPlaceholderIcon(
-    suggestion: SearchSuggestion
-): ImageVector {
-    return when (suggestion) {
-        is SearchSuggestion.AlbumSuggestion -> {
-            XAlbum
-        }
-        is SearchSuggestion.ArtistSuggestion -> {
-            XArtist
-        }
-        is SearchSuggestion.QuerySuggestion -> {
-            XSearch
-        }
-        is SearchSuggestion.SongSuggestion -> {
-            XMusic
         }
     }
 }

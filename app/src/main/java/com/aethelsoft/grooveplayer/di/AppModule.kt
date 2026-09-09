@@ -59,4 +59,10 @@ object AppModule {
     
     @Provides
     fun provideSearchHistoryDao(database: GroovePlayerDatabase) = database.searchHistoryDao()
+
+    @Provides
+    fun provideTransferDao(database: GroovePlayerDatabase) = database.transferDao()
+
+    @Provides
+    fun provideTransferFileDao(database: GroovePlayerDatabase) = database.transferFileDao()
 }

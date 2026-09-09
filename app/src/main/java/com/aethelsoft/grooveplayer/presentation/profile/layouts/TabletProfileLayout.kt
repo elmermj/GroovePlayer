@@ -2,14 +2,10 @@ package com.aethelsoft.grooveplayer.presentation.profile.layouts
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -18,23 +14,35 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ActionType
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileRowIcon
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSectionComponent
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingRow
-import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
+import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileStorageSection
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAppVersion
+import com.aethelsoft.grooveplayer.utils.theme.icons.XCopyright
+import com.aethelsoft.grooveplayer.utils.theme.icons.XPrivacyPolicy
+import com.aethelsoft.grooveplayer.utils.theme.icons.XRecentUpdates
+import com.aethelsoft.grooveplayer.utils.theme.icons.XUiStyle
+import com.aethelsoft.grooveplayer.utils.theme.icons.XShareMusic
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
 fun TabletProfileLayout(
     viewModel: ProfileViewModel,
-    onNavigateToShare: () -> Unit = {}
+    onNavigateToShare: () -> Unit = {},
+    onNavigateToUiStyling: () -> Unit = {},
 ) {
+    val canvas = GrooveTheme.colors.canvas
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(canvas)
             .padding(horizontal = M_PADDING)
     ) {
         item {
@@ -42,10 +50,8 @@ fun TabletProfileLayout(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(360.dp)
-                    .background(Color.Black)
-                    .height(
-                        APP_BAR_HEIGHT + WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + M_PADDING
-                    )
+                    .background(canvas)
+                    .height(topBarContentInset())
             )
         }
         item {
@@ -58,11 +64,30 @@ fun TabletProfileLayout(
             ProfileSectionComponent(
                 sectionTitle = "Account",
             ) {
+                val activeRowId by viewModel.activeRowId.collectAsState()
+
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XShareMusic) },
                     title = "Share Music",
                     subtitle = "Share via Tap (NFC) or nearby device",
                     actionType = ActionType.EXPANDABLE,
                     onClick = onNavigateToShare
+                )
+                Spacer(Modifier.height(S_PADDING))
+                ProfileSettingRow(
+                    icon = { ProfileRowIcon(XUiStyle) },
+                    title = "UI Customisation",
+                    subtitle = "Customize colors, type, spacing, and more",
+                    actionType = ActionType.LINK,
+                    onClick = onNavigateToUiStyling,
+                )
+                Spacer(Modifier.height(S_PADDING))
+                NotificationsRow(
+                    viewModel = viewModel,
+                    isExpanded = activeRowId == "notifications",
+                    onExpandedChange = { expanded ->
+                        viewModel.setActiveRowId(if (expanded) "notifications" else null)
+                    }
                 )
                 Spacer(Modifier.height(S_PADDING))
                 AccountSection(viewModel = viewModel)
@@ -143,38 +168,11 @@ fun TabletProfileLayout(
              *
              * - Excluded folders.
              * - Storage usage.
-             * - A button for consolidating specific folders which contain music files into a specific folder.
+             * - Consolidate music folders.
              * - Clear cache.
              */
-            ProfileSectionComponent(
-                sectionTitle = "Storage",
-            ) {
-                val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
-                ExcludedFoldersRow(
-                    viewModel = viewModel,
-                    isExpanded = storageActiveRowId == "excluded_folders",
-                    onExpandedChange = { expanded ->
-                        viewModel.setStorageActiveRowId(if (expanded) "excluded_folders" else null)
-                    }
-                )
-                Spacer(Modifier.height(S_PADDING))
-                ProfileSettingRow(
-                    title = "Storage usage",
-                    subtitle = "View how much space GroovePlayer uses"
-                )
-                Spacer(Modifier.height(S_PADDING))
-                ProfileSettingRow(
-                    title = "Consolidate music folders",
-                    subtitle = "Move scattered music into a single location"
-                )
-                Spacer(Modifier.height(S_PADDING))
-                ProfileSettingRow(
-                    title = "Clear cache",
-                    subtitle = "Remove temporary data"
-                )
-            }
+            ProfileStorageSection(viewModel = viewModel)
         }
-
         item {
             /** xdev
              * About section
@@ -188,21 +186,25 @@ fun TabletProfileLayout(
                 sectionTitle = "About",
             ) {
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XAppVersion) },
                     title = "App version",
                     subtitle = "See current version"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XRecentUpdates) },
                     title = "Recent updates",
                     subtitle = "What’s new in GroovePlayer"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XCopyright) },
                     title = "Copyright & licenses",
                     subtitle = "Legal information"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
+                    icon = { ProfileRowIcon(XPrivacyPolicy) },
                     title = "Privacy policy",
                     subtitle = "How your data is handled"
                 )
@@ -211,7 +213,7 @@ fun TabletProfileLayout(
         item {
             Spacer(
                 modifier = Modifier
-                    .height(M_PADDING + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 240.dp)
+                    .height(M_PADDING + grooveBottomContentInset(includeMiniPlayer = true) + 134.dp)
                     .width(420.dp)
             )
         }

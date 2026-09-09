@@ -1,0 +1,16 @@
+23:29:33.226  D  All permissions granted. Ready for nearby share.
+23:29:33.246  D  loadFilePathsFromShareIntent: 3 songs -> 3 file paths
+23:29:33.262  D  startAdvertising: starting with 3 files
+23:29:34.855  D  Advertising started successfully. Waiting for receiver.
+23:29:43.712  D  Connection accepted. endpointId=NOML
+23:29:43.720  D  Connection established. Navigating to transfer progress.
+23:29:43.723  D  Advertising: connection successful with endpointId=NOML
+23:29:43.793  D  Sender: MSG_OFFSET_RESPONSE received, sending 3 files (14394022 bytes)
+23:29:43.793  D  Sender: sendFileMetadata fileCount=3 totalBytes=14394022
+23:29:43.806  D  Sender: starting fileIndex=0 path=/storage/emulated/0/Download/2026/Can't Let Go.mp3 size=4433360 transferId=18
+23:29:44.748  D  Sender: completed fileIndex=0 size=4433360 transferId=18
+23:29:44.756  D  Sender: starting fileIndex=1 path=/storage/emulated/0/Download/2026/Electric (feat. Khalid).mp3 size=6001981 transferId=18
+23:29:46.119  D  Sender: completed fileIndex=1 size=6001981 transferId=18
+23:29:46.126  D  Sender: starting fileIndex=2 path=/storage/emulated/0/Download/2026/End of Beginning.mp3 size=3958681 transferId=18
+23:29:46.969  D  Sender: completed fileIndex=2 size=3958681 transferId=18
+23:29:46.972  D  Sender: all files sent for transferId=18, marking COMPLETED and sending MSG_COMPLETE

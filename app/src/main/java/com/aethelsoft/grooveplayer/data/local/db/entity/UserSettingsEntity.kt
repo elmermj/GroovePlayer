@@ -21,5 +21,8 @@ data class UserSettingsEntity(
     val isEndlessQueue: Boolean = false,    // Whether queue is endless
     val visualizationMode: String = "SIMULATED", // "OFF", "SIMULATED", "REAL_TIME"
     val showMiniPlayerOnStart: Boolean = false,
-    val excludedFolders: String = ""  // Delimiter-separated paths ("||") to ignore during scanning
+    val notificationsEnabled: Boolean = true,
+    val excludedFolders: String = "",  // Delimiter-separated paths ("||") to ignore during scanning
+    val uiStyleId: String = "default",
+    val uiStyleOverrides: String = "",
 )

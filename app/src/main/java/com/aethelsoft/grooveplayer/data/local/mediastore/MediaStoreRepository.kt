@@ -14,6 +14,10 @@ import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -29,6 +33,13 @@ class MediaStoreRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val userRepository: UserRepository
 ) : MusicRepository {
+
+    private val _catalogGeneration = MutableStateFlow(0L)
+    override val catalogGeneration: StateFlow<Long> = _catalogGeneration.asStateFlow()
+
+    override fun bumpCatalogGeneration() {
+        _catalogGeneration.update { it + 1 }
+    }
 
     override suspend fun getMusicFolderPaths(): List<String> = withContext(Dispatchers.IO) {
         fetchMusicFolderPaths()

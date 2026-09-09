@@ -43,6 +43,7 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume1
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume2
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolume3
 import com.aethelsoft.grooveplayer.utils.theme.icons.XVolumeOff
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.volumeMaxColor
 import com.aethelsoft.grooveplayer.utils.theme.ui.volumeWarningColor
 
@@ -122,8 +123,8 @@ fun VolumeSlider(
                     modifier = Modifier.width(adjustedSliderWidth),
                     valueRange = 0f..1f,
                     height = 4.dp,
-                    activeColor =  if(volume > 0.85f) volumeWarningColor else Color.White,
-                    inactiveColor = Color.White.copy(alpha = 0.3f),
+                    activeColor =  if(volume > 0.85f) volumeWarningColor else GrooveTheme.colors.sliderFill,
+                    inactiveColor = GrooveTheme.colors.sliderTrack.copy(alpha = 0.45f),
                     interactionSource = interactionSource
                 )
                 Spacer(Modifier.weight(1f))

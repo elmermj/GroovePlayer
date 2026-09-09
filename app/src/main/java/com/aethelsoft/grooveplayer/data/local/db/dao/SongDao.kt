@@ -22,5 +22,8 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE songId = :songId")
     suspend fun getSong(songId: String): SongEntity?
+
+    @Query("DELETE FROM songs WHERE songId IN (:songIds)")
+    suspend fun deleteBySongIds(songIds: List<String>)
 }
 

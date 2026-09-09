@@ -1,7 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.player.ui
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -17,8 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,16 +31,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import coil3.compose.AsyncImage
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.grooveBottomChromeGlass
+import com.aethelsoft.grooveplayer.presentation.common.grooveTopChromeGlass
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
@@ -54,12 +53,15 @@ import com.aethelsoft.grooveplayer.utils.helpers.BluetoothHelpers
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPause
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPlay
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniPlayerBar(
-    onMiniPlayerClicked: () -> Unit
+    onMiniPlayerClicked: () -> Unit,
+    /** When true, bar is top-anchored (song-details overlay): status inset + top glass. */
+    anchorAtTop: Boolean = false,
 ) {
     val playerViewModel = rememberPlayerViewModel()
     val bluetoothViewModel: BluetoothViewModel = rememberBluetoothViewModel()
@@ -79,7 +81,11 @@ fun MiniPlayerBar(
 
     val targetColor = genreColor(song?.genre)
     val bg by animateColorAsState(targetColor)
-    val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val edgeInset = if (anchorAtTop) {
+        WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    } else {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    }
 
     if (showBluetoothSheet) {
         BluetoothBottomSheet(onDismiss = { showBluetoothSheet = false })
@@ -93,7 +99,8 @@ fun MiniPlayerBar(
                 pos = pos,
                 dur = dur,
                 playerViewModel = playerViewModel,
-                navigationBarPadding = navigationBarPadding,
+                edgeInset = edgeInset,
+                anchorAtTop = anchorAtTop,
                 onMiniPlayerClicked = onMiniPlayerClicked
             )
         }
@@ -107,7 +114,8 @@ fun MiniPlayerBar(
                 dur = dur,
                 bg = bg,
                 playerViewModel = playerViewModel,
-                navigationBarPadding = navigationBarPadding,
+                edgeInset = edgeInset,
+                anchorAtTop = anchorAtTop,
                 showBluetoothIcon = true,
                 onShowBluetoothSheet = { showBluetoothSheet = true },
                 onMiniPlayerClicked = onMiniPlayerClicked,
@@ -124,7 +132,8 @@ private fun PhoneMiniPlayerBarContent(
     pos: Long,
     dur: Long,
     playerViewModel: PlayerViewModel,
-    navigationBarPadding: Dp,
+    edgeInset: Dp,
+    anchorAtTop: Boolean,
     onMiniPlayerClicked: () -> Unit
 ) {
     // Swipe gesture state for phone layout
@@ -135,17 +144,7 @@ private fun PhoneMiniPlayerBarContent(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.5f),
-                        Color.Black.copy(alpha = 0.6f),
-                        Color.Black.copy(alpha = 0.95f),
-                    )
-                )
-            )
-            .padding()
+            .then(if (anchorAtTop) Modifier.grooveTopChromeGlass() else Modifier.grooveBottomChromeGlass())
             .pointerInput(Unit) {
                 detectDragGestures(
                     onDragEnd = {
@@ -176,15 +175,20 @@ private fun PhoneMiniPlayerBarContent(
             .clickable { onMiniPlayerClicked() }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            if (anchorAtTop) {
+                Spacer(modifier = Modifier.height(edgeInset))
+            }
             Box(modifier = Modifier.fillMaxWidth().height(S_PADDING))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(M_PADDING)
             ) {
-                AsyncImage(
-                    model = song.artworkUrl,
+                MediaArtwork(
+                    url = song.artworkUrl,
+                    kind = MediaArtworkKind.SONG,
                     contentDescription = "Artwork",
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(56.dp),
+                    cornerRadius = 8.dp,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -194,7 +198,10 @@ private fun PhoneMiniPlayerBarContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.width(180.dp)) {
-                            SongDetails(song = song)
+                            SongDetails(
+                                song = song,
+                                isMiniPlayer = true
+                            )
                         }
                         Spacer(modifier = Modifier.weight(1f).height(24.dp))
                         
@@ -204,12 +211,11 @@ private fun PhoneMiniPlayerBarContent(
                             onClick = { playerViewModel.playPauseToggle() }
                         ) { playing ->
                             if (playing) {
-                                Icon(XPause, contentDescription = "Pause", tint = Color.White)
+                                Icon(XPause, contentDescription = "Pause", tint = GrooveTheme.colors.onSurface)
                             } else {
-                                Icon(XPlay, contentDescription = "Play", tint = Color.White)
+                                Icon(XPlay, contentDescription = "Play", tint = GrooveTheme.colors.onSurface)
                             }
                         }
-                        Spacer(modifier = Modifier.width(12.dp))
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(
@@ -225,20 +231,24 @@ private fun PhoneMiniPlayerBarContent(
                             },
                             modifier = Modifier.weight(1f),
                             height = 4.dp,
-                            activeColor = Color.White,
-                            inactiveColor = Color.White.copy(alpha = 0.3f)
+                            activeColor = GrooveTheme.colors.sliderFill,
+                            inactiveColor = GrooveTheme.colors.sliderTrack
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             formatMillis(pos),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = Color.White
+                            color = GrooveTheme.colors.onSurface
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(navigationBarPadding))
+            if (!anchorAtTop) {
+                Spacer(modifier = Modifier.height(edgeInset))
+            } else {
+                Spacer(modifier = Modifier.height(S_PADDING))
+            }
         }
     }
 }
@@ -253,7 +263,8 @@ private fun TabletMiniPlayerBarContent(
     dur: Long,
     bg: Color,
     playerViewModel: PlayerViewModel,
-    navigationBarPadding: Dp,
+    edgeInset: Dp,
+    anchorAtTop: Boolean,
     showBluetoothIcon: Boolean,
     bluetoothViewModel: BluetoothViewModel,
     onShowBluetoothSheet: () -> Unit,
@@ -262,29 +273,24 @@ private fun TabletMiniPlayerBarContent(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        Color.Black.copy(alpha = 0.5f),
-                        Color.Black.copy(alpha = 0.6f),
-                        Color.Black.copy(alpha = 0.95f),
-                    )
-                )
-            )
-            .padding()
+            .then(if (anchorAtTop) Modifier.grooveTopChromeGlass() else Modifier.grooveBottomChromeGlass())
             .clickable { onMiniPlayerClicked() }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            if (anchorAtTop) {
+                Spacer(modifier = Modifier.height(edgeInset))
+            }
             Box(modifier = Modifier.fillMaxWidth().height(S_PADDING))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(M_PADDING)
             ) {
-                AsyncImage(
-                    model = song.artworkUrl,
+                MediaArtwork(
+                    url = song.artworkUrl,
+                    kind = MediaArtworkKind.SONG,
                     contentDescription = "Artwork",
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(56.dp),
+                    cornerRadius = 8.dp,
                 )
                 Spacer(modifier = Modifier.width(12.dp))
 
@@ -294,7 +300,7 @@ private fun TabletMiniPlayerBarContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(modifier = Modifier.width(180.dp)) {
-                            SongDetails(song = song)
+                            SongDetails(song = song, isMiniPlayer = true)
                         }
                         Spacer(modifier = Modifier.weight(1f).height(24.dp))
                         
@@ -345,23 +351,25 @@ private fun TabletMiniPlayerBarContent(
                             },
                             modifier = Modifier.weight(1f),
                             height = 4.dp,
-                            activeColor = Color.White,
-                            inactiveColor = Color.White.copy(alpha = 0.3f)
+                            activeColor = GrooveTheme.colors.sliderFill,
+                            inactiveColor = GrooveTheme.colors.sliderTrack
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             formatMillis(pos),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            color = Color.White
+                            color = GrooveTheme.colors.onSurface
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(navigationBarPadding))
+            if (!anchorAtTop) {
+                Spacer(modifier = Modifier.height(edgeInset))
+            } else {
+                Spacer(modifier = Modifier.height(S_PADDING))
+            }
         }
     }
 }
-
-
 

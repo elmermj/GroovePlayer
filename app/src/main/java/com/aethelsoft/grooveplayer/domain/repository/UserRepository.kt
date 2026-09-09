@@ -69,10 +69,15 @@ interface UserRepository {
     suspend fun updateVisualizationMode(mode: com.aethelsoft.grooveplayer.domain.model.VisualizationMode)
     suspend fun updateRepeatAndShuffle(shuffle: Boolean, repeat: String)
     suspend fun updateShowMiniPlayerOnStart(enabled: Boolean)
+    suspend fun updateNotificationsEnabled(enabled: Boolean)
     /**
      * Replaces the list of folder paths excluded from music scanning.
      */
     suspend fun updateExcludedFolders(paths: List<String>)
+    /**
+     * Persists UI style preset id + optional encoded overrides for the customization screen.
+     */
+    suspend fun updateUiStyle(styleId: String, overrides: String = "")
     suspend fun updateLastPlayedSong(songId: String?, position: Long)
     suspend fun updatePlayerState(
         songId: String?,

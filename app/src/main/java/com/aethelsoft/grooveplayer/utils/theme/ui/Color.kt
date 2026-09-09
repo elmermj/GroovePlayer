@@ -1,31 +1,83 @@
 package com.aethelsoft.grooveplayer.utils.theme.ui
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+/**
+ * Theme-aware color aliases used across Compose UI.
+ *
+ * These resolve from [LocalGrooveStyle] so UI styling presets / overrides apply app-wide.
+ * Prefer [GrooveTheme.colors] in new code; keep these for gradual migration of existing call sites.
+ *
+ * For non-Compose / default-parameter fallbacks, use [GrooveStyleCatalog.Default].colors.
+ */
+val GrooveBlack: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.canvas
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val SoftWhite: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.muted
 
-val sliderSpaceColor = Color(0xFF888888)
-val sliderFilledColor = Color(0xFFFFFFFF)
+val SoftBlack: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.surface
 
-val buttonColor = Color(0xFFFFFFFF)
+val InactivePrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.inactive
 
-val brandPrimaryColor = Color(0xFF262626)
-val brandSecondaryColor = Color(0xFF443E3E)
-val brandTertiaryColor = Color(0xFF828D6F)
+val InactiveSecondary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.inactiveContainer
 
-val volumeWarningColor = Color(0xFFFFB349)
-val volumeMaxColor = Color(0xFFFF4949)
+val HighlightPrimary: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.surfaceRaised
 
-val SoftWhite = Color(0xFFDBDBDB)
-val SoftBlack = Color(0xFF212121)
+val brandPrimaryColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.inactive
 
-val InactivePrimary = Color(0xFF262626)
-val InactiveSecondary = Color(0xFF443E3E)
+val brandSecondaryColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.brandSecondary
 
-val HighlightPrimary = Color(0xFF1F1F1F)
+val brandTertiaryColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.brandTertiary
+
+val volumeWarningColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.warning
+
+val volumeMaxColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.error
+
+val sliderSpaceColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.sliderTrack
+
+val sliderFilledColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.sliderFill
+
+val buttonColor: Color
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalGrooveStyle.current.colors.sliderFill

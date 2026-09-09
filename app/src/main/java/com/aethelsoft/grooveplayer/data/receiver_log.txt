@@ -1,0 +1,683 @@
+---------------------------- PROCESS STARTED (18866) for package com.aethelsoft.grooveplayer ----------------------------
+23:29:38.834  D  All permissions granted. Ready for nearby share.
+23:29:38.835  D  startDiscovery: starting discovery for nearby devices
+23:29:39.094  D  Discovery started successfully. Searching for nearby devices.
+23:29:39.094  D  Device found nearby: id=RIET name=SM-X926B
+23:29:39.130  D  Found 1 device(s) nearby: [SM-X926B]
+23:29:39.789  D  Device found nearby: id=SWPU name=SM-X926B
+23:29:39.825  D  Found 2 device(s) nearby: [SM-X926B, SM-X926B]
+23:29:43.696  D  Connection request sent to endpointId=RIET
+23:29:43.709  D  Receiver accepted connection to endpointId=RIET
+23:29:43.726  D  Discovery: connection successful with endpointId=RIET
+23:29:43.752  D  Connection established. Navigating to transfer progress.
+23:29:43.840  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:43.842  D  Receiver: handleReceiverPayloadReceived type=1 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=106
+23:29:43.842  D  Receiver: MSG_FILE_METADATA transferId=8 totalBytes=14394022 fileCount=3 receiveDir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads
+23:29:43.849  D  Receiver: inserting 3 file entities for transferId=8 -> [(Can't Let Go.mp3, 4433360), (Electric (feat. Khalid).mp3, 6001981), (End of Beginning.mp3, 3958681)]
+23:29:45.100  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.103  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.106  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=0 chunkSize=65536
+23:29:45.224  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.226  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.227  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=65536 chunkSize=65536
+23:29:45.370  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.373  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.373  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=131072 chunkSize=65536
+23:29:45.436  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.438  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.438  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=196608 chunkSize=65536
+23:29:45.477  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.477  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.477  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=262144 chunkSize=65536
+23:29:45.498  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.498  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.498  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=327680 chunkSize=65536
+23:29:45.584  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.584  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.585  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=393216 chunkSize=65536
+23:29:45.607  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.608  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.608  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=458752 chunkSize=65536
+23:29:45.640  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.640  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.640  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=524288 chunkSize=65536
+23:29:45.690  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.690  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.690  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=589824 chunkSize=65536
+23:29:45.763  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.763  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.763  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=655360 chunkSize=65536
+23:29:45.781  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.782  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.782  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=720896 chunkSize=65536
+23:29:45.815  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.815  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.816  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=786432 chunkSize=65536
+23:29:45.837  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.838  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.838  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=851968 chunkSize=65536
+23:29:45.875  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.875  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.875  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=917504 chunkSize=65536
+23:29:45.877  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.878  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.878  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=983040 chunkSize=65536
+23:29:45.903  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.904  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.904  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1048576 chunkSize=65536
+23:29:45.907  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.908  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.908  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1114112 chunkSize=65536
+23:29:45.984  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.985  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.985  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1179648 chunkSize=65536
+23:29:45.999  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:45.999  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:45.999  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1245184 chunkSize=65536
+23:29:46.003  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.003  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.003  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1310720 chunkSize=65536
+23:29:46.032  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.032  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.032  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1376256 chunkSize=65536
+23:29:46.034  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.034  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.034  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1441792 chunkSize=65536
+23:29:46.054  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.055  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.055  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1507328 chunkSize=65536
+23:29:46.064  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.065  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.065  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1572864 chunkSize=65536
+23:29:46.075  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.076  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.076  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1638400 chunkSize=65536
+23:29:46.193  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.194  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.194  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1703936 chunkSize=65536
+23:29:46.208  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.209  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.209  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1769472 chunkSize=65536
+23:29:46.215  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.215  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.216  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1835008 chunkSize=65536
+23:29:46.239  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.239  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.239  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1900544 chunkSize=65536
+23:29:46.248  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.248  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.248  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=1966080 chunkSize=65536
+23:29:46.260  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.260  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.260  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2031616 chunkSize=65536
+23:29:46.269  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.270  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.270  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2097152 chunkSize=65536
+23:29:46.348  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.349  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.349  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2162688 chunkSize=65536
+23:29:46.851  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.852  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.852  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2228224 chunkSize=65536
+23:29:46.887  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.888  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.889  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2293760 chunkSize=65536
+23:29:46.914  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.914  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.914  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.914  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.914  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2359296 chunkSize=65536
+23:29:46.914  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2424832 chunkSize=65536
+23:29:46.965  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.966  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.966  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2490368 chunkSize=65536
+23:29:46.983  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.983  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.983  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2555904 chunkSize=65536
+23:29:46.991  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:46.992  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:46.992  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2621440 chunkSize=65536
+23:29:47.017  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.017  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.017  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2686976 chunkSize=65536
+23:29:47.037  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.037  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.037  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2752512 chunkSize=65536
+23:29:47.038  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.038  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.038  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2818048 chunkSize=65536
+23:29:47.079  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.080  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.080  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2883584 chunkSize=65536
+23:29:47.149  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.149  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.149  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=2949120 chunkSize=65536
+23:29:47.181  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.181  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.181  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.182  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3014656 chunkSize=65536
+23:29:47.182  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.182  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3080192 chunkSize=65536
+23:29:47.221  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.221  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.221  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3145728 chunkSize=65536
+23:29:47.243  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.244  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.244  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3211264 chunkSize=65536
+23:29:47.271  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.272  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.272  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3276800 chunkSize=65536
+23:29:47.288  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.289  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.289  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3342336 chunkSize=65536
+23:29:47.319  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.320  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.320  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3407872 chunkSize=65536
+23:29:47.324  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.324  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.324  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3473408 chunkSize=65536
+23:29:47.353  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.353  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.353  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3538944 chunkSize=65536
+23:29:47.357  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.358  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.358  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.358  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3604480 chunkSize=65536
+23:29:47.358  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.358  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3670016 chunkSize=65536
+23:29:47.405  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.405  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.406  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3735552 chunkSize=65536
+23:29:47.424  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.425  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.425  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3801088 chunkSize=65536
+23:29:47.441  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.441  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.442  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3866624 chunkSize=65536
+23:29:47.458  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.458  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.458  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3932160 chunkSize=65536
+23:29:47.558  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:47.558  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:47.558  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=3997696 chunkSize=65536
+23:29:48.444  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.445  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.446  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4063232 chunkSize=65536
+23:29:48.451  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.452  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.452  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4128768 chunkSize=65536
+23:29:48.473  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.474  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.474  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.474  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4194304 chunkSize=65536
+23:29:48.474  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.474  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4259840 chunkSize=65536
+23:29:48.766  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.769  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.770  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4325376 chunkSize=65536
+23:29:48.838  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.838  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=42465
+23:29:48.838  V  Receiver: MSG_CHUNK transferId=8 fileIndex=0 offset=4390912 chunkSize=42448
+23:29:48.948  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.949  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.949  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=0 chunkSize=65536
+23:29:48.968  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.969  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.969  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=65536 chunkSize=65536
+23:29:48.974  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:48.974  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:48.974  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=131072 chunkSize=65536
+23:29:49.010  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.011  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.011  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.011  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.011  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=262144 chunkSize=65536
+23:29:49.011  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=196608 chunkSize=65536
+23:29:49.064  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.064  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.064  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=327680 chunkSize=65536
+23:29:49.067  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.067  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.067  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=393216 chunkSize=65536
+23:29:49.116  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.117  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.117  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=458752 chunkSize=65536
+23:29:49.153  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.153  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.153  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=524288 chunkSize=65536
+23:29:49.185  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.186  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.186  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=589824 chunkSize=65536
+23:29:49.333  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:49.336  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:49.337  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=655360 chunkSize=65536
+23:29:50.264  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.266  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.267  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=720896 chunkSize=65536
+23:29:50.900  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.901  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.902  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=786432 chunkSize=65536
+23:29:50.903  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.904  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.905  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=851968 chunkSize=65536
+23:29:50.907  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.908  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.908  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=917504 chunkSize=65536
+23:29:50.909  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.911  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.913  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=983040 chunkSize=65536
+23:29:50.916  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.917  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.917  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1048576 chunkSize=65536
+23:29:50.918  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.919  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.919  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1114112 chunkSize=65536
+23:29:50.920  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.921  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.921  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1179648 chunkSize=65536
+23:29:50.923  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.924  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.925  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1245184 chunkSize=65536
+23:29:50.987  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:50.987  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:50.987  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1310720 chunkSize=65536
+23:29:52.102  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.104  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.105  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1376256 chunkSize=65536
+23:29:52.118  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.121  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.121  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1441792 chunkSize=65536
+23:29:52.122  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.124  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.124  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1507328 chunkSize=65536
+23:29:52.140  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.141  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.141  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.141  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.141  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.141  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1572864 chunkSize=65536
+23:29:52.141  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1638400 chunkSize=65536
+23:29:52.141  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.141  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1703936 chunkSize=65536
+23:29:52.142  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.143  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.143  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1769472 chunkSize=65536
+23:29:52.152  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.152  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.152  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1835008 chunkSize=65536
+23:29:52.407  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.409  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.410  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1900544 chunkSize=65536
+23:29:52.600  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.601  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.601  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=1966080 chunkSize=65536
+23:29:52.616  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.617  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.617  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2031616 chunkSize=65536
+23:29:52.633  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.633  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.634  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2097152 chunkSize=65536
+23:29:52.654  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:52.655  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:52.655  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2162688 chunkSize=65536
+23:29:53.210  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.212  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.212  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2228224 chunkSize=65536
+23:29:53.217  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.219  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.220  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2293760 chunkSize=65536
+23:29:53.231  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.235  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.235  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2359296 chunkSize=65536
+23:29:53.250  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.250  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.250  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2424832 chunkSize=65536
+23:29:53.253  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.254  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.254  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2490368 chunkSize=65536
+23:29:53.261  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.262  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.262  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2555904 chunkSize=65536
+23:29:53.390  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.391  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.391  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2621440 chunkSize=65536
+23:29:53.634  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.635  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.635  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2686976 chunkSize=65536
+23:29:53.691  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:53.693  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:53.693  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2752512 chunkSize=65536
+23:29:54.432  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.433  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.434  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2818048 chunkSize=65536
+23:29:54.450  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.454  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.455  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2883584 chunkSize=65536
+23:29:54.466  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.467  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.467  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=2949120 chunkSize=65536
+23:29:54.472  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.474  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.474  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3014656 chunkSize=65536
+23:29:54.521  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.522  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.522  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3080192 chunkSize=65536
+23:29:54.760  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.760  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.762  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3145728 chunkSize=65536
+23:29:54.968  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.970  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.970  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3211264 chunkSize=65536
+23:29:54.991  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:54.995  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:54.996  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3276800 chunkSize=65536
+23:29:55.007  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.010  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.010  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3342336 chunkSize=65536
+23:29:55.038  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.039  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.039  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3407872 chunkSize=65536
+23:29:55.279  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.281  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.281  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3473408 chunkSize=65536
+23:29:55.303  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.306  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.306  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3538944 chunkSize=65536
+23:29:55.484  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.486  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.488  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3604480 chunkSize=65536
+23:29:55.512  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.514  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.515  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3670016 chunkSize=65536
+23:29:55.533  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.534  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.536  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3735552 chunkSize=65536
+23:29:55.727  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.728  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.728  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3801088 chunkSize=65536
+23:29:55.757  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.757  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.757  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3866624 chunkSize=65536
+23:29:55.799  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.800  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.800  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3932160 chunkSize=65536
+23:29:55.828  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:55.828  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:55.829  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=3997696 chunkSize=65536
+23:29:56.576  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.577  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.577  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4063232 chunkSize=65536
+23:29:56.585  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.585  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.586  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4128768 chunkSize=65536
+23:29:56.603  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.603  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.603  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4194304 chunkSize=65536
+23:29:56.611  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.612  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.612  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4259840 chunkSize=65536
+23:29:56.801  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.802  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.802  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4325376 chunkSize=65536
+23:29:56.820  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.821  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.822  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4390912 chunkSize=65536
+23:29:56.841  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.841  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.841  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4456448 chunkSize=65536
+23:29:56.848  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:56.849  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:56.849  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4521984 chunkSize=65536
+23:29:57.372  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:57.375  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:57.375  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:57.376  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4587520 chunkSize=65536
+23:29:57.376  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:57.377  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4653056 chunkSize=65536
+23:29:57.384  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:57.385  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:57.386  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4718592 chunkSize=65536
+23:29:57.920  D  Device lost: endpointId=RIET
+23:29:59.175  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:59.181  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:59.182  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4784128 chunkSize=65536
+23:29:59.188  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:59.190  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:59.190  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4849664 chunkSize=65536
+23:29:59.223  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:59.223  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:59.223  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4915200 chunkSize=65536
+23:29:59.938  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:59.940  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:59.940  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=4980736 chunkSize=65536
+23:29:59.974  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:29:59.979  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:29:59.979  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5046272 chunkSize=65536
+23:30:00.270  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:00.272  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:00.272  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5111808 chunkSize=65536
+23:30:00.559  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:00.561  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:00.562  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5177344 chunkSize=65536
+23:30:02.070  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:02.071  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:02.072  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5242880 chunkSize=65536
+23:30:05.748  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:05.750  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:05.750  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5308416 chunkSize=65536
+23:30:07.573  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:07.576  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:07.577  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5373952 chunkSize=65536
+23:30:08.381  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:08.383  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:08.384  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5439488 chunkSize=65536
+23:30:09.741  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:09.744  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:09.745  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5505024 chunkSize=65536
+23:30:11.744  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:11.747  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:11.747  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5570560 chunkSize=65536
+23:30:13.058  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:13.059  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:13.059  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5636096 chunkSize=65536
+23:30:14.956  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:14.959  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:14.960  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5701632 chunkSize=65536
+23:30:15.648  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:15.651  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:15.651  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5767168 chunkSize=65536
+23:30:17.526  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:17.527  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:17.528  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5832704 chunkSize=65536
+23:30:18.572  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:18.575  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:18.577  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5898240 chunkSize=65536
+23:30:18.849  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:18.850  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=38222
+23:30:18.850  V  Receiver: MSG_CHUNK transferId=8 fileIndex=1 offset=5963776 chunkSize=38205
+23:30:19.644  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:19.645  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:19.646  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=0 chunkSize=65536
+23:30:20.442  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:20.442  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:20.442  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=65536 chunkSize=65536
+23:30:21.165  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:21.168  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:21.168  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=131072 chunkSize=65536
+23:30:21.484  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:21.485  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:21.485  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=196608 chunkSize=65536
+23:30:22.241  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:22.245  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:22.246  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=262144 chunkSize=65536
+23:30:22.571  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:22.573  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:22.573  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=327680 chunkSize=65536
+23:30:23.046  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:23.048  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:23.048  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=393216 chunkSize=65536
+23:30:23.316  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:23.319  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:23.320  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=458752 chunkSize=65536
+23:30:24.081  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:24.082  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:24.082  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=524288 chunkSize=65536
+23:30:24.557  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:24.560  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:24.560  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=589824 chunkSize=65536
+23:30:24.661  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:24.662  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:24.663  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=655360 chunkSize=65536
+23:30:24.896  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:24.899  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:24.899  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=720896 chunkSize=65536
+23:30:25.133  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:25.136  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:25.138  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=786432 chunkSize=65536
+23:30:25.205  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:25.206  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:25.206  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=851968 chunkSize=65536
+23:30:26.008  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:26.011  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:26.012  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=917504 chunkSize=65536
+23:30:26.232  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:26.235  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:26.236  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=983040 chunkSize=65536
+23:30:26.763  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:26.766  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:26.766  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1048576 chunkSize=65536
+23:30:27.466  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:27.471  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:27.472  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1114112 chunkSize=65536
+23:30:27.807  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:27.811  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:27.812  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1179648 chunkSize=65536
+23:30:28.082  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:28.085  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:28.086  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1245184 chunkSize=65536
+23:30:28.314  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:28.316  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:28.317  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1310720 chunkSize=65536
+23:30:28.560  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:28.563  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:28.564  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1376256 chunkSize=65536
+23:30:28.791  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:28.791  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:28.792  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1441792 chunkSize=65536
+23:30:29.030  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:29.033  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:29.035  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1507328 chunkSize=65536
+23:30:29.793  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:29.795  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:29.795  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1572864 chunkSize=65536
+23:30:29.906  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:29.907  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:29.907  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1638400 chunkSize=65536
+23:30:30.672  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:30.674  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:30.675  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1703936 chunkSize=65536
+23:30:31.213  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:31.219  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:31.221  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1769472 chunkSize=65536
+23:30:31.425  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:31.426  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:31.426  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1835008 chunkSize=65536
+23:30:31.484  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:31.485  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:31.485  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1900544 chunkSize=65536
+23:30:31.739  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:31.740  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:31.742  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=1966080 chunkSize=65536
+23:30:31.977  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:31.983  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:31.983  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2031616 chunkSize=65536
+23:30:32.339  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.343  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.344  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2097152 chunkSize=65536
+23:30:32.361  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.363  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.363  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2162688 chunkSize=65536
+23:30:32.367  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.370  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.370  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2228224 chunkSize=65536
+23:30:32.377  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.377  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.378  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2293760 chunkSize=65536
+23:30:32.387  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.387  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.387  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2359296 chunkSize=65536
+23:30:32.391  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.392  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.393  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.393  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2490368 chunkSize=65536
+23:30:32.393  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.393  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2424832 chunkSize=65536
+23:30:32.395  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.397  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.397  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2555904 chunkSize=65536
+23:30:32.410  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.411  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.411  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2621440 chunkSize=65536
+23:30:32.413  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.414  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.414  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2686976 chunkSize=65536
+23:30:32.433  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.434  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.434  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.434  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.434  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2752512 chunkSize=65536
+23:30:32.434  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.434  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.434  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.434  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2818048 chunkSize=65536
+23:30:32.435  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.435  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2949120 chunkSize=65536
+23:30:32.435  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.435  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3014656 chunkSize=65536
+23:30:32.435  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.435  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=2883584 chunkSize=65536
+23:30:32.554  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.554  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.554  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3080192 chunkSize=65536
+23:30:32.559  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.560  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.560  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3145728 chunkSize=65536
+23:30:32.567  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.568  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.568  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3211264 chunkSize=65536
+23:30:32.575  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.575  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.575  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3276800 chunkSize=65536
+23:30:32.589  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.589  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.589  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3342336 chunkSize=65536
+23:30:32.591  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.591  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.591  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3407872 chunkSize=65536
+23:30:32.832  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.833  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.833  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3473408 chunkSize=65536
+23:30:32.834  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.835  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.835  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3538944 chunkSize=65536
+23:30:32.838  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.838  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.838  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3604480 chunkSize=65536
+23:30:32.851  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.854  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.854  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3670016 chunkSize=65536
+23:30:32.861  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.861  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.861  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3735552 chunkSize=65536
+23:30:32.878  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.881  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.881  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.881  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3866624 chunkSize=65536
+23:30:32.881  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=65553
+23:30:32.881  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3801088 chunkSize=65536
+23:30:32.882  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.882  D  Receiver: onPayloadReceived endpointId=RIET transferId=8 type=1
+23:30:32.882  D  Receiver: handleReceiverPayloadReceived type=3 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=26538
+23:30:32.882  V  Receiver: MSG_CHUNK transferId=8 fileIndex=2 offset=3932160 chunkSize=26521
+23:30:32.882  D  Receiver: handleReceiverPayloadReceived type=4 transferId=8 dir=/storage/emulated/0/Android/data/com.aethelsoft.grooveplayer/files/Groove Downloads size=1
+23:30:32.882  D  Receiver: MSG_COMPLETE transferId=8, marking COMPLETED and updating notification to 100%

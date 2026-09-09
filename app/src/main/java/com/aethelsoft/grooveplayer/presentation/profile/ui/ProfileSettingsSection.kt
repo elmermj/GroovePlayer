@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
-import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
 fun ProfileSectionComponent(
@@ -26,7 +26,7 @@ fun ProfileSectionComponent(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.Transparent)
-            .padding(vertical = M_PADDING)
+            .padding(vertical = GrooveTheme.spacing.sectionSpacing)
     ) {
         Column{
             Box(
@@ -35,11 +35,11 @@ fun ProfileSectionComponent(
             ) {
                 Text(
                     text = sectionTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                    color = GrooveTheme.colors.onSurface,
                 )
             }
-            Spacer(Modifier.height(S_PADDING))
+            Spacer(Modifier.height(GrooveTheme.spacing.s))
             content?.invoke()
         }
     }

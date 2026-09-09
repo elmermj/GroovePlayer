@@ -18,11 +18,18 @@ object AppRoutes {
     const val ARTIST_DETAIL = "artist/{artistId}"
     const val PROFILE = "profile"
     const val SHARE_OPTIONS = "share_options"
+    const val SHARE_CONFIRMATION = "share_confirmation/{shareMethod}"
     const val SHARE_VIA_NFC = "share_via_nfc"
     const val SHARE_VIA_NEARBY = "share_via_nearby"
+    const val NEARBY_DISCOVERY = "nearby_discovery"
+    const val TRANSFER_PROGRESS = "transfer_progress"
     const val RECEIVE_APPROVAL = "receive_approval"
+    const val TRANSFER_STATUS = "transfer_status"
+    const val UI_STYLING = "ui_styling"
 
     fun searchRoute(query: String) = "search/${Uri.encode(query)}"
+    fun shareConfirmationRoute(shareMethod: String) = "share_confirmation/$shareMethod"
+    fun nearbyDiscoveryRoute(isSender: Boolean = true) = "nearby_discovery?isSender=$isSender"
     fun albumDetailRoute(albumId: String) = "album/${Uri.encode(albumId)}"
     fun artistDetailRoute(artistId: String) = "artist/${Uri.encode(artistId)}"
 }

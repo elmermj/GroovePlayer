@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,7 +55,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
+import com.aethelsoft.grooveplayer.presentation.common.navigationBarsInset
 import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
@@ -64,6 +67,7 @@ import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.player.PlayerSongDetailsSheetState
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
@@ -72,8 +76,12 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
+import com.aethelsoft.grooveplayer.presentation.player.ui.SongDetails
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDetails
+import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
@@ -94,9 +102,10 @@ fun PhonePlayerLayout(
     shuffle: Boolean,
     repeat: RepeatMode,
     playerViewModel: PlayerViewModel,
-    bg: Color = Color.Black,
+    bg: Color? = null,
     onClose: () -> Unit
 ) {
+    val pageBackground = bg ?: GrooveTheme.colors.canvas
     var showQueue by remember { mutableStateOf(false) }
     var showEqualizer by remember { mutableStateOf(false) }
     var showBluetoothSheet by remember { mutableStateOf(false) }
@@ -104,6 +113,9 @@ fun PhonePlayerLayout(
     val audioVisualization by playerViewModel.audioVisualization.collectAsState()
     val visualizationMode by playerViewModel.visualizationMode.collectAsState()
     val glowEffectConfig by playerViewModel.glowEffectConfig.collectAsState()
+    val songDetailsSheetState by playerViewModel.songDetailsSheetState.collectAsState()
+    val overlaysBlockingPullUp = showQueue || showBluetoothSheet || showEqualizer
+    val bottomSafeInset = navigationBarsInset()
 
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
@@ -194,46 +206,87 @@ fun PhonePlayerLayout(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(bg)
-                .padding(start = 16.dp, end = 16.dp, top = 16.dp),
+                .background(pageBackground)
+                .statusBarsPadding()
+                .padding(horizontal = M_PADDING)
+                .detectPullUpToSongDetails(
+                    enabled = !overlaysBlockingPullUp &&
+                        (songDetailsSheetState == PlayerSongDetailsSheetState.Hidden ||
+                            songDetailsSheetState == PlayerSongDetailsSheetState.Peek),
+                    sheetState = songDetailsSheetState,
+                    onOpenPeek = {
+                        playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Peek)
+                    },
+                    onExpandDetails = {
+                        playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Expanded)
+                    },
+                ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(M_PADDING))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(APP_BAR_HEIGHT),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
                     Icon(XBack, contentDescription = "Close")
                 }
-                ToggledIconButton(
-                    state = showBluetoothSheet,
-                    onClick = {
-                        if (!showBluetoothSheet) {
-                            // If opening bluetooth sheet, close queue first
-                            if (showQueue) {
-                                showQueue = false
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlayerShareButton(song = song)
+                    ToggledIconButton(
+                        state = showBluetoothSheet,
+                        onClick = {
+                            if (!showBluetoothSheet) {
+                                // If opening bluetooth sheet, close queue first
+                                if (showQueue) {
+                                    showQueue = false
+                                }
                             }
-                        }
-                        showBluetoothSheet = !showBluetoothSheet
-                    },
-                    activeBackground = Color.White,
-                    inactiveBackground = Color.Transparent,
-                ) {
-                    BTIndicatorIconComponent(
-                        connectedDeviceName = connectedBtDevice?.name,
-                        isConnected = connectedBtDevice != null,
-                        tint = if(showBluetoothSheet || connectedBtDevice != null) Color.Black else Color.White,
-                    )
+                            showBluetoothSheet = !showBluetoothSheet
+                        },
+                        activeBackground = Color.White,
+                        inactiveBackground = Color.Transparent,
+                    ) {
+                        BTIndicatorIconComponent(
+                            connectedDeviceName = connectedBtDevice?.name,
+                            isConnected = connectedBtDevice != null,
+                            tint = if (showBluetoothSheet || connectedBtDevice != null) Color.Black else Color.White,
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.weight(1f))
 
+            val density = LocalDensity.current
+            val artworkTargetOffsetPx = when {
+                showBluetoothSheet && !showQueue -> with(density) { (-56).dp.toPx() }
+                showQueue && !showBluetoothSheet -> with(density) { (-56).dp.toPx() }
+                else -> 0f
+            }
+            val artworkScale by animateFloatAsState(
+                targetValue = if (showBluetoothSheet || showQueue) 0.85f else 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = 300f
+                ),
+                label = "PhoneArtworkScale"
+            )
+            val artworkOffsetXPx by animateFloatAsState(
+                targetValue = artworkTargetOffsetPx,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "PhoneArtworkOffsetX"
+            )
+
             Box(
                 modifier = Modifier
-                    .size(320.dp)
+                    .fillMaxWidth()
+                    .height(480.dp)
                     .graphicsLayer { clip = false },
                 contentAlignment = Alignment.Center
             ) {
@@ -241,6 +294,11 @@ fun PhonePlayerLayout(
                     dominantColor = dominantColor,
                     visualization = effectiveVisualization,
                     modifier = Modifier
+                        .graphicsLayer {
+                            translationX = artworkOffsetXPx
+                            scaleX = artworkScale
+                            scaleY = artworkScale
+                        }
                         .size(320.dp)
                         .padding(24.dp) // Add padding for glow to extend outward
                 ) {
@@ -253,19 +311,65 @@ fun PhonePlayerLayout(
                         onDismiss = onClose
                     )
                 }
+                // Same vertical band as artwork; only covers this region so title/controls stay clickable.
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showBluetoothSheet,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier
+                        .matchParentSize()
+                        .offset(x = 16.dp)
+                        .graphicsLayer { clip = false }
+                ) {
+                    BluetoothEllipticalLazyScroll(
+                        availableDevices = availableDevices,
+                        connectedDevice = connectedBtDevice,
+                        onDeviceClick = { device ->
+                            if (connectedBtDevice?.address == device.address) {
+                                bluetoothViewModel.disconnectDevice()
+                                showBluetoothSheet = false
+                                playerViewModel.playPauseToggle()
+                            } else {
+                                bluetoothViewModel.connectToDevice(device)
+                            }
+                        },
+                        maxHeight = 320.dp,
+                        modifier = Modifier.fillMaxSize(),
+                        connectingDeviceAddress = connectingDeviceAddress,
+                        connectionSuccessDisplay = connectionSuccessDisplay,
+                        connectionFailedDisplay = connectionFailedDisplay,
+                        isBluetoothEnabled = isBluetoothEnabledNow,
+                        hasBluetoothPermissions = hasBluetoothPermissions,
+                        onRequestBluetoothPermission = requestBluetoothPermissions,
+                        onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
+                        deviceType = com.aethelsoft.grooveplayer.utils.DeviceType.PHONE,
+                        onShaderClicked = { showBluetoothSheet = false }
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.weight(1f))
-            Text(
-                song?.title ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                song?.artist ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ){
+                SongDetails(
+                    song = song,
+                    isMiniPlayer = false
+                )
+            }
 
             Spacer(modifier = Modifier.height(M_PADDING))
 
@@ -328,7 +432,7 @@ fun PhonePlayerLayout(
                 }
             )
 
-            Spacer(modifier = Modifier.height(S_PADDING + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()))
+            Spacer(modifier = Modifier.height(S_PADDING + bottomSafeInset))
         }
         androidx.compose.animation.AnimatedVisibility(
             visible = showQueue,
@@ -385,57 +489,6 @@ fun PhonePlayerLayout(
         }
 
         androidx.compose.animation.AnimatedVisibility(
-            visible = showBluetoothSheet,
-            enter = slideInHorizontally(
-                initialOffsetX = { it },
-                animationSpec = spring(
-                    dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .offset(32.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .height(maxArtworkHeight)
-                    .width(360.dp + 32.dp)
-                    .align(Alignment.CenterEnd)
-            ) {
-                BluetoothEllipticalLazyScroll(
-                    availableDevices = availableDevices,
-                    connectedDevice = connectedBtDevice,
-                    onDeviceClick = { device ->
-                        if (connectedBtDevice?.address == device.address) {
-                            bluetoothViewModel.disconnectDevice()
-                            showBluetoothSheet = false
-                            playerViewModel.playPauseToggle()
-                        } else {
-                            bluetoothViewModel.connectToDevice(device)
-                        }
-                    },
-                    maxHeight = maxArtworkHeight,
-                    connectingDeviceAddress = connectingDeviceAddress,
-                    connectionSuccessDisplay = connectionSuccessDisplay,
-                    connectionFailedDisplay = connectionFailedDisplay,
-                    isBluetoothEnabled = isBluetoothEnabledNow,
-                    hasBluetoothPermissions = hasBluetoothPermissions,
-                    onRequestBluetoothPermission = requestBluetoothPermissions,
-                    onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
-                    onShaderClicked = { showBluetoothSheet = false }
-                )
-            }
-        }
-
-        androidx.compose.animation.AnimatedVisibility(
             visible = showEqualizer,
             enter = slideInHorizontally(
                 initialOffsetX = { -it },
@@ -459,6 +512,7 @@ fun PhonePlayerLayout(
                     .padding(top = 24.dp)
             )
         }
+
     }
 }
 

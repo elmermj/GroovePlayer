@@ -33,10 +33,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
@@ -112,17 +113,17 @@ fun PlayerQueueComponent(
                         modifier = Modifier.padding(horizontal = S_PADDING)
                     ) {
                         Spacer(modifier = Modifier.height(S_PADDING))
-                        AsyncImage(
+                        MediaArtwork(
+                            url = song.artworkUrl,
+                            kind = MediaArtworkKind.SONG,
                             model = ImageRequest.Builder(LocalContext.current)
                                 .data(song.artworkUrl)
                                 .size(36, 36)
                                 .allowHardware(false)
                                 .build(),
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(4.dp)),
-                            contentScale = ContentScale.Crop
+                            modifier = Modifier.size(36.dp),
+                            cornerRadius = 4.dp,
                         )
                         Spacer(modifier = Modifier.height(S_PADDING))
                     }

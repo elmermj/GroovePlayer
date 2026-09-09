@@ -19,5 +19,13 @@ data class UserSettings(
     val isEndlessQueue: Boolean = false,   // Whether queue is endless
     val visualizationMode: VisualizationMode = VisualizationMode.SIMULATED, // OFF, SIMULATED, REAL_TIME
     val showMiniPlayerOnStart: Boolean = false,  // Whether to show mini player when app launches
-    val excludedFolders: List<String> = emptyList()  // Folders to ignore during music scanning
+    val notificationsEnabled: Boolean = true,    // Whether the user wants app notifications enabled
+    val excludedFolders: List<String> = emptyList(),  // Folders to ignore during music scanning
+    /** Built-in preset id from [com.aethelsoft.grooveplayer.utils.theme.ui.GrooveStyleIds]. */
+    val uiStyleId: String = "default",
+    /**
+     * Encoded [com.aethelsoft.grooveplayer.utils.theme.ui.GrooveStyleOverrides]
+     * for a future customization screen. Empty = no overrides.
+     */
+    val uiStyleOverrides: String = "",
 )

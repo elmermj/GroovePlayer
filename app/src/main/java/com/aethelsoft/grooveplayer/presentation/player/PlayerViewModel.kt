@@ -78,6 +78,20 @@ class PlayerViewModel @Inject constructor(
             .map { it.showMiniPlayerOnStart }
             .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    val notificationsEnabled: StateFlow<Boolean> =
+        userRepository.observeUserSettings()
+            .map { it.notificationsEnabled }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    private val _songDetailsSheetState =
+        MutableStateFlow(PlayerSongDetailsSheetState.Hidden)
+    val songDetailsSheetState: StateFlow<PlayerSongDetailsSheetState> =
+        _songDetailsSheetState.asStateFlow()
+
+    fun setSongDetailsSheetState(state: PlayerSongDetailsSheetState) {
+        _songDetailsSheetState.value = state
+    }
+
     private val _glowEffectConfig = MutableStateFlow<GlowEffectConfig>(GlowEffectConfig.Dramatic)
 
     val glowEffectConfig: StateFlow<GlowEffectConfig> = _glowEffectConfig.asStateFlow()
@@ -116,6 +130,9 @@ class PlayerViewModel @Inject constructor(
     fun setVolume(volume: Float) = viewModelScope.launch { setVolumeUseCase.setVolume(volume) }
 
     fun setFullScreenPlayerOpen(isOpen: Boolean) = viewModelScope.launch {
+        if (!isOpen) {
+            _songDetailsSheetState.value = PlayerSongDetailsSheetState.Hidden
+        }
         setFullScreenPlayerOpenUseCase.setFullScreenPlayerOpen(isOpen = isOpen)
     }
     fun setMute(mute: Boolean) = viewModelScope.launch { setMuteUseCase.setMute(mute) }
@@ -133,6 +150,12 @@ class PlayerViewModel @Inject constructor(
     
     fun restoreLastPlayedSong() = viewModelScope.launch {
         try {
+            // The player is a process-wide singleton. If a song is already loaded —
+            // the activity was recreated (rotation/layout change) or the user started
+            // playback before this delayed restore ran — restoring would replace the
+            // queue with autoPlay=false and silently stop the music. Cold start is
+            // the only case where restoring makes sense, and there currentSong is null.
+            if (currentSong.value != null) return@launch
             val settings = userRepository.getUserSettings()
             if (settings.lastPlayedSongId != null && settings.lastPlayedPosition > 0) {
                 val allSongs = getSongsUseCase()

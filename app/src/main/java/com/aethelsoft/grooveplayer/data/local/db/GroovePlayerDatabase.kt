@@ -8,6 +8,8 @@ import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SearchHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.TransferDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.TransferFileDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserProfileDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserSettingsDao
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
@@ -17,6 +19,8 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SearchHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
+import com.aethelsoft.grooveplayer.data.local.db.entity.TransferEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.TransferFileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
@@ -36,9 +40,11 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         SongGenreCrossRef::class,
         UserProfileEntity::class,
         UserSettingsEntity::class,
-        SearchHistoryEntity::class
+        SearchHistoryEntity::class,
+        TransferEntity::class,
+        TransferFileEntity::class
     ],
-    version = 12,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -52,5 +58,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
     abstract fun userProfileDao(): UserProfileDao
     abstract fun userSettingsDao(): UserSettingsDao
     abstract fun searchHistoryDao(): SearchHistoryDao
+    abstract fun transferDao(): TransferDao
+    abstract fun transferFileDao(): TransferFileDao
 }
 

@@ -8,8 +8,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
-import coil3.compose.AsyncImage
+import androidx.compose.ui.unit.dp
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 
 @Composable
 fun ArtworkGrid(
@@ -66,10 +67,11 @@ fun ArtworkImage(
     url: String,
     modifier: Modifier = Modifier
 ) {
-    AsyncImage(
-        model = url,
+    MediaArtwork(
+        url = url,
+        kind = MediaArtworkKind.SONG,
         contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = modifier
+        modifier = modifier,
+        cornerRadius = 0.dp,
     )
 }
