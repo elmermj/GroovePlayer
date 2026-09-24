@@ -116,7 +116,13 @@ jobs:
           echo "VERSION_NAME=1.0.${{ github.run_number }}"
 
       - name: Build dev release APK
-        run: ./gradlew :app:assembleDevRelease --stacktrace
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          echo "VERSION_CODE=${VERSION_CODE}"
+          echo "VERSION_NAME=${VERSION_NAME}"
+          ./gradlew :app:assembleDevRelease --stacktrace
 
       - name: Check signed APK
         id: apk
