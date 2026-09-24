@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.aethelsoft.grooveplayer.BuildConfig
 import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
+import com.aethelsoft.grooveplayer.data.local.db.RoomDbSwapFiles
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
@@ -12,6 +13,14 @@ import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupUploadUrlRequestDto
 import com.aethelsoft.grooveplayer.di.NetworkModule
+import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
+import com.aethelsoft.grooveplayer.domain.backup.CloudHashDedup
+import com.aethelsoft.grooveplayer.domain.backup.ContentHash
+import com.aethelsoft.grooveplayer.domain.backup.DbSwapStep
+import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
+import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
+import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
+import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
 import com.aethelsoft.grooveplayer.domain.model.BackupKinds
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
@@ -40,7 +49,6 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPOutputStream
@@ -51,9 +59,9 @@ import javax.inject.Singleton
 /**
  * Manual cloud backup via Benny R2 API (docs/backup-api.md + docs/backup-library.md).
  *
- * Per song: POST /v1/backup/match (basename+size) preferred; GET objects belt;
- * else SHA-256 → upload-url (honor deduped) → PUT → complete.
- * Room DB snapshot always runs first. Refresh `/v1/me` storage from complete.user.
+ * Approved songs are copied into Groove Downloads and Room `sourcePath` is updated
+ * before any upload. Same SHA-256 + size already in the cloud is skipped.
+ * Song bytes are confirmed first; the Room snapshot is uploaded only after that.
  *
  * R2 cost rules: skip never remints upload-url;
  * one whole-object GetObject; reuse download signed URLs until near expiry;
@@ -64,7 +72,7 @@ class BackupRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: GroovePlayerDatabase,
     private val restoreSession: LibraryRestoreSession,
-    private val snapshotApplier: LibrarySnapshotApplier,
+    private val grooveDownloads: GrooveDownloadsLocator,
     private val musicRepository: MusicRepository,
     private val userRepository: UserRepository,
     private val authRepository: AuthRepository,
@@ -210,58 +218,19 @@ class BackupRepositoryImpl @Inject constructor(
             _state.update {
                 it.copy(
                     phase = CloudBackupPhase.UPLOADING,
-                    progressPercent = 20,
+                    progressPercent = 15,
                     filesTotal = files.size,
-                    message = "Uploading library snapshot…",
+                    message = "Copying approved songs into Groove Downloads…",
                 )
             }
 
-            // Room DB snapshot first (kind=room_db) — docs/backup-library.md
-            val roomResult = uploadRoomDbSnapshot(remainingQuotaHeadroom)
-            anyDryRun = anyDryRun || roomResult.anyDryRun
-            dedupedCount += if (roomResult.deduped) 1 else 0
-            if (!roomResult.deduped && roomResult.uploadedBytes > 0L) {
-                uploadedBytes += roomResult.uploadedBytes
-            }
-            roomResult.remainingQuotaHeadroom?.let { remainingQuotaHeadroom = it }
-            prepared += roomResult.uploadedBytes
+            // Paths in Room change before the snapshot, and only after that copy exists.
+            val uploadFiles = canonicalizeApprovedSongs(files)
+            prepared = uploadFiles.sumOf { it.length() }
 
-            if (files.isEmpty()) {
-                val now = System.currentTimeMillis()
-                prefs.edit()
-                    .putLong(KEY_LAST_BACKUP, now)
-                    .remove(KEY_LAST_ERROR)
-                    .apply()
-                runCatching { authRepository.refreshSession() }
-                _state.update {
-                    it.copy(
-                        phase = CloudBackupPhase.SUCCESS,
-                        progressPercent = 100,
-                        bytesPrepared = prepared,
-                        bytesUploaded = uploadedBytes,
-                        filesCompleted = 0,
-                        filesDeduped = dedupedCount,
-                        filesSkipped = 0,
-                        lastBackupAtEpochMs = now,
-                        lastError = null,
-                        lastRunDryRun = anyDryRun,
-                        canRetry = false,
-                        message = buildString {
-                            append("Library snapshot backed up")
-                            if (roomResult.deduped) append(" (unchanged)")
-                            append(" — no audio in included folders")
-                            if (anyDryRun) append(" · dry-run")
-                        },
-                    )
-                }
-                return@runCatching Unit
-            }
-
-            // Jorge double-guard (R2 cost rule 1): prefer POST /match (basename+size);
-            // GET /v1/backup/objects (Postgres catalog) as belt. Skip hits MUST NOT remint
-            // upload-url or PUT. upload-url deduped remains hash/path short-circuit only.
+            // Skip only when cloud already has the same SHA-256 and size. A name match is not identity.
             var skippedCount = 0
-            val catalogPairs: MutableSet<Pair<String, Long>> = runCatching {
+            val cloudIdentities: MutableSet<Pair<String, Long>> = runCatching {
                 backupApi.listObjects(kind = BackupKinds.SONG).objects
                     .asSequence()
                     .filter { obj ->
@@ -269,44 +238,47 @@ class BackupRepositoryImpl @Inject constructor(
                         k == BackupKinds.SONG
                     }
                     .mapNotNull { obj ->
-                        val path = obj.logicalPath?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                        val base = path.substringAfterLast('/').substringAfterLast('\\')
-                        if (base.isEmpty()) null else base to obj.sizeBytes
+                        val hash = obj.contentHash.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                        hash.lowercase() to obj.sizeBytes
                     }
                     .toMutableSet()
             }.getOrElse { e ->
-                Log.w(TAG, "catalog list for skip failed — continuing without client skip: ${e.message}")
+                Log.w(TAG, "catalog list for hash skip failed — continuing: ${e.message}")
                 mutableSetOf()
             }
-            Log.i(TAG, "client skip catalog pairs=${catalogPairs.size}")
+            Log.i(TAG, "cloud hash identities=${cloudIdentities.size}")
 
             _state.update {
                 it.copy(
-                    message = "Uploading 0/${files.size}…",
+                    filesTotal = uploadFiles.size,
+                    message = if (uploadFiles.isEmpty()) {
+                        "No audio in included folders — uploading library snapshot…"
+                    } else {
+                        "Uploading 0/${uploadFiles.size}…"
+                    },
                     filesSkipped = 0,
                 )
             }
 
-            for (file in files) {
+            for (file in uploadFiles) {
                 val size = file.length()
                 if (size <= 0L) {
                     completed++
                     continue
                 }
 
-                val basename = file.name // case-sensitive as stored on device
-                // Full logical_path still sent for display/catalog; match key is basename+size.
                 val logicalPath = file.absolutePath
+                val hash = sha256Hex(file)
 
                 fun markSkipped(reason: String) {
                     skippedCount++
                     completed++
-                    catalogPairs.add(basename to size)
-                    Log.i(TAG, "skip $reason basename=$basename size=$size")
-                    val uploadPct = 20 + ((completed * 80) / files.size.coerceAtLeast(1))
+                    cloudIdentities.add(hash.lowercase() to size)
+                    Log.i(TAG, "skip $reason hash=$hash size=$size")
+                    val uploadPct = 20 + ((completed * 75) / uploadFiles.size.coerceAtLeast(1))
                     _state.update {
                         it.copy(
-                            progressPercent = uploadPct.coerceIn(0, 99),
+                            progressPercent = uploadPct.coerceIn(0, 94),
                             bytesPrepared = prepared,
                             bytesUploaded = uploadedBytes,
                             filesCompleted = completed,
@@ -314,7 +286,7 @@ class BackupRepositoryImpl @Inject constructor(
                             filesSkipped = skippedCount,
                             lastRunDryRun = anyDryRun,
                             message = buildString {
-                                append("Uploading $completed/${files.size}")
+                                append("Uploading $completed/${uploadFiles.size}")
                                 if (skippedCount > 0) append(" · $skippedCount skipped")
                                 if (dedupedCount > 0) append(" · $dedupedCount deduped")
                                 if (anyDryRun) append(" · dry-run (R2 keys pending)")
@@ -323,27 +295,31 @@ class BackupRepositoryImpl @Inject constructor(
                     }
                 }
 
-                // Belt: local catalog from GET /v1/backup/objects
-                if ((basename to size) in catalogPairs) {
-                    markSkipped("objects-belt")
+                if (CloudHashDedup.alreadyStored(cloudIdentities, hash, size)) {
+                    markSkipped("hash")
                     continue
                 }
 
-                // Preferred: POST /v1/backup/match (server basename+size; no hash yet)
-                val matchHit = runCatching {
+                val match = runCatching {
                     backupApi.matchBackup(
                         BackupMatchRequestDto(
                             logicalPath = logicalPath,
                             sizeBytes = size,
-                            contentHash = null,
+                            contentHash = hash,
                         )
-                    ).matched
+                    )
                 }.getOrElse { e ->
                     Log.w(TAG, "match pre-check failed — falling through: ${e.message}")
-                    false
+                    null
                 }
-                if (matchHit) {
-                    markSkipped("match-name_size")
+                val matchHash = match?.contentHash
+                val matchSize = match?.sizeBytes ?: 0L
+                if (match?.matched == true &&
+                    !matchHash.isNullOrBlank() &&
+                    matchHash.equals(hash, ignoreCase = true) &&
+                    (matchSize <= 0L || matchSize == size)
+                ) {
+                    markSkipped("hash-match")
                     continue
                 }
 
@@ -356,7 +332,6 @@ class BackupRepositoryImpl @Inject constructor(
                     error("Quota would be exceeded.")
                 }
 
-                val hash = sha256Hex(file)
                 val contentType = guessContentType(file)
 
                 val uploadResp = try {
@@ -382,7 +357,7 @@ class BackupRepositoryImpl @Inject constructor(
                     dedupedCount++
                     // Hash short-circuit when basename/path differed — no PUT.
                     Log.i(TAG, "deduped hash=$hash key=$r2Key")
-                    catalogPairs.add(basename to size)
+                    cloudIdentities.add(hash.lowercase() to size)
                 } else {
                     if (!uploadResp.dryRun) {
                         val url = uploadResp.uploadUrl
@@ -435,14 +410,14 @@ class BackupRepositoryImpl @Inject constructor(
                     } else {
                         dedupedCount++
                     }
-                    catalogPairs.add(basename to size)
+                    cloudIdentities.add(hash.lowercase() to size)
                 }
 
                 completed++
-                val uploadPct = 20 + ((completed * 80) / files.size.coerceAtLeast(1))
+                val uploadPct = 20 + ((completed * 75) / uploadFiles.size.coerceAtLeast(1))
                 _state.update {
                     it.copy(
-                        progressPercent = uploadPct.coerceIn(0, 99),
+                        progressPercent = uploadPct.coerceIn(0, 94),
                         bytesPrepared = prepared,
                         bytesUploaded = uploadedBytes,
                         filesCompleted = completed,
@@ -450,7 +425,7 @@ class BackupRepositoryImpl @Inject constructor(
                         filesSkipped = skippedCount,
                         lastRunDryRun = anyDryRun,
                         message = buildString {
-                            append("Uploading $completed/${files.size}")
+                            append("Uploading $completed/${uploadFiles.size}")
                             if (skippedCount > 0) append(" · $skippedCount skipped")
                             if (dedupedCount > 0) append(" · $dedupedCount deduped")
                             if (anyDryRun) append(" · dry-run (R2 keys pending)")
@@ -458,6 +433,20 @@ class BackupRepositoryImpl @Inject constructor(
                     )
                 }
             }
+
+            _state.update {
+                it.copy(
+                    progressPercent = 95,
+                    message = "Uploading library snapshot…",
+                )
+            }
+            val roomResult = uploadRoomDbSnapshot(remainingQuotaHeadroom)
+            anyDryRun = anyDryRun || roomResult.anyDryRun
+            dedupedCount += if (roomResult.deduped) 1 else 0
+            if (!roomResult.deduped && roomResult.uploadedBytes > 0L) {
+                uploadedBytes += roomResult.uploadedBytes
+            }
+            prepared += roomResult.uploadedBytes
 
             val now = System.currentTimeMillis()
             prefs.edit()
@@ -482,9 +471,15 @@ class BackupRepositoryImpl @Inject constructor(
                     lastRunDryRun = anyDryRun,
                     canRetry = false,
                     message = buildString {
-                        append("Backed up $completed file(s)")
-                        if (skippedCount > 0) append(" · $skippedCount skipped (already on cloud)")
-                        if (dedupedCount > 0) append(" · $dedupedCount hash-deduped")
+                        if (uploadFiles.isEmpty()) {
+                            append("Library snapshot backed up")
+                            if (roomResult.deduped) append(" (unchanged)")
+                            append(" — no audio in included folders")
+                        } else {
+                            append("Backed up $completed file(s)")
+                            if (skippedCount > 0) append(" · $skippedCount skipped (same content hash)")
+                            if (dedupedCount > 0) append(" · $dedupedCount hash-deduped")
+                        }
                         if (anyDryRun) append(" · dry-run URLs (catalog only until R2 live)")
                     },
                 )
@@ -854,93 +849,265 @@ class BackupRepositoryImpl @Inject constructor(
         }
 
     override suspend fun stageLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
-        // Commit DOWNLOADING before any byte is written so a killed process cannot
-        // treat a partial file as a finished snapshot.
-        restoreSession.beginDownload()
+        val phaseAtStart = restoreSession.phase()
+        if (phaseAtStart == RestorePhase.IDLE || phaseAtStart == RestorePhase.COMMITTED) {
+            // A fresh job only. A kill while DOWNLOADING must not wipe a finished snapshot.
+            restoreSession.beginDownload()
+        }
         try {
-            val resp = try {
-                backupApi.getLibrary()
-            } catch (e: HttpException) {
-                throw mapBackupHttp(e)
+            val reuseSnapshot = phaseAtStart != RestorePhase.IDLE &&
+                phaseAtStart != RestorePhase.DOWNLOADING &&
+                phaseAtStart != RestorePhase.COMMITTED &&
+                restoreSession.peekStagingVerdict() == StagingVerdict.VALID
+            if (!reuseSnapshot) {
+                if (restoreSession.phase() != RestorePhase.DOWNLOADING) {
+                    restoreSession.beginDownload()
+                }
+                downloadLibrarySnapshot()
+                restoreSession.markStaged()
             }
-            val lib = resp.library
-                ?: error("No cloud library snapshot yet — back up first.")
-            val remoteSchema = lib.schemaVersion
-                ?: error("Cloud library missing schema_version")
-            val localSchema = GroovePlayerDatabase.SCHEMA_VERSION
-            if (remoteSchema > localSchema) {
-                error(
-                    "Cloud library schema $remoteSchema is newer than this app ($localSchema). " +
-                        "Update GroovePlayer before restoring.",
-                )
-            }
-            if (resp.dryRun) {
-                Log.i(TAG, "dry_run skip library restore key=${lib.r2Key}")
-                error("Cloud restore is dry-run only until R2 is live.")
-            }
-            val url = lib.downloadUrl ?: error("library missing download_url")
-            val expiresInSec = (lib.expiresInSec ?: DEFAULT_DOWNLOAD_EXPIRES_SEC).coerceAtLeast(1)
-            rememberDownloadUrl(
-                CachedSignedDownload(
-                    url = url,
-                    r2Key = lib.r2Key,
-                    contentHash = lib.contentHash,
-                    expiresAtEpochMs = System.currentTimeMillis() + expiresInSec * 1000L,
-                ),
-            )
-            val gz = restoreSession.partialGzip()
-            val raw = restoreSession.partialDatabase()
-            getFromR2(url, gz)
-            gunzipFile(gz, raw)
-            val staged = restoreSession.stagingDatabase()
-            if (staged.exists()) staged.delete()
-            if (!raw.renameTo(staged)) {
-                raw.copyTo(staged, overwrite = true)
-                raw.delete()
-            }
-            gz.delete()
-            when (val verdict = restoreSession.peekStagingVerdict()) {
-                StagingVerdict.VALID -> Unit
-                StagingVerdict.NEWER_THAN_APP -> error(
-                    "Cloud library schema is newer than this app. Update GroovePlayer before restoring.",
-                )
-                StagingVerdict.TRUNCATED, StagingVerdict.NOT_SQLITE, null -> error(
-                    "Downloaded library file was incomplete. Your music was not changed.",
-                )
-            }
-            restoreSession.markStaged()
-            Log.i(TAG, "library snapshot staged schema=$remoteSchema path=${staged.absolutePath}")
+            ensureCloudSongs(restoreSession.stagingDatabase())
+            restoreSession.markFilesReady()
+            Log.i(TAG, "restore files ready at ${restoreSession.stagingDatabase().absolutePath}")
             Result.success(Unit)
         } catch (e: CancellationException) {
-            restoreSession.discard()
             throw e
         } catch (e: Exception) {
-            restoreSession.discard()
+            if (restoreSession.peekStagingVerdict() != StagingVerdict.VALID) {
+                restoreSession.discard()
+            }
             Result.failure(e)
         }
     }
 
     override suspend fun applyStagedLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
-        val staged = restoreSession.stagingDatabase()
-        if (restoreSession.peekStagingVerdict() != StagingVerdict.VALID) {
-            restoreSession.discard()
-            return@withContext Result.failure(
-                IllegalStateException(
-                    "Restored library file was incomplete. Your music was not changed.",
-                ),
-            )
-        }
-        restoreSession.markApplying()
         try {
-            snapshotApplier.apply(staged)
-            restoreSession.discard()
-            Log.i(TAG, "library snapshot applied into the open database")
-            Result.success(Unit)
+            val phase = restoreSession.phase()
+            if (phase != RestorePhase.FILES_READY && phase != RestorePhase.SWAPPING) {
+                val staged = stageLibraryRestore()
+                if (staged.isFailure) return@withContext staged
+            } else {
+                ensureCloudSongs(restoreSession.stagingDatabase())
+            }
+            val staged = restoreSession.stagingDatabase()
+            if (restoreSession.peekStagingVerdict() != StagingVerdict.VALID) {
+                return@withContext Result.failure(
+                    IllegalStateException(
+                        "Restored library file was incomplete. Your music was not changed.",
+                    ),
+                )
+            }
+            checkpointLiveDatabase()
+            restoreSession.markSwapping()
+            val swap = RoomDbSwapFiles.forContext(context)
+            swap.arm(staged)
+            swap.commit()
+            restoreSession.markCommitted()
+            Log.i(TAG, "library database swapped; restarting onto the restored file")
+            ProcessRestarter.restart(context)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            restoreSession.discard()
+            val swap = RoomDbSwapFiles.forContext(context)
+            if (swap.step() == DbSwapStep.COMMITTED) {
+                restoreSession.markCommitted()
+                ProcessRestarter.restart(context)
+            }
+            runCatching { swap.rollback() }
+            if (restoreSession.peekStagingVerdict() == StagingVerdict.VALID) {
+                restoreSession.markFilesReady()
+            }
             Result.failure(e)
+        }
+    }
+
+    private suspend fun downloadLibrarySnapshot() {
+        val resp = try {
+            backupApi.getLibrary()
+        } catch (e: HttpException) {
+            throw mapBackupHttp(e)
+        }
+        val lib = resp.library
+            ?: error("No cloud library snapshot yet — back up first.")
+        val remoteSchema = lib.schemaVersion
+            ?: error("Cloud library missing schema_version")
+        val localSchema = GroovePlayerDatabase.SCHEMA_VERSION
+        if (remoteSchema > localSchema) {
+            error(
+                "Cloud library schema $remoteSchema is newer than this app ($localSchema). " +
+                    "Update GroovePlayer before restoring.",
+            )
+        }
+        if (resp.dryRun) {
+            Log.i(TAG, "dry_run skip library restore key=${lib.r2Key}")
+            error("Cloud restore is dry-run only until R2 is live.")
+        }
+        val url = lib.downloadUrl ?: error("library missing download_url")
+        val expiresInSec = (lib.expiresInSec ?: DEFAULT_DOWNLOAD_EXPIRES_SEC).coerceAtLeast(1)
+        rememberDownloadUrl(
+            CachedSignedDownload(
+                url = url,
+                r2Key = lib.r2Key,
+                contentHash = lib.contentHash,
+                expiresAtEpochMs = System.currentTimeMillis() + expiresInSec * 1000L,
+            ),
+        )
+        val gz = restoreSession.partialGzip()
+        val raw = restoreSession.partialDatabase()
+        getFromR2(url, gz)
+        gunzipFile(gz, raw)
+        val staged = restoreSession.stagingDatabase()
+        if (staged.exists()) staged.delete()
+        if (!raw.renameTo(staged)) {
+            raw.copyTo(staged, overwrite = true)
+            raw.delete()
+        }
+        gz.delete()
+        when (val verdict = restoreSession.peekStagingVerdict()) {
+            StagingVerdict.VALID -> Unit
+            StagingVerdict.NEWER_THAN_APP -> error(
+                "Cloud library schema is newer than this app. Update GroovePlayer before restoring.",
+            )
+            StagingVerdict.TRUNCATED, StagingVerdict.NOT_SQLITE, null -> error(
+                "Downloaded library file was incomplete. Your music was not changed.",
+            )
+        }
+        Log.i(TAG, "library snapshot staged schema=$remoteSchema path=${staged.absolutePath}")
+    }
+
+    /**
+     * Copy each approved song into Groove Downloads, point Room at that path, then delete
+     * the original only when the path update changed a row. Upload uses the canonical file.
+     */
+    private suspend fun canonicalizeApprovedSongs(sources: List<File>): List<File> {
+        if (sources.isEmpty()) return emptyList()
+        val downloadsDir = grooveDownloads.directory()
+        val existing = indexDownloads(downloadsDir).toMutableList()
+        val canonical = LinkedHashMap<String, File>()
+        for (source in sources) {
+            if (!source.isFile || source.length() <= 0L) continue
+            val hash = sha256Hex(source)
+            val size = source.length()
+            val placement = GrooveDownloadPlacement.place(
+                downloadsDir = downloadsDir.absolutePath,
+                cosmeticFileName = source.name,
+                contentHash = hash,
+                sizeBytes = size,
+                existing = existing,
+            )
+            val dest = File(placement.destinationPath)
+            if (!placement.reusedExisting && source.absolutePath != dest.absolutePath) {
+                RoomDbSwapFiles.copyDurable(source, dest)
+                val copiedHash = sha256Hex(dest)
+                if (!copiedHash.equals(hash, ignoreCase = true) || dest.length() != size) {
+                    dest.delete()
+                    error("Copy into Groove Downloads did not match ${source.name}")
+                }
+                existing += HashedAudio(dest.absolutePath, hash, dest.length())
+            } else if (placement.reusedExisting) {
+                Log.i(TAG, "reuse Groove Downloads hash=$hash path=${dest.absolutePath}")
+            }
+            val aliases = buildList {
+                add(source.absolutePath)
+                runCatching { source.canonicalPath }.getOrNull()?.let { add(it) }
+            }.distinct()
+            var updated = 0
+            for (old in aliases) {
+                updated += database.songDao().retargetSourcePath(old, dest.absolutePath)
+            }
+            val moved = source.absolutePath != dest.absolutePath
+            if (updated > 0 && moved) {
+                if (!source.delete()) {
+                    Log.w(TAG, "Room path updated; original kept at ${source.absolutePath}")
+                }
+            } else if (updated == 0 && moved) {
+                Log.i(TAG, "No Room row for ${source.absolutePath}; original left in place")
+            }
+            canonical[dest.absolutePath] = dest
+        }
+        return canonical.values.toList()
+    }
+
+    private fun indexDownloads(dir: File): List<HashedAudio> {
+        val children = dir.listFiles() ?: return emptyList()
+        return children
+            .filter { it.isFile && it.length() > 0L && !it.name.endsWith(".partial") }
+            .map { file -> HashedAudio(file.absolutePath, sha256Hex(file), file.length()) }
+    }
+
+    /**
+     * Download cloud songs that are not already in Groove Downloads under the same hash,
+     * rewrite the staged catalog to those paths, and refuse to swap if any required file is missing.
+     * Tracks that were never uploaded are not required and their on-disk files are not deleted.
+     */
+    private suspend fun ensureCloudSongs(stagedDb: File) {
+        val objects = try {
+            backupApi.listObjects(kind = BackupKinds.SONG).objects
+        } catch (e: HttpException) {
+            throw mapBackupHttp(e)
+        }
+        val songs = objects.filter { obj ->
+            val kind = obj.kind?.takeIf { it.isNotBlank() } ?: BackupKinds.SONG
+            kind == BackupKinds.SONG && obj.contentHash.isNotBlank()
+        }
+        val downloadsDir = grooveDownloads.directory()
+        val existing = indexDownloads(downloadsDir).toMutableList()
+        val placements = mutableListOf<PlacedCloudSong>()
+        for (obj in songs) {
+            val hash = obj.contentHash
+            val size = obj.sizeBytes
+            val cosmetic = obj.logicalPath?.takeIf { it.isNotBlank() }?.let(GrooveDownloadPlacement::fileName)
+                ?: GrooveDownloadPlacement.hashedFileName("audio.bin", hash)
+            val placement = GrooveDownloadPlacement.place(
+                downloadsDir = downloadsDir.absolutePath,
+                cosmeticFileName = cosmetic,
+                contentHash = hash,
+                sizeBytes = size,
+                existing = existing,
+            )
+            val dest = File(placement.destinationPath)
+            if (!placement.reusedExisting) {
+                val partial = File(stagedDb.parentFile, "$hash.partial")
+                val downloaded = downloadObject(contentHash = hash, r2Key = obj.r2Key, destFile = partial)
+                downloaded.getOrThrow()
+                if (size > 0L && partial.length() != size) {
+                    partial.delete()
+                    error("Downloaded song size does not match the cloud catalog")
+                }
+                val got = sha256Hex(partial)
+                if (!got.equals(hash, ignoreCase = true)) {
+                    partial.delete()
+                    error("Downloaded song hash does not match the cloud catalog")
+                }
+                RoomDbSwapFiles.copyDurable(partial, dest)
+                partial.delete()
+                existing += HashedAudio(dest.absolutePath, hash, dest.length())
+            } else if (size > 0L && dest.length() != size) {
+                error("Groove Downloads already has different bytes for this song")
+            }
+            placements += PlacedCloudSong(
+                contentHash = hash,
+                sizeBytes = size,
+                logicalPath = obj.logicalPath,
+                localPath = dest.absolutePath,
+            )
+        }
+        StagedCatalogRewriter.rewrite(stagedDb, placements)
+        val missing = BackupCatalogPaths.missingLocalBytes(placements) { path ->
+            val file = File(path)
+            if (!file.isFile) -1L else file.length()
+        }
+        if (missing.isNotEmpty()) {
+            error(
+                "Restore is missing ${missing.size} song file(s) in Groove Downloads. " +
+                    "The library database was not replaced.",
+            )
+        }
+    }
+
+    private fun checkpointLiveDatabase() {
+        database.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { cursor ->
+            cursor.moveToFirst()
         }
     }
 
@@ -1137,18 +1304,7 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun sha256Hex(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        FileInputStream(file).use { input ->
-            val buf = ByteArray(DEFAULT_BUFFER_SIZE)
-            while (true) {
-                val read = input.read(buf)
-                if (read < 0) break
-                digest.update(buf, 0, read)
-            }
-        }
-        return digest.digest().joinToString("") { b -> "%02x".format(b) }
-    }
+    private fun sha256Hex(file: File): String = ContentHash.sha256(file)
 
     private fun formatSize(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
@@ -1168,9 +1324,9 @@ class BackupRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TAG = "BackupRepository"
-        private const val PREFS = "groove_cloud_backup"
+        private const val PREFS = LibraryRestoreSession.PREFS
         private const val KEY_LAST_BACKUP = "last_backup_at"
-        private const val KEY_LAST_ERROR = "last_error"
+        private const val KEY_LAST_ERROR = LibraryRestoreSession.KEY_LAST_ERROR
         private const val KEY_LAST_ROOM_HASH = "last_room_db_hash"
         private const val KEY_LAST_ROOM_SIZE = "last_room_db_size"
         private const val LOGICAL_PATH_ROOM_DB = "library/room.db.gz"

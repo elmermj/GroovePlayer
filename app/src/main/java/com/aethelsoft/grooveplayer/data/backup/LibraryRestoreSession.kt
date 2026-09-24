@@ -29,6 +29,12 @@ class LibraryRestoreSession @Inject constructor(
 
     fun markStaged() = setPhase(RestorePhase.STAGED)
 
+    fun markFilesReady() = setPhase(RestorePhase.FILES_READY)
+
+    fun markSwapping() = setPhase(RestorePhase.SWAPPING)
+
+    fun markCommitted() = setPhase(RestorePhase.COMMITTED)
+
     fun markApplying() = setPhase(RestorePhase.APPLYING)
 
     fun discard() {
@@ -80,6 +86,7 @@ class LibraryRestoreSession @Inject constructor(
     companion object {
         const val PREFS = "groove_cloud_backup"
         const val KEY_PHASE = "library_restore_phase"
+        const val KEY_LAST_ERROR = "last_error"
         const val KEY_NEEDS_RESTART_AFTER_RESTORE = "needs_restart_after_library_restore"
     }
 }

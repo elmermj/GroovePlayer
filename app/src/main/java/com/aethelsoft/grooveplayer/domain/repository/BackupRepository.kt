@@ -17,7 +17,7 @@ interface BackupRepository {
 
     /**
      * Manual backup. Gates on Premium + quota + grace + over_quota.
-     * Flow: room_db snapshot then songs — upload-url → PUT → complete.
+     * Copies approved audio into Groove Downloads, uploads those files, then the Room snapshot.
      */
     suspend fun startBackup(entitlement: StorageEntitlement?, isPremium: Boolean): Result<Unit>
 

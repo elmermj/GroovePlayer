@@ -6,8 +6,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Cold-start decision for an interrupted restore. The unread
- * `needs_restart_after_library_restore` flag is cleared and never used to swap files.
+ * Cold-start decision for an interrupted restore. File rename recovery already ran
+ * when Room opened. This only chooses Home versus the applying screen.
+ * The unread `needs_restart_after_library_restore` flag is cleared and never swaps files.
  */
 @Singleton
 class LibraryRestoreGate @Inject constructor(

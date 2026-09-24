@@ -376,7 +376,7 @@ fun GroovePlayerAppMain() {
                 AppNavHost(
                     navController = navController,
                     startDestination = if (restoreLaunch.startOnApplyScreen) {
-                        AppRoutes.restoreApplyRoute(startDownload = false)
+                        AppRoutes.restoreApplyRoute(startDownload = restoreLaunch.resumeDownload)
                     } else {
                         AppRoutes.HOME
                     },

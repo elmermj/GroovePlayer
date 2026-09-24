@@ -22,7 +22,7 @@ data class CloudBackupState(
     val filesTotal: Int = 0,
     val filesCompleted: Int = 0,
     val filesDeduped: Int = 0,
-    /** Songs skipped client-side: catalog already has same basename(logical_path) + size_bytes. */
+    /** Songs skipped client-side: cloud already has the same SHA-256 and size. */
     val filesSkipped: Int = 0,
     val lastBackupAtEpochMs: Long? = null,
     val lastError: String? = null,

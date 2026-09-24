@@ -126,8 +126,9 @@ fun BackupContent(
         )
 
         Text(
-            text = "Cloud backup includes your library data (Room DB snapshot: favourites, " +
-                "recents, playlists, settings, metadata) plus audio from included folders. " +
+            text = "Cloud backup copies approved songs into Groove Downloads, uploads those files, " +
+                "then uploads the library snapshot (favourites, recents, playlists, settings). " +
+                "A song already in the cloud with the same content hash is skipped. " +
                 "Trim and long-press remove songs only — not the library snapshot.",
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = SoftWhite.copy(alpha = 0.75f),
@@ -685,8 +686,9 @@ private fun ConfirmBackupDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Library data (Room DB) and audio from these folders will upload to cloud backup. " +
-                        "Songs already on cloud (same filename + size) are skipped.",
+                    text = "Approved songs are copied into Groove Downloads and the library paths are updated. " +
+                        "Audio uploads first. The Room snapshot uploads only after those files are in the cloud. " +
+                        "Songs already on cloud with the same content hash are skipped.",
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                     color = SoftWhite.copy(alpha = 0.85f),
                 )
@@ -809,8 +811,8 @@ private fun BackupNowSection(
         }
         else -> {
             Text(
-                text = "Uploads library data (Room DB) plus included-folder audio to Cloudflare R2 " +
-                "(real PUT when backend dry_run is false).",
+                text = "Copies included-folder audio into Groove Downloads, uploads those files to Cloudflare R2, " +
+                "then uploads the Room snapshot (real PUT when backend dry_run is false).",
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite.copy(alpha = 0.85f),
             )
@@ -867,7 +869,7 @@ private fun BackupNowSection(
     ) {
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "${backupState.filesSkipped} song(s) skipped — already on cloud (filename + size)",
+            text = "${backupState.filesSkipped} song(s) skipped — already on cloud (same content hash)",
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = SoftWhite.copy(alpha = 0.75f),
         )
@@ -914,7 +916,8 @@ private fun RestoreLibrarySection(
             val schema = librarySnapshot?.schemaVersion?.toString() ?: "?"
             val size = librarySnapshot?.sizeBytes ?: 0L
             "Cloud Room DB ready · schema $schema · ${StorageFormatUtils.formatBytes(size, size.coerceAtLeast(1L))}. " +
-                "Restores favourites, recents, and settings. Songs already on this device stay put."
+                "Missing songs download into Groove Downloads, then the app reopens on the restored library. " +
+                "Songs that were never backed up stay on this device."
         } else {
             emptyHint
         },

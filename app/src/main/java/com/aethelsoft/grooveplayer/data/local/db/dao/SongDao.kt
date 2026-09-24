@@ -35,6 +35,10 @@ interface SongDao {
     @Query("UPDATE songs SET sourcePath = :sourcePath WHERE songId = :songId")
     suspend fun updateSourcePath(songId: String, sourcePath: String)
 
+    /** Rows whose stored path matched. Callers delete the old file only when this is > 0. */
+    @Query("UPDATE songs SET sourcePath = :newPath WHERE sourcePath = :oldPath")
+    suspend fun retargetSourcePath(oldPath: String, newPath: String): Int
+
     @Query("DELETE FROM songs WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
 }
