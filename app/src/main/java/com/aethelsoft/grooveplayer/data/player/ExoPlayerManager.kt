@@ -716,7 +716,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     /**
      * Local MediaItem builder.
      *
-     * R2 cost rule 2 (app/R2_COST_RULES.md): do **not** set signed R2 URLs as the
+     * R2 cost rule 2: do **not** set signed R2 URLs as the
      * playback URI. Media3 issues HTTP Range requests by default, which would
      * Class-B spam GetObject. Download whole-object via BackupRepository first.
      */

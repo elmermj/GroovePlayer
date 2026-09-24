@@ -7,7 +7,7 @@ plugins {
     id("kotlin-kapt")
 }
 
-// Crashlytics / Google Services — only when Elmer drops app/google-services.json (see app/FIREBASE_SETUP.md).
+// Crashlytics / Google Services — only when Elmer drops app/google-services.json.
 val googleServicesJson = file("google-services.json")
 val hasGoogleServices = googleServicesJson.exists()
 if (hasGoogleServices) {
@@ -103,7 +103,7 @@ android {
         )
     }
 
-    // environment: day-to-day `dev` vs store-oriented `prod`. See app/FLAVORS.md
+    // environment: day-to-day `dev` vs store-oriented `prod`.
     flavorDimensions += "environment"
     productFlavors {
         create("dev") {
@@ -178,7 +178,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Play upload signing from local.properties / CI — see app/FLAVORS.md.
+            // Play upload signing from local.properties / CI.
             // Never fall back to the debug keystore for release.
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
@@ -293,7 +293,7 @@ dependencies {
     // Google Play Billing (subscriptions + storage add-ons)
     implementation(libs.billing.ktx)
 
-    // Firebase Crashlytics — only when app/google-services.json exists (see app/FIREBASE_SETUP.md).
+    // Firebase Crashlytics — only when app/google-services.json exists.
     if (hasGoogleServices) {
         implementation(platform(libs.firebase.bom))
         implementation(libs.firebase.crashlytics)
@@ -331,14 +331,14 @@ gradle.taskGraph.whenReady {
         throw GradleException(
             "prodRelease requires real AdMob IDs. Set ADMOB_APP_ID, ADMOB_BANNER_UNIT_ID, " +
                 "and ADMOB_INTERSTITIAL_UNIT_ID in local.properties (or CI env). " +
-                "Google sample IDs are not allowed for prod. See app/ADS_SETUP.md."
+                "Google sample IDs are not allowed for prod."
         )
     }
     if (!hasReleaseSigning) {
         throw GradleException(
             "prodRelease requires a Play upload keystore. Set RELEASE_STORE_FILE, " +
                 "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD in " +
-                "local.properties (or CI env). Do not use the debug keystore. See app/FLAVORS.md."
+                "local.properties (or CI env). Do not use the debug keystore."
         )
     }
 }

@@ -76,7 +76,7 @@ object NetworkModule {
      * Plain client for R2 signed PUT/GET — must NOT attach Bearer.
      * Longer timeouts for large audio uploads.
      *
-     * R2 cost rules ([app/R2_COST_RULES.md](../../../../R2_COST_RULES.md)):
+     * R2 cost rules:
      * - One whole-object GetObject (no Range spam)
      * - No client HeadObject (HEAD rejected; complete does server Head once)
      */

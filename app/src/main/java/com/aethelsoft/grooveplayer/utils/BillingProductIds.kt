@@ -1,8 +1,7 @@
 package com.aethelsoft.grooveplayer.utils
 
 /**
- * Canonical Google Play product IDs — see grooveplayer-backend/docs/play-billing.md
- * and app/BILLING_SETUP.md.
+ * Canonical Google Play product IDs — see grooveplayer-backend/docs/play-billing.md.
  *
  * Region PPP (T1/T2/T3) is Play country pricing on the same SKU; do not invent tier SKUs.
  */
