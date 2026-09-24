@@ -1,6 +1,6 @@
 # Build a signed dev-release APK and publish it to Firebase App Distribution.
 # Signing and Firebase credentials come from GitHub Actions secrets only.
-# Do not echo those values. See app/DISTRIBUTE.md.
+# Do not echo those values. Distribute setup notes stay local and are not in this repo.
 
 name: Distribute APK
 

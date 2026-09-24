@@ -364,7 +364,7 @@ GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The
 
 ### Test APK on a phone (no USB)
 
-See [app/DISTRIBUTE.md](app/DISTRIBUTE.md) and [app/FIREBASE_SETUP.md](app/FIREBASE_SETUP.md). After the one-time Firebase and GitHub secrets setup, a merge or push to `test` runs **Actions → Distribute APK** and publishes to Firebase App Tester. `main` is production and is not the OTA target. Mobi and others should land WIP and test builds on `test`.
+After the one-time Firebase and GitHub secrets setup, a merge or push to `test` runs **Actions → Distribute APK** and publishes to Firebase App Tester. `main` is production and is not the OTA target. Mobi and others should land WIP and test builds on `test`. Firebase and distribute setup notes stay local and are not in this repository.
 
 ## 📝 License
 
