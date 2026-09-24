@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,6 +7,39 @@ plugins {
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
     id("kotlin-kapt")
+}
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+fun localProp(name: String): String? =
+    localProperties.getProperty(name)?.trim()?.takeIf { it.isNotEmpty() }
+
+val releaseStoreFile = localProp("RELEASE_STORE_FILE")
+val releaseStorePassword = localProp("RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = localProp("RELEASE_KEY_ALIAS")
+val releaseKeyPassword = localProp("RELEASE_KEY_PASSWORD")
+val releaseSigningProps = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+)
+val hasReleaseSigning = releaseSigningProps.all { it != null }
+
+if (releaseSigningProps.any { it != null } && !hasReleaseSigning) {
+    error(
+        "Release signing is incomplete. Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD in local.properties."
+    )
+}
+if (System.getenv("CI") == "true" && !hasReleaseSigning) {
+    error(
+        "Release signing is required on CI. Set RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD in local.properties."
+    )
 }
 
 android {
@@ -15,14 +50,43 @@ android {
         applicationId = "com.aethelsoft.grooveplayer"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("VERSION_NAME") ?: "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // dev is the Firebase App Distribution test track. prod is the store track.
+    // Both keep applicationId com.aethelsoft.grooveplayer so a signed CI build
+    // can update the existing install. This project has no AdMob ids yet, so the
+    // variants match; keep shipping devRelease so a future prod flavor can
+    // require ADMOB_* without blocking testers.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+        }
+        create("prod") {
+            dimension = "environment"
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseStoreFile))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

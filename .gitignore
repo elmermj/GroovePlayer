@@ -17,3 +17,8 @@ local.properties
 /.vscode/
 /.gradle/
 /.kotlin/
+
+# Release signing material. Never commit.
+keystore/
+*.jks
+*.keystore
