@@ -206,13 +206,14 @@ private fun SignOutConfirmDialog(
         title = { Text("Sign out?") },
         text = {
             Text(
-                "You’ll return to Free (ads on). Cloud backup and Premium stay on the server " +
-                    "until you sign in again. This device’s session will be cleared.",
+                "This device returns to Free with ads on. Cloud backup and Premium stay on " +
+                    "your account until you sign in again. The next Sign in with Google " +
+                    "will ask which account to use.",
             )
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Sign out", color = colors.onSurface)
+                Text("Sign out", color = colors.accent)
             }
         },
         dismissButton = {

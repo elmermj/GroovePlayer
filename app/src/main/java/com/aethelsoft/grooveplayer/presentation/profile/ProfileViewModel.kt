@@ -168,7 +168,8 @@ class ProfileViewModel @Inject constructor(
     fun signOut() = viewModelScope.launch {
         _authError.value = null
         _authLoading.value = true
-        val result = signOutUseCase()
+        // Finish the wipe even if Profile is left mid-request (drawer close / back).
+        val result = withContext(NonCancellable) { signOutUseCase() }
         _authLoading.value = false
         result.onFailure { e ->
             _authError.value = e.message ?: "Sign-out failed"
@@ -178,7 +179,7 @@ class ProfileViewModel @Inject constructor(
     fun deleteAccount() = viewModelScope.launch {
         _authError.value = null
         _authLoading.value = true
-        val result = deleteAccountUseCase()
+        val result = withContext(NonCancellable) { deleteAccountUseCase() }
         _authLoading.value = false
         result.onFailure { e ->
             _authError.value = e.message ?: "Couldn't delete account. Try again."

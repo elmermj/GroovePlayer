@@ -13,12 +13,14 @@ import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 import java.io.IOException
 import java.net.ConnectException
@@ -73,30 +75,61 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signOut(): Result<Unit> = mutex.withLock {
-        runCatching {
-            // POST /v1/auth/logout with Bearer access (+ optional refresh).
-            // all_devices:true (default) revokes every refresh for this user.
-            // Access JWT is NOT server-blacklisted — must clear BOTH local tokens.
-            val access = tokenStore.getAccessToken()
-            val refresh = tokenStore.getRefreshToken()
-            if (!access.isNullOrBlank() || !refresh.isNullOrBlank()) {
-                try {
-                    authApi.logout(
-                        LogoutRequestDto(
-                            refreshToken = refresh?.takeIf { it.isNotBlank() },
-                            allDevices = true,
-                        )
-                    )
-                } catch (e: Exception) {
-                    Log.w(TAG, "Logout API failed (clearing local session anyway)", e)
-                }
+    override suspend fun signOut(): Result<Unit> = withContext(NonCancellable) {
+        mutex.withLock {
+            // POST /v1/auth/logout with Bearer access (interceptor) + refresh body.
+            // all_devices:true revokes every refresh for this user.
+            // Access JWT is NOT server-blacklisted — local tokens must still go.
+            // API failure must not keep Premium, ads-off, or the Google session.
+            try {
+                postLogout()
+            } catch (e: Exception) {
+                Log.w(TAG, "Logout API failed (clearing local session anyway)", e)
             }
-            tokenStore.clear()
-            googleIdTokenProvider.clearCredentialSession()
-            userRepository.deleteUserProfile()
-            _authUser.value = null
+            clearLocalSession()
+            Result.success(Unit)
         }
+    }
+
+    /**
+     * Bearer comes from the OkHttp interceptor when an access token is present.
+     * Refresh is sent in the body so the server can revoke it (and every device).
+     */
+    private suspend fun postLogout() {
+        val access = tokenStore.getAccessToken()
+        val refresh = tokenStore.getRefreshToken()
+        if (access.isNullOrBlank() && refresh.isNullOrBlank()) return
+        authApi.logout(
+            LogoutRequestDto(
+                refreshToken = refresh?.takeIf { it.isNotBlank() },
+                allDevices = true,
+            )
+        )
+    }
+
+    /**
+     * Drops access, refresh, Credential Manager session, Room profile, and the
+     * in-memory /v1/me user. Each step is isolated so one failure cannot leave
+     * privilege on Premium. Caller must hold [mutex].
+     */
+    private suspend fun clearLocalSession() {
+        try {
+            tokenStore.clear()
+        } catch (e: Exception) {
+            Log.w(TAG, "token clear failed", e)
+        }
+        try {
+            googleIdTokenProvider.clearCredentialSession()
+        } catch (e: Exception) {
+            Log.w(TAG, "clearCredentialState failed", e)
+        }
+        try {
+            userRepository.deleteUserProfile()
+        } catch (e: Exception) {
+            Log.w(TAG, "profile delete failed", e)
+        }
+        _authUser.value = null
+        _serverSyncError.value = null
     }
 
     override suspend fun deleteAccount(): Result<Unit> = mutex.withLock {
@@ -111,12 +144,10 @@ class AuthRepositoryImpl @Inject constructor(
                     if (body?.deleted != true) {
                         error("Delete account returned 200 without deleted=true")
                     }
-                    // already_gone is still success — sign out locally, do not refresh.
-                    tokenStore.clear()
-                    googleIdTokenProvider.clearCredentialSession()
-                    userRepository.deleteUserProfile()
-                    _authUser.value = null
-                    _serverSyncError.value = null
+                    // already_gone is still success — same local wipe as Sign-out.
+                    withContext(NonCancellable) {
+                        clearLocalSession()
+                    }
                 }
                 401 -> error("Session expired. Sign in again, then retry delete.")
                 500 -> error(
@@ -160,12 +191,12 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun restoreSession(): Result<AuthUser?> = mutex.withLock {
         runCatching {
             if (!tokenStore.hasSession()) {
-                // Keep local profile if present for offline display, but treat as free for ads
-                // unless we can verify. Prefer clearing stale auth identity.
-                val local = userRepository.getUserProfile()
-                if (local != null && tokenStore.getRefreshToken().isNullOrBlank()) {
-                    // No tokens — local guest / stale profile: show as signed-out free.
-                    _authUser.value = null
+                // No tokens: signed-out Free. Drop a leftover Room profile so a later
+                // process start cannot rebuild Premium from cached /v1/me.
+                _authUser.value = null
+                _serverSyncError.value = null
+                if (userRepository.getUserProfile() != null) {
+                    userRepository.deleteUserProfile()
                 }
                 return@runCatching null
             }
@@ -238,6 +269,12 @@ class AuthRepositoryImpl @Inject constructor(
 
 
     override suspend fun applyRemoteUser(user: AuthUser) = mutex.withLock {
+        // Backup/billing responses can arrive after Sign-out. Applying them would
+        // put Premium back on screen with no tokens and ads still off.
+        if (!tokenStore.hasSession()) {
+            Log.w(TAG, "Ignoring remote user; local session already cleared")
+            return@withLock
+        }
         persistLocalProfile(user)
         _authUser.value = user
         _serverSyncError.value = null

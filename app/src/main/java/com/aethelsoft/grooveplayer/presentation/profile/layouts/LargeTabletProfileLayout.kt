@@ -274,6 +274,10 @@ MiniPlayerOnStartRow(
     }
 }
 
+/**
+ * Shared by Phone, Tablet, and LargeTablet. Sign-out and delete both confirm
+ * inside [com.aethelsoft.grooveplayer.presentation.profile.ui.AccountAuthHeader].
+ */
 @Composable
 fun AccountSection(
     viewModel: ProfileViewModel,

@@ -103,6 +103,8 @@ fun BackupContent(
     onRestoreLibrary: () -> Unit = {},
 ) {
     val storage = user?.storage
+    // Signed-out must not keep an in-flight Premium backup job on screen.
+    val visibleBackupState = if (user == null) backupState.asSignedOut() else backupState
     val context = LocalContext.current
     val activity = context as? Activity
     var pendingCancelAddon by remember { mutableStateOf<StorageAddon?>(null) }
@@ -163,7 +165,7 @@ fun BackupContent(
             BackupNowSection(
                 storage = storage,
                 tier = tier,
-                backupState = backupState,
+                backupState = visibleBackupState,
                 onStartBackup = { showConfirmBackup = true },
             )
         } else {
@@ -182,7 +184,7 @@ fun BackupContent(
             BackupNowSection(
                 storage = null,
                 tier = tier,
-                backupState = backupState,
+                backupState = visibleBackupState,
                 onStartBackup = { showConfirmBackup = true },
             )
         }
@@ -943,3 +945,19 @@ private fun RestoreLibrarySection(
         modifier = Modifier.fillMaxWidth(),
     )
 }
+
+/** Drop in-flight Premium job chrome once the account session is gone. */
+private fun CloudBackupState.asSignedOut(): CloudBackupState = copy(
+    phase = CloudBackupPhase.IDLE,
+    progressPercent = 0,
+    bytesPrepared = 0L,
+    bytesUploaded = 0L,
+    filesTotal = 0,
+    filesCompleted = 0,
+    filesDeduped = 0,
+    filesSkipped = 0,
+    message = null,
+    canRetry = false,
+    lastError = null,
+    lastRunDryRun = false,
+)
