@@ -59,13 +59,52 @@ class BackupLeasePolicyTest {
                 RemoteBackupLease(
                     active = true,
                     heldByThisDevice = false,
-                    deviceId = "device-b",
+                    otherDeviceActive = true,
+                    code = BackupLeasePolicy.CODE_OTHER_DEVICE,
                     expiresAtEpochMs = now + 30_000L,
                 ),
                 localId,
                 now,
             ),
         )
+    }
+
+    @Test
+    fun conflictCodeBlocksWithoutHolderId() {
+        assertTrue(
+            BackupLeasePolicy.blocksThisDevice(
+                RemoteBackupLease(
+                    code = BackupLeasePolicy.CODE_OTHER_DEVICE,
+                    otherDeviceActive = true,
+                    expiresAtEpochMs = now + 480_000L,
+                ),
+                localId,
+                now,
+                httpStatus = 409,
+            ),
+        )
+    }
+
+    @Test
+    fun missingLeaseDoesNotDisableTheButton() {
+        assertFalse(
+            BackupLeasePolicy.blocksThisDevice(
+                RemoteBackupLease(
+                    code = BackupLeasePolicy.CODE_NOT_FOUND,
+                    otherDeviceActive = false,
+                ),
+                localId,
+                now,
+                httpStatus = 404,
+            ),
+        )
+    }
+
+    @Test
+    fun heartbeatDefaultsToTwoMinutes() {
+        assertEquals(120_000L, BackupLeasePolicy.heartbeatIntervalMs(null))
+        assertEquals(120_000L, BackupLeasePolicy.heartbeatIntervalMs(120))
+        assertEquals(120_000L, BackupLeasePolicy.DEFAULT_HEARTBEAT_INTERVAL_MS)
     }
 
     @Test
@@ -97,10 +136,14 @@ class BackupLeasePolicyTest {
     }
 
     @Test
-    fun explicitNotHeldBlocksEvenWithoutHolderId() {
-        assertTrue(
+    fun idleStatusDoesNotBlock() {
+        assertFalse(
             BackupLeasePolicy.blocksThisDevice(
-                RemoteBackupLease(active = true, heldByThisDevice = false),
+                RemoteBackupLease(
+                    active = false,
+                    heldByThisDevice = false,
+                    otherDeviceActive = false,
+                ),
                 localId,
                 now,
             ),

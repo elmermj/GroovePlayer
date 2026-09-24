@@ -147,29 +147,33 @@ data class BackupTrimResponseDto(
 )
 
 /**
- * Backup lease body.
- * POST /v1/backup/lease, /heartbeat, and /release.
- * [deviceName] is optional and only meaningful on acquire.
+ * POST /v1/backup/lease sends device_id and optional device_label.
+ * Heartbeat and release also send lease_id.
  */
 data class BackupLeaseRequestDto(
     @param:Json(name = "device_id") val deviceId: String,
-    @param:Json(name = "device_name") val deviceName: String? = null,
+    @param:Json(name = "device_label") val deviceLabel: String? = null,
+    @param:Json(name = "lease_id") val leaseId: String? = null,
 )
 
 /**
- * GET/POST /v1/backup/lease response.
- * 409 from acquire uses the same shape, often only `{ "error": "..." }`.
- * [heldByThisDevice] stays null when the server omits it — the client compares [deviceId].
+ * Acquire/heartbeat 200, GET status 200, and 409/404 lease errors.
+ * 409 sets code OTHER_DEVICE_BACKUP and other_device_active, without the holder's device_id.
  */
 data class BackupLeaseResponseDto(
-    @param:Json(name = "active") val active: Boolean = false,
-    @param:Json(name = "acquired") val acquired: Boolean = false,
-    @param:Json(name = "released") val released: Boolean = false,
-    @param:Json(name = "held_by_this_device") val heldByThisDevice: Boolean? = null,
+    @param:Json(name = "lease_id") val leaseId: String? = null,
     @param:Json(name = "device_id") val deviceId: String? = null,
-    @param:Json(name = "device_name") val deviceName: String? = null,
+    @param:Json(name = "device_label") val deviceLabel: String? = null,
     @param:Json(name = "expires_at") val expiresAt: String? = null,
     @param:Json(name = "expires_in_sec") val expiresInSec: Int? = null,
+    @param:Json(name = "ttl_sec") val ttlSec: Int? = null,
+    @param:Json(name = "heartbeat_interval_sec") val heartbeatIntervalSec: Int? = null,
+    @param:Json(name = "refreshed") val refreshed: Boolean = false,
+    @param:Json(name = "active") val active: Boolean = false,
+    @param:Json(name = "held_by_this_device") val heldByThisDevice: Boolean? = null,
+    @param:Json(name = "other_device_active") val otherDeviceActive: Boolean = false,
+    @param:Json(name = "code") val code: String? = null,
+    @param:Json(name = "released") val released: Boolean? = null,
     @param:Json(name = "error") val error: String? = null,
 )
 

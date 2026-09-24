@@ -58,17 +58,16 @@ interface BackupApi {
     suspend fun trimBackup(@Body body: BackupTrimRequestDto): BackupTrimResponseDto
 
     /**
-     * Cross-device backup lease (SCRUM-73).
+     * Cross-device backup lease (SCRUM-73). TTL 600s. Heartbeat about every 120s.
      *
-     * - GET  /v1/backup/lease?device_id= — status. `device_id` lets the server set
-     *   held_by_this_device; the client also compares device_id itself.
-     * - POST /v1/backup/lease — acquire. Same device_id may re-acquire (200).
-     *   Another device holding a non-expired lease → 409.
-     * - POST /v1/backup/lease/heartbeat — extend TTL while consolidating/uploading.
-     * - POST /v1/backup/lease/release — idempotent release for this device_id.
-     *
-     * Assumed lease TTL is at least 45s. The client heartbeats every 15s.
-     * 404/405/501 means the route is not deployed yet; backup then proceeds without the lock.
+     * - POST /v1/backup/lease — `{ device_id, device_label? }`.
+     *   200 `{ lease_id, device_id, expires_at, expires_in_sec, ttl_sec, heartbeat_interval_sec, refreshed }`.
+     *   Same device_id refreshes and keeps lease_id. 409 code OTHER_DEVICE_BACKUP.
+     *   403 when storage is read-only.
+     * - POST /v1/backup/lease/heartbeat — `{ device_id, lease_id }`. 200 extends TTL. 404 LEASE_NOT_FOUND.
+     * - POST /v1/backup/lease/release — `{ device_id, lease_id }`. 200 `{ released: true|false }`.
+     * - GET /v1/backup/lease?device_id= — `{ active, held_by_this_device, other_device_active }`
+     *   and code OTHER_DEVICE_BACKUP when another device holds the lease.
      */
     @GET("/v1/backup/lease")
     suspend fun getLease(@Query("device_id") deviceId: String): Response<BackupLeaseResponseDto>
