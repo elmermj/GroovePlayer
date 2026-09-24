@@ -7,7 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -202,7 +202,7 @@ private fun EditSongMetadataSheet(
 
     val artworkModel: Any? = when {
         uiState.isLoading -> song.artworkUrl?.takeIf { it.isNotBlank() }
-        !uiState.artworkBytes.isNullOrEmpty() -> uiState.artworkBytes
+        uiState.artworkBytes.hasArtwork() -> uiState.artworkBytes
         else -> null
     }
     val artworkIdentity: Any? = when (val model = artworkModel) {
@@ -329,7 +329,7 @@ private fun EditSongMetadataSheet(
                             wash = wash,
                             artworkSize = artworkSize,
                             isLoading = uiState.isLoading,
-                            canRemoveArtwork = !uiState.artworkBytes.isNullOrEmpty(),
+                            canRemoveArtwork = uiState.artworkBytes.hasArtwork(),
                             editingEnabled = !uiState.isSaving && !uiState.isLoading,
                             onArtworkChange = onArtworkChange,
                         )
@@ -378,7 +378,7 @@ private fun EditSongMetadataSheet(
                         wash = wash,
                         artworkSize = artworkSize,
                         isLoading = uiState.isLoading,
-                        canRemoveArtwork = !uiState.artworkBytes.isNullOrEmpty(),
+                        canRemoveArtwork = uiState.artworkBytes.hasArtwork(),
                         editingEnabled = !uiState.isSaving && !uiState.isLoading,
                         onArtworkChange = onArtworkChange,
                     )
@@ -867,8 +867,8 @@ private fun MetadataForm(
 
         Text(
             text = "Save writes these tags into the audio file and your library.",
-            style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-            color = GrooveTheme.colors.muted.copy(alpha = 0.85f),
+            style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle().copy(shadow = labelShadow),
+            color = GrooveTheme.colors.muted,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
     }
@@ -891,13 +891,14 @@ private fun GlassSection(
             style = typography.sectionItemSubtitle.toTextStyle().copy(
                 fontWeight = FontWeight.Medium,
                 letterSpacing = 1.6.sp,
+                shadow = labelShadow,
             ),
-            color = colors.onSurface.copy(alpha = 0.82f),
+            color = colors.onSurface.copy(alpha = 0.92f),
         )
         Text(
             text = subtitle,
-            style = typography.sectionItemSubtitle.toTextStyle(),
-            color = colors.muted.copy(alpha = 0.90f),
+            style = typography.sectionItemSubtitle.toTextStyle().copy(shadow = labelShadow),
+            color = colors.muted,
         )
         GlassPanel(content = content)
     }
@@ -1314,12 +1315,20 @@ private fun Modifier.frostedPanel(shape: Shape): Modifier = this
         }
     }
 
+private val labelShadow = Shadow(
+    color = Color.Black.copy(alpha = 0.72f),
+    offset = Offset(0f, 1f),
+    blurRadius = 8f,
+)
+
 private fun Color.deepened(amount: Float = 0.58f): Color = copy(
     red = red * amount,
     green = green * amount,
     blue = blue * amount,
     alpha = 1f,
 )
+
+private fun ByteArray?.hasArtwork(): Boolean = this != null && this.isNotEmpty()
 
 private fun List<String>.asCreditLine(): String =
     if (isEmpty()) "Unknown artist" else joinToString(separator = " · ")
