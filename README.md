@@ -333,6 +333,7 @@ app/src/main/java/com/aethelsoft/grooveplayer/
 Planned features and directions:
 
 - **Authentication** — User sign-in and account management
+  - App Tester / release Sign-In needs the **upload keystore SHA-1** on the Google Cloud Android OAuth client (`com.aethelsoft.grooveplayer`). Missing SHA → UI error `[16] Account reauth failed`. Debug and upload SHA-1s are listed in local `app/AUTH_SETUP.md`.
 - **Profile** — Account and user settings
 - **Cloud backup and sync** — For paid users
 - **Cloud streaming** — If financially feasible

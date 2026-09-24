@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.presentation.profile
 
 import android.app.Application
 import android.app.Activity
+import com.aethelsoft.grooveplayer.data.auth.GoogleIdTokenProvider
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.domain.model.UserProfile
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
@@ -155,12 +156,11 @@ class ProfileViewModel @Inject constructor(
         val result = signInWithGoogleUseCase(activity)
         _authLoading.value = false
         result.onFailure { e ->
-            // User cancelled — don't surface as error
-            if (e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
+            // Quiet dismiss only for a real user cancel — not Google's mislabeled [16] reauth.
+            if (GoogleIdTokenProvider.isUserCancelledSignIn(e)) {
                 _authError.value = null
             } else {
-                val msg = e.message?.takeIf { it.isNotBlank() } ?: "Sign-in failed"
-                _authError.value = msg
+                _authError.value = GoogleIdTokenProvider.humanizeSignInFailure(e)
             }
         }
     }
