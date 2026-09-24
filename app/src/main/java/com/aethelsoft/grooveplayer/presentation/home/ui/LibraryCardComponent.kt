@@ -18,11 +18,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkPlaceholder
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
+
+/** Inset of the title/subtitle overlay. Continue-tile height reserves this plus the label lines. */
+internal val LibraryCardOverlayPadding = 12.dp
 
 @Composable
 fun LibraryCardComponent(
@@ -30,7 +34,11 @@ fun LibraryCardComponent(
     subtitle: String,
     artworks: List<String>,
     emptyNoticeText: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    square: Boolean = true,
+    titleMaxLines: Int = 1,
+    subtitleMaxLines: Int = 1,
 ) {
     val uniqueArtworks = remember(artworks) {
         artworks
@@ -41,9 +49,9 @@ fun LibraryCardComponent(
     val typography = GrooveTheme.typography
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .then(if (square) Modifier.aspectRatio(1f) else Modifier)
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -93,24 +101,32 @@ fun LibraryCardComponent(
             )
 
             // --- Title overlay ---
+            // Wider continue tiles opt into extra lines; those labels fill the card so
+            // ellipsis uses the tile width. Default cards keep the original wrap width.
+            val widenLabels = titleMaxLines > 1 || subtitleMaxLines > 1
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(12.dp),
+                    .then(if (widenLabels) Modifier.fillMaxWidth() else Modifier)
+                    .padding(LibraryCardOverlayPadding),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = title,
+                    modifier = if (widenLabels) Modifier.fillMaxWidth() else Modifier,
                     style = typography.cardTitle.toTextStyle(),
                     color = colors.onSurface,
-                    maxLines = 1,
+                    textAlign = if (widenLabels) TextAlign.Center else TextAlign.Unspecified,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = subtitle,
+                    modifier = if (widenLabels) Modifier.fillMaxWidth() else Modifier,
                     style = typography.cardSubtitle.toTextStyle(),
                     color = colors.onSurface.copy(alpha = 0.85f),
-                    maxLines = 1,
+                    textAlign = if (widenLabels) TextAlign.Center else TextAlign.Unspecified,
+                    maxLines = subtitleMaxLines,
                     overflow = TextOverflow.Ellipsis
                 )
             }
