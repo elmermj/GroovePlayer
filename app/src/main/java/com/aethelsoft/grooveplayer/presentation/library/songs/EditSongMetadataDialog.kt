@@ -1,21 +1,21 @@
 package com.aethelsoft.grooveplayer.presentation.library.songs
 
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +36,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -43,7 +46,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -54,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,18 +73,24 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -86,6 +101,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import coil3.imageLoader
@@ -108,47 +125,100 @@ import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
-import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.material3.Icon
-import androidx.compose.ui.graphics.graphicsLayer
+import com.aethelsoft.grooveplayer.utils.theme.ui.PoppinsFontFamily
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.draw.drawBehind
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+private val TokenCanvas = Color(0xFF000000)
+private val TokenEdge = Color(0xFF161616)
+private val TokenSurface = Color(0xFF212121)
+private val TokenMuted = Color(0xFFDBDBDB)
+private val TokenInactive = Color(0xFF262626)
+private val RadiusCard = 12.dp
+private val RadiusControl = 8.dp
+private val GlassFillAlpha = 0.64f
+private val GlassBorderColor = Color.White.copy(alpha = 0.08f)
+
+private val LabelStyle = TextStyle(
+    fontFamily = PoppinsFontFamily,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Medium,
+    color = TokenMuted,
+)
+private val ValueStyle = TextStyle(
+    fontFamily = PoppinsFontFamily,
+    fontSize = 16.sp,
+    fontWeight = FontWeight.Normal,
+    color = Color.White,
+)
+private val PreviewTitleStyle = TextStyle(
+    fontFamily = PoppinsFontFamily,
+    fontSize = 22.sp,
+    fontWeight = FontWeight.SemiBold,
+    color = Color.White,
+)
+private val PreviewArtistStyle = TextStyle(
+    fontFamily = PoppinsFontFamily,
+    fontSize = 14.sp,
+    fontWeight = FontWeight.Normal,
+    color = TokenMuted,
+)
+
 /**
- * Immersive metadata editor. Songs and song details both enter here.
- *
- * The wash is the artwork's dominant color (Palette, same helper as the full player).
- * Fields sit on frosted glass. Phone stacks the hero over the form; tablet keeps the
- * hero beside a scrolling form. Saving still goes through [EditSongMetadataViewModel].
+ * Full-height metadata editor. Songs and song details both enter here.
+ * Phone is a full-bleed sheet. Tablet and large tablet use a centered glass panel.
+ * Saving stays on [EditSongMetadataViewModel].
  */
 @Composable
 fun EditSongMetadataDialog(
     song: Song,
     onDismiss: () -> Unit,
     onSave: (Song) -> Unit,
-    viewModel: EditSongMetadataViewModel = hiltViewModel()
+    viewModel: EditSongMetadataViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    var baseline by remember(song.id) { mutableStateOf<EditMetadataUiState?>(null) }
+    var confirmDiscard by remember(song.id) { mutableStateOf(false) }
 
     LaunchedEffect(song.id) {
         viewModel.loadMetadata(song)
     }
+    LaunchedEffect(song.id, uiState.isLoading) {
+        if (!uiState.isLoading && baseline == null) {
+            baseline = uiState
+        }
+    }
+
+    val dirty = baseline?.let { !it.sameEdits(uiState) } == true
+    val canSave = dirty && !uiState.isSaving && !uiState.isLoading
+
+    fun requestDismiss() {
+        if (uiState.isSaving) return
+        if (dirty) confirmDiscard = true else onDismiss()
+    }
 
     Dialog(
-        onDismissRequest = { if (!uiState.isSaving) onDismiss() },
+        onDismissRequest = { requestDismiss() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
             dismissOnClickOutside = false,
             dismissOnBackPress = !uiState.isSaving,
-        )
+        ),
     ) {
+        val view = LocalView.current
+        SideEffect {
+            (view.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
+        }
         EditSongMetadataSheet(
             song = song,
             uiState = uiState,
-            onDismiss = onDismiss,
+            canSave = canSave,
+            onClose = { requestDismiss() },
             onTitleChange = viewModel::updateTitle,
             onGenresChange = viewModel::updateGenres,
             onArtistsChange = viewModel::updateArtists,
@@ -161,7 +231,7 @@ fun EditSongMetadataDialog(
             onSearchArtists = viewModel::searchArtists,
             onSearchAlbums = viewModel::searchAlbums,
             onSaveClick = save@{
-                if (uiState.isSaving || uiState.isLoading) return@save
+                if (!canSave) return@save
                 val snapshot = uiState
                 coroutineScope.launch {
                     val ok = viewModel.saveMetadata()
@@ -172,13 +242,24 @@ fun EditSongMetadataDialog(
             },
         )
     }
+
+    if (confirmDiscard) {
+        DiscardConfirmDialog(
+            onNo = { confirmDiscard = false },
+            onYes = {
+                confirmDiscard = false
+                onDismiss()
+            },
+        )
+    }
 }
 
 @Composable
 private fun EditSongMetadataSheet(
     song: Song,
     uiState: EditMetadataUiState,
-    onDismiss: () -> Unit,
+    canSave: Boolean,
+    onClose: () -> Unit,
     onTitleChange: (String) -> Unit,
     onGenresChange: (List<String>) -> Unit,
     onArtistsChange: (List<String>) -> Unit,
@@ -192,13 +273,25 @@ private fun EditSongMetadataSheet(
     onSearchAlbums: (String) -> Unit,
     onSaveClick: () -> Unit,
 ) {
+    val context = LocalContext.current
     val deviceType = rememberDeviceType()
     val window = rememberAdaptiveWindowInfo()
     val wide = deviceType != DeviceType.PHONE
-    val colors = GrooveTheme.colors
-    val context = LocalContext.current
-    val fallbackWash = colors.brandTertiary
-    var dominant by remember(song.id) { mutableStateOf(fallbackWash) }
+    val reduceMotion = rememberReducedMotion()
+    val enter = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        enter.animateTo(
+            targetValue = 1f,
+            animationSpec = if (reduceMotion) {
+                tween(durationMillis = 180)
+            } else {
+                spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                )
+            },
+        )
+    }
 
     val artworkModel: Any? = when {
         uiState.isLoading -> song.artworkUrl?.takeIf { it.isNotBlank() }
@@ -209,11 +302,11 @@ private fun EditSongMetadataSheet(
         is ByteArray -> model.contentHashCode()
         else -> model
     }
-
-    LaunchedEffect(artworkIdentity, fallbackWash) {
+    var dominant by remember(song.id) { mutableStateOf(TokenEdge) }
+    LaunchedEffect(artworkIdentity) {
         val source = artworkModel
         if (source == null) {
-            dominant = fallbackWash
+            dominant = TokenEdge
             return@LaunchedEffect
         }
         val extracted = runCatching {
@@ -230,173 +323,275 @@ private fun EditSongMetadataSheet(
                 withContext(Dispatchers.Default) { extractDominantColor(frame) }
             }
         }.getOrNull()
-        dominant = extracted ?: fallbackWash
+        dominant = extracted ?: TokenEdge
     }
-
     val wash by animateColorAsState(
         targetValue = dominant,
-        animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing),
-        label = "metadataArtworkWash",
+        animationSpec = tween(durationMillis = if (reduceMotion) 180 else 520),
+        label = "metadataWash",
     )
 
-    val entrance = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        entrance.animateTo(1f, tween(durationMillis = 480, easing = FastOutSlowInEasing))
-    }
-
-    val displayTitle = if (uiState.isLoading) {
-        song.title.ifBlank { "Untitled" }
+    val previewTitle = uiState.title.ifBlank { if (uiState.isLoading) song.title else "" }
+    val previewArtists = if (uiState.artists.isNotEmpty()) {
+        uiState.artists.joinToString(", ")
+    } else if (uiState.isLoading) {
+        song.artist
     } else {
-        uiState.title.ifBlank { "Untitled" }
-    }
-    val displayArtist = if (uiState.isLoading) {
-        song.artist.ifBlank { "Unknown artist" }
-    } else {
-        uiState.artists.asCreditLine()
+        ""
     }
     val artworkSize = when {
-        deviceType == DeviceType.PHONE -> if (window.heightDp < 700f) 176.dp else 208.dp
-        window.heightDp < 700f -> 200.dp
-        deviceType == DeviceType.LARGE_TABLET -> 300.dp
-        else -> 248.dp
+        wide -> 180.dp
+        window.heightDp < 680f -> 160.dp
+        window.heightDp > 900f -> 200.dp
+        else -> 180.dp
     }
-    val horizontal = when (deviceType) {
-        DeviceType.PHONE -> 20.dp
-        DeviceType.TABLET -> 28.dp
-        DeviceType.LARGE_TABLET -> 36.dp
+    val editingEnabled = !uiState.isSaving && !uiState.isLoading
+    val foregroundMotion = Modifier.graphicsLayer {
+        alpha = enter.value
+        if (!reduceMotion) {
+            translationY = (1f - enter.value) * 18.dp.toPx()
+            val scale = 0.98f + (0.02f * enter.value)
+            scaleX = scale
+            scaleY = scale
+        }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .graphicsLayer {
-                alpha = entrance.value
-                translationY = (1f - entrance.value) * 28.dp.toPx()
-            }
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         ArtworkWashBackdrop(
             artworkModel = artworkModel,
             wash = wash,
-            canvas = colors.canvas,
-            glowBiasX = if (wide) 0.24f else 0.5f,
-            glowBiasY = if (wide) 0.38f else 0.24f,
+            hasArtwork = artworkModel != null,
+            modifier = Modifier.graphicsLayer { alpha = enter.value },
         )
-
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                .then(foregroundMotion),
+            contentAlignment = Alignment.Center,
         ) {
-            MetadataTopBar(
-                isSaving = uiState.isSaving,
-                saveEnabled = !uiState.isSaving && !uiState.isLoading,
-                onDiscard = onDismiss,
-                onSave = onSaveClick,
-            )
-
-            AnimatedVisibility(
-                visible = uiState.saveError != null,
-                enter = fadeIn(tween(220)) + expandVertically(),
-                exit = fadeOut(tween(160)),
-            ) {
-                uiState.saveError?.let { message ->
-                    SaveErrorBanner(
-                        message = message,
-                        modifier = Modifier.padding(horizontal = horizontal, vertical = 4.dp),
-                    )
-                }
-            }
-
             if (wide) {
-                Row(
+                TabletMetadataPanel(
+                    deviceType = deviceType,
+                    artworkSize = artworkSize,
+                    artworkModel = artworkModel,
+                    wash = wash,
+                    previewTitle = previewTitle,
+                    previewArtists = previewArtists,
+                    uiState = uiState,
+                    editingEnabled = editingEnabled,
+                    canSave = canSave,
+                    onClose = onClose,
+                    onTitleChange = onTitleChange,
+                    onArtistsChange = onArtistsChange,
+                    onAlbumChange = onAlbumChange,
+                    onYearChange = onYearChange,
+                    onUseAlbumYearChange = onUseAlbumYearChange,
+                    onTrackNumberChange = onTrackNumberChange,
+                    onGenresChange = onGenresChange,
+                    onArtworkChange = onArtworkChange,
+                    onSearchArtists = onSearchArtists,
+                    onSearchAlbums = onSearchAlbums,
+                    onSearchGenres = onSearchGenres,
+                    onSaveClick = onSaveClick,
+                )
+            } else {
+                PhoneMetadataSheet(
+                    artworkSize = artworkSize,
+                    artworkModel = artworkModel,
+                    wash = wash,
+                    previewTitle = previewTitle,
+                    previewArtists = previewArtists,
+                    uiState = uiState,
+                    editingEnabled = editingEnabled,
+                    canSave = canSave,
+                    onClose = onClose,
+                    onTitleChange = onTitleChange,
+                    onArtistsChange = onArtistsChange,
+                    onAlbumChange = onAlbumChange,
+                    onYearChange = onYearChange,
+                    onUseAlbumYearChange = onUseAlbumYearChange,
+                    onTrackNumberChange = onTrackNumberChange,
+                    onGenresChange = onGenresChange,
+                    onArtworkChange = onArtworkChange,
+                    onSearchArtists = onSearchArtists,
+                    onSearchAlbums = onSearchAlbums,
+                    onSearchGenres = onSearchGenres,
+                    onSaveClick = onSaveClick,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhoneMetadataSheet(
+    artworkSize: Dp,
+    artworkModel: Any?,
+    wash: Color,
+    previewTitle: String,
+    previewArtists: String,
+    uiState: EditMetadataUiState,
+    editingEnabled: Boolean,
+    canSave: Boolean,
+    onClose: () -> Unit,
+    onTitleChange: (String) -> Unit,
+    onArtistsChange: (List<String>) -> Unit,
+    onAlbumChange: (String?) -> Unit,
+    onYearChange: (Int?) -> Unit,
+    onUseAlbumYearChange: (Boolean) -> Unit,
+    onTrackNumberChange: (Int?) -> Unit,
+    onGenresChange: (List<String>) -> Unit,
+    onArtworkChange: (ByteArray?, String?) -> Unit,
+    onSearchArtists: (String) -> Unit,
+    onSearchAlbums: (String) -> Unit,
+    onSearchGenres: (String) -> Unit,
+    onSaveClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        EditorTopBar(onClose = onClose, enabled = !uiState.isSaving)
+        ArtworkHero(
+            artworkModel = artworkModel,
+            wash = wash,
+            artworkSize = artworkSize,
+            editingEnabled = editingEnabled,
+            canRemove = uiState.artworkBytes.hasArtwork(),
+            onArtworkChange = onArtworkChange,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        LivePreview(title = previewTitle, artists = previewArtists)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            GlassPanel(
+                artworkModel = artworkModel,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                MetadataFields(
+                    uiState = uiState,
+                    editingEnabled = editingEnabled,
+                    onTitleChange = onTitleChange,
+                    onArtistsChange = onArtistsChange,
+                    onAlbumChange = onAlbumChange,
+                    onYearChange = onYearChange,
+                    onUseAlbumYearChange = onUseAlbumYearChange,
+                    onTrackNumberChange = onTrackNumberChange,
+                    onGenresChange = onGenresChange,
+                    onSearchArtists = onSearchArtists,
+                    onSearchAlbums = onSearchAlbums,
+                    onSearchGenres = onSearchGenres,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+        GlassFooter(
+            canSave = canSave,
+            isSaving = uiState.isSaving,
+            onDiscard = onClose,
+            onSave = onSaveClick,
+        )
+        SaveErrorLine(uiState.saveError)
+    }
+}
+
+@Composable
+private fun TabletMetadataPanel(
+    deviceType: DeviceType,
+    artworkSize: Dp,
+    artworkModel: Any?,
+    wash: Color,
+    previewTitle: String,
+    previewArtists: String,
+    uiState: EditMetadataUiState,
+    editingEnabled: Boolean,
+    canSave: Boolean,
+    onClose: () -> Unit,
+    onTitleChange: (String) -> Unit,
+    onArtistsChange: (List<String>) -> Unit,
+    onAlbumChange: (String?) -> Unit,
+    onYearChange: (Int?) -> Unit,
+    onUseAlbumYearChange: (Boolean) -> Unit,
+    onTrackNumberChange: (Int?) -> Unit,
+    onGenresChange: (List<String>) -> Unit,
+    onArtworkChange: (ByteArray?, String?) -> Unit,
+    onSearchArtists: (String) -> Unit,
+    onSearchAlbums: (String) -> Unit,
+    onSearchGenres: (String) -> Unit,
+    onSaveClick: () -> Unit,
+) {
+    val panelMax = if (deviceType == DeviceType.LARGE_TABLET) 640.dp else 560.dp
+    GlassPanel(
+        artworkModel = artworkModel,
+        fill = true,
+        modifier = Modifier
+            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .widthIn(max = panelMax)
+            .fillMaxWidth()
+            .fillMaxHeight(0.90f),
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            EditorTopBar(onClose = onClose, enabled = !uiState.isSaving)
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(start = 8.dp, end = 16.dp, bottom = 8.dp),
+            ) {
+                Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                        .width(220.dp)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    ArtworkHero(
+                        artworkModel = artworkModel,
+                        wash = wash,
+                        artworkSize = artworkSize,
+                        editingEnabled = editingEnabled,
+                        canRemove = uiState.artworkBytes.hasArtwork(),
+                        onArtworkChange = onArtworkChange,
+                    )
+                    LivePreview(title = previewTitle, artists = previewArtists)
+                }
+                Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     Column(
                         modifier = Modifier
-                            .weight(if (deviceType == DeviceType.LARGE_TABLET) 0.40f else 0.44f)
+                            .weight(1f)
                             .verticalScroll(rememberScrollState())
-                            .padding(start = horizontal, end = 12.dp, bottom = 28.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                            .padding(start = 8.dp),
                     ) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        MetadataHero(
-                            title = displayTitle,
-                            artist = displayArtist,
-                            artworkModel = artworkModel,
-                            wash = wash,
-                            artworkSize = artworkSize,
-                            isLoading = uiState.isLoading,
-                            canRemoveArtwork = uiState.artworkBytes.hasArtwork(),
-                            editingEnabled = !uiState.isSaving && !uiState.isLoading,
-                            onArtworkChange = onArtworkChange,
-                        )
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(if (deviceType == DeviceType.LARGE_TABLET) 0.60f else 0.56f)
-                            .verticalScroll(rememberScrollState())
-                            .padding(start = 8.dp, end = horizontal, bottom = 28.dp),
-                    ) {
-                        MetadataForm(
+                        MetadataFields(
                             uiState = uiState,
-                            editingEnabled = !uiState.isSaving && !uiState.isLoading,
+                            editingEnabled = editingEnabled,
                             onTitleChange = onTitleChange,
-                            onGenresChange = onGenresChange,
                             onArtistsChange = onArtistsChange,
                             onAlbumChange = onAlbumChange,
                             onYearChange = onYearChange,
                             onUseAlbumYearChange = onUseAlbumYearChange,
                             onTrackNumberChange = onTrackNumberChange,
-                            onSearchGenres = onSearchGenres,
+                            onGenresChange = onGenresChange,
                             onSearchArtists = onSearchArtists,
                             onSearchAlbums = onSearchAlbums,
-                            modifier = Modifier
-                                .widthIn(max = 640.dp)
-                                .fillMaxWidth(),
+                            onSearchGenres = onSearchGenres,
                         )
                     }
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = horizontal)
-                        .padding(bottom = 28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    MetadataHero(
-                        title = displayTitle,
-                        artist = displayArtist,
-                        artworkModel = artworkModel,
-                        wash = wash,
-                        artworkSize = artworkSize,
-                        isLoading = uiState.isLoading,
-                        canRemoveArtwork = uiState.artworkBytes.hasArtwork(),
-                        editingEnabled = !uiState.isSaving && !uiState.isLoading,
-                        onArtworkChange = onArtworkChange,
+                    GlassFooter(
+                        canSave = canSave,
+                        isSaving = uiState.isSaving,
+                        onDiscard = onClose,
+                        onSave = onSaveClick,
+                        inset = true,
                     )
-                    MetadataForm(
-                        uiState = uiState,
-                        editingEnabled = !uiState.isSaving && !uiState.isLoading,
-                        onTitleChange = onTitleChange,
-                        onGenresChange = onGenresChange,
-                        onArtistsChange = onArtistsChange,
-                        onAlbumChange = onAlbumChange,
-                        onYearChange = onYearChange,
-                        onUseAlbumYearChange = onUseAlbumYearChange,
-                        onTrackNumberChange = onTrackNumberChange,
-                        onSearchGenres = onSearchGenres,
-                        onSearchArtists = onSearchArtists,
-                        onSearchAlbums = onSearchAlbums,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    SaveErrorLine(uiState.saveError)
                 }
             }
         }
@@ -407,20 +602,16 @@ private fun EditSongMetadataSheet(
 private fun ArtworkWashBackdrop(
     artworkModel: Any?,
     wash: Color,
-    canvas: Color,
-    glowBiasX: Float,
-    glowBiasY: Float,
+    hasArtwork: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val frostBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    val artAlpha = if (frostBlur) 0.82f else 0.28f
-    val deep = wash.deepened()
-
+    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .clipToBounds()
-            .background(canvas)
+            .background(TokenCanvas),
     ) {
         if (artworkModel != null) {
             AsyncImage(
@@ -433,16 +624,12 @@ private fun ArtworkWashBackdrop(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(
-                        if (frostBlur) {
-                            Modifier.blur(68.dp, BlurredEdgeTreatment.Unbounded)
-                        } else {
-                            Modifier
-                        }
+                        if (canBlur) Modifier.blur(56.dp, BlurredEdgeTreatment.Unbounded) else Modifier
                     )
                     .graphicsLayer {
-                        scaleX = 1.22f
-                        scaleY = 1.22f
-                        alpha = artAlpha
+                        scaleX = 1.18f
+                        scaleY = 1.18f
+                        alpha = if (canBlur) 0.92f else 0.30f
                     },
             )
         }
@@ -450,144 +637,77 @@ private fun ArtworkWashBackdrop(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.00f to deep.copy(alpha = 0.78f),
-                            0.30f to wash.copy(alpha = 0.42f),
-                            0.62f to canvas.copy(alpha = 0.78f),
-                            1.00f to canvas.copy(alpha = 0.94f),
+                    if (hasArtwork) {
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.00f to wash.copy(alpha = 0.42f),
+                                0.42f to TokenEdge.copy(alpha = 0.55f),
+                                1.00f to TokenCanvas.copy(alpha = 0.94f),
+                            ),
                         )
-                    )
-                )
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithCache {
-                    val center = Offset(size.width * glowBiasX, size.height * glowBiasY)
-                    val radius = size.minDimension * 0.78f
-                    val glow = Brush.radialGradient(
-                        colors = listOf(
-                            wash.copy(alpha = 0.55f),
-                            wash.copy(alpha = 0.16f),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = radius,
-                    )
-                    onDrawBehind {
-                        drawCircle(brush = glow, radius = radius, center = center)
-                    }
-                }
+                    } else {
+                        Brush.verticalGradient(
+                            colors = listOf(TokenEdge, TokenCanvas),
+                        )
+                    },
+                ),
         )
     }
 }
 
 @Composable
-private fun MetadataTopBar(
-    isSaving: Boolean,
-    saveEnabled: Boolean,
-    onDiscard: () -> Unit,
-    onSave: () -> Unit,
+private fun EditorTopBar(
+    onClose: () -> Unit,
+    enabled: Boolean,
 ) {
-    val colors = GrooveTheme.colors
-    val typography = GrooveTheme.typography
-    Box(modifier = Modifier.fillMaxWidth()) {
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .padding(horizontal = 4.dp),
+    ) {
+        IconButton(
+            onClick = onClose,
+            enabled = enabled,
             modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Black.copy(alpha = 0.18f),
-                            Color.Transparent,
-                        )
-                    )
-                )
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .align(Alignment.CenterStart)
+                .size(48.dp),
         ) {
-            TextButton(
-                onClick = onDiscard,
-                enabled = !isSaving,
-                modifier = Modifier.heightIn(min = 48.dp),
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = colors.onSurface,
-                    disabledContentColor = colors.onSurface.copy(alpha = 0.38f),
-                ),
-            ) {
-                Text(
-                    text = "Discard",
-                    style = typography.buttonLabel.toTextStyle(),
-                )
-            }
-            Text(
-                text = "Edit metadata",
-                style = typography.pageTitle.toTextStyle(),
-                color = colors.onSurface,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .weight(1f)
-                    .semantics { heading() },
+            Icon(
+                imageVector = XClose,
+                contentDescription = "Close",
+                tint = Color.White,
             )
-            Button(
-                onClick = onSave,
-                enabled = saveEnabled,
-                modifier = Modifier.heightIn(min = 48.dp),
-                shape = RoundedCornerShape(50),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = colors.accent,
-                    contentColor = colors.onAccent,
-                    disabledContainerColor = colors.accent.copy(alpha = 0.32f),
-                    disabledContentColor = colors.onAccent.copy(alpha = 0.55f),
-                ),
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .semantics { contentDescription = "Saving metadata" },
-                        strokeWidth = 2.dp,
-                        color = colors.onAccent,
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                }
-                Text(
-                    text = if (isSaving) "Saving" else "Save",
-                    style = typography.buttonLabel.toTextStyle(),
-                )
-            }
         }
+        Text(
+            text = "Edit metadata",
+            style = TextStyle(
+                fontFamily = PoppinsFontFamily,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White,
+            ),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .semantics { heading() },
+        )
     }
 }
 
 @Composable
-private fun MetadataHero(
-    title: String,
-    artist: String,
+private fun ArtworkHero(
     artworkModel: Any?,
     wash: Color,
     artworkSize: Dp,
-    isLoading: Boolean,
-    canRemoveArtwork: Boolean,
     editingEnabled: Boolean,
+    canRemove: Boolean,
     onArtworkChange: (ByteArray?, String?) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val colors = GrooveTheme.colors
-    val typography = GrooveTheme.typography
-    val spacing = GrooveTheme.spacing
     val context = LocalContext.current
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(RadiusCard)
     val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         runCatching {
@@ -600,523 +720,800 @@ private fun MetadataHero(
             }
         }
     }
+    fun pick() {
+        if (editingEnabled) imagePicker.launch("image/*")
+    }
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
+        modifier = modifier
+            .padding(top = 4.dp, bottom = 8.dp)
+            .size(artworkSize)
+            .drawBehind {
+                val center = Offset(size.width / 2f, size.height / 2f)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(wash.copy(alpha = 0.30f), Color.Transparent),
+                        center = center,
+                        radius = size.minDimension * 0.72f,
+                    ),
+                    radius = size.minDimension * 0.72f,
+                    center = center,
+                )
+            },
+        contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier = Modifier
-                .size(artworkSize + 36.dp)
-                .drawWithCache {
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val glow = Brush.radialGradient(
-                        colors = listOf(
-                            wash.copy(alpha = 0.50f),
-                            Color.Transparent,
-                        ),
-                        center = center,
-                        radius = size.minDimension * 0.48f,
+                .fillMaxSize()
+                .clip(shape)
+                .border(1.dp, GlassBorderColor, shape)
+                .pointerInput(editingEnabled) {
+                    detectTapGestures(
+                        onTap = { pick() },
+                        onLongPress = { pick() },
                     )
-                    onDrawBehind {
-                        drawCircle(
-                            color = Color.Black.copy(alpha = 0.38f),
-                            radius = size.minDimension * 0.34f,
-                            center = Offset(size.width / 2f, size.height * 0.58f),
-                        )
-                        drawCircle(brush = glow, radius = size.minDimension * 0.48f, center = center)
-                    }
-                },
-            contentAlignment = Alignment.Center,
+                }
+                .semantics { contentDescription = "Album artwork" },
         ) {
+            if (artworkModel != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(artworkModel)
+                        .crossfade(280)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                MediaArtworkPlaceholder(
+                    modifier = Modifier.fillMaxSize(),
+                    kind = MediaArtworkKind.ALBUM,
+                    cornerRadius = RadiusCard,
+                    contentDescription = "No artwork",
+                )
+            }
+        }
+        if (canRemove && editingEnabled) {
             Box(
                 modifier = Modifier
-                    .size(artworkSize)
-                    .clip(shape)
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.42f),
-                                wash.copy(alpha = 0.35f),
-                                Color.White.copy(alpha = 0.08f),
-                            )
-                        ),
-                        shape = shape,
-                    ),
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .size(48.dp)
+                    .semantics { contentDescription = "Remove artwork" }
+                    .clickable { onArtworkChange(null, null) },
+                contentAlignment = Alignment.Center,
             ) {
-                if (artworkModel != null) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(context)
-                            .data(artworkModel)
-                            .crossfade(280)
-                            .build(),
-                        contentDescription = "Album artwork",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    MediaArtworkPlaceholder(
-                        modifier = Modifier.fillMaxSize(),
-                        kind = MediaArtworkKind.ALBUM,
-                        cornerRadius = 22.dp,
-                        contentDescription = "No artwork",
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(RadiusControl))
+                        .background(TokenSurface.copy(alpha = 0.88f))
+                        .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusControl)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = XClose,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
         }
-
-        Text(
-            text = title,
-            style = typography.playerSongTitle.toTextStyle().copy(
-                shadow = Shadow(
-                    color = Color.Black.copy(alpha = 0.45f),
-                    offset = Offset(0f, 2f),
-                    blurRadius = 12f,
-                )
-            ),
-            color = colors.onSurface,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.s),
-        )
-        Spacer(modifier = Modifier.height(spacing.xs))
-        Text(
-            text = artist,
-            style = typography.playerSongArtist.toTextStyle().copy(
-                shadow = Shadow(
-                    color = Color.Black.copy(alpha = 0.40f),
-                    offset = Offset(0f, 1f),
-                    blurRadius = 8f,
-                )
-            ),
-            color = colors.muted,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.m),
-        )
-        Spacer(modifier = Modifier.height(spacing.m))
-
-        if (!isLoading) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.s),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                GlassPill(
-                    label = "Replace",
-                    enabled = editingEnabled,
-                    onClick = { imagePicker.launch("image/*") },
-                    contentDescription = "Replace artwork",
-                )
-                if (canRemoveArtwork) {
-                    GlassPill(
-                        label = "Remove",
-                        enabled = editingEnabled,
-                        onClick = { onArtworkChange(null, null) },
-                        contentDescription = "Remove artwork",
-                    )
-                }
-            }
+        if (editingEnabled) {
+            Text(
+                text = "Replace",
+                style = TextStyle(
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White,
+                ),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(6.dp)
+                    .heightIn(min = 48.dp)
+                    .clip(RoundedCornerShape(RadiusControl))
+                    .background(TokenSurface.copy(alpha = 0.88f))
+                    .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusControl))
+                    .clickable(onClick = ::pick)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .semantics { contentDescription = "Replace artwork" },
+            )
         }
-        Spacer(modifier = Modifier.height(spacing.l))
     }
 }
 
 @Composable
-private fun MetadataForm(
+private fun LivePreview(
+    title: String,
+    artists: String,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = title.ifBlank { "Title" },
+            style = PreviewTitleStyle,
+            color = if (title.isBlank()) TokenMuted.copy(alpha = 0.55f) else Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = artists.ifBlank { "Artists" },
+            style = PreviewArtistStyle,
+            color = if (artists.isBlank()) TokenMuted.copy(alpha = 0.45f) else TokenMuted,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun MetadataFields(
     uiState: EditMetadataUiState,
     editingEnabled: Boolean,
     onTitleChange: (String) -> Unit,
-    onGenresChange: (List<String>) -> Unit,
     onArtistsChange: (List<String>) -> Unit,
     onAlbumChange: (String?) -> Unit,
     onYearChange: (Int?) -> Unit,
     onUseAlbumYearChange: (Boolean) -> Unit,
     onTrackNumberChange: (Int?) -> Unit,
-    onSearchGenres: (String) -> Unit,
+    onGenresChange: (List<String>) -> Unit,
     onSearchArtists: (String) -> Unit,
     onSearchAlbums: (String) -> Unit,
-    modifier: Modifier = Modifier,
+    onSearchGenres: (String) -> Unit,
 ) {
-    val spacing = GrooveTheme.spacing
     if (uiState.isLoading) {
-        Column(modifier = modifier.padding(top = spacing.s)) {
-            GlassPanel {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.m),
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = GrooveTheme.colors.onSurface,
-                    )
-                    Column {
-                        Text(
-                            text = "Reading tags",
-                            style = GrooveTheme.typography.sectionItemTitle.toTextStyle(),
-                            color = GrooveTheme.colors.onSurface,
-                        )
-                        Text(
-                            text = "Pulling title, people, and artwork from the file.",
-                            style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                            color = GrooveTheme.colors.muted,
-                        )
-                    }
-                }
-            }
-        }
+        Text(
+            text = "Reading tags",
+            style = LabelStyle,
+            modifier = Modifier.padding(vertical = 12.dp),
+        )
         return
     }
+    val artistFocus = remember { FocusRequester() }
+    val trackFocus = remember { FocusRequester() }
+    val yearFocus = remember { FocusRequester() }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        GlassTextField(
+            label = "Title",
+            value = uiState.title,
+            onValueChange = onTitleChange,
+            placeholder = "Title",
+            enabled = editingEnabled,
+            imeAction = ImeAction.Next,
+            onNext = { artistFocus.requestFocus() },
+        )
+        TokenMenuField(
+            label = "Artists",
+            placeholder = "Add an artist",
+            values = uiState.artists,
+            suggestions = uiState.artistSuggestions,
+            enabled = editingEnabled,
+            focusRequester = artistFocus,
+            onValuesChange = onArtistsChange,
+            onSearch = onSearchArtists,
+        )
+        AlbumMenuField(
+            album = uiState.album,
+            suggestions = uiState.albumSuggestions,
+            enabled = editingEnabled,
+            onAlbumChange = onAlbumChange,
+            onSearch = onSearchAlbums,
+            onNext = { trackFocus.requestFocus() },
+        )
+        TrackYearRow(
+            trackNumber = uiState.trackNumber,
+            year = uiState.year,
+            useAlbumYear = uiState.useAlbumYear,
+            enabled = editingEnabled,
+            trackFocus = trackFocus,
+            yearFocus = yearFocus,
+            onTrackNumberChange = onTrackNumberChange,
+            onYearChange = onYearChange,
+            onUseAlbumYearChange = onUseAlbumYearChange,
+        )
+        TokenMenuField(
+            label = "Genres",
+            placeholder = "Add a genre",
+            values = uiState.genres,
+            suggestions = uiState.genreSuggestions,
+            enabled = editingEnabled,
+            onValuesChange = onGenresChange,
+            onSearch = onSearchGenres,
+        )
+    }
+}
 
-    Column(
-        modifier = modifier.padding(top = spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
+@Composable
+private fun TrackYearRow(
+    trackNumber: Int?,
+    year: Int?,
+    useAlbumYear: Boolean,
+    enabled: Boolean,
+    trackFocus: FocusRequester,
+    yearFocus: FocusRequester,
+    onTrackNumberChange: (Int?) -> Unit,
+    onYearChange: (Int?) -> Unit,
+    onUseAlbumYearChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        GlassSection(
-            title = "Song",
-            subtitle = "The name shown in your library and on the player.",
-        ) {
-            GlassTextField(
-                value = uiState.title,
-                onValueChange = onTitleChange,
-                placeholder = "Title",
-                enabled = editingEnabled,
+        NumberGlassField(
+            label = "Track number",
+            value = trackNumber,
+            placeholder = "Track",
+            enabled = enabled,
+            focusRequester = trackFocus,
+            imeAction = ImeAction.Next,
+            onNext = { yearFocus.requestFocus() },
+            onValueChange = onTrackNumberChange,
+            modifier = Modifier.weight(1f),
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            NumberGlassField(
+                label = "Year",
+                value = year,
+                placeholder = "Year",
+                enabled = enabled && !useAlbumYear,
+                focusRequester = yearFocus,
+                imeAction = ImeAction.Done,
+                onValueChange = onYearChange,
             )
-        }
-
-        GlassSection(
-            title = "Artists",
-            subtitle = "The first name is the primary artist.",
-        ) {
-            GlassTokenEditor(
-                values = uiState.artists,
-                suggestions = uiState.artistSuggestions,
-                placeholder = "Add an artist",
-                enabled = editingEnabled,
-                onValuesChange = onArtistsChange,
-                onSearch = onSearchArtists,
-            )
-        }
-
-        GlassSection(
-            title = "Release",
-            subtitle = "Album, year, and track.",
-        ) {
-            AlbumGlassField(
-                album = uiState.album,
-                suggestions = uiState.albumSuggestions,
-                enabled = editingEnabled,
-                onAlbumChange = onAlbumChange,
-                onSearchAlbums = onSearchAlbums,
-            )
-            Spacer(modifier = Modifier.height(spacing.m))
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(1.dp)
-                    .background(Color.White.copy(alpha = 0.10f))
-            )
-            Spacer(modifier = Modifier.height(spacing.s))
-            UseAlbumYearRow(
-                useAlbumYear = uiState.useAlbumYear,
-                enabled = editingEnabled,
-                onUseAlbumYearChange = onUseAlbumYearChange,
-            )
-            AnimatedVisibility(
-                visible = !uiState.useAlbumYear,
-                enter = fadeIn(tween(220)) + expandVertically(),
-                exit = fadeOut(tween(160)) + shrinkVertically(),
+                    .heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Column {
-                    Spacer(modifier = Modifier.height(spacing.s))
-                    YearGlassField(
-                        year = uiState.year,
-                        enabled = editingEnabled,
-                        onYearChange = onYearChange,
-                    )
-                }
+                Text(
+                    text = "Use album year",
+                    style = LabelStyle,
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 4.dp),
+                    maxLines = 2,
+                )
+                Switch(
+                    checked = useAlbumYear,
+                    onCheckedChange = onUseAlbumYearChange,
+                    enabled = enabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.Black,
+                        checkedTrackColor = Color.White,
+                        uncheckedThumbColor = TokenMuted,
+                        uncheckedTrackColor = TokenInactive,
+                        uncheckedBorderColor = GlassBorderColor,
+                    ),
+                )
             }
-            Spacer(modifier = Modifier.height(spacing.s))
-            TrackGlassField(
-                trackNumber = uiState.trackNumber,
-                enabled = editingEnabled,
-                onTrackNumberChange = onTrackNumberChange,
-            )
         }
-
-        GlassSection(
-            title = "Genres",
-            subtitle = "The first genre is the primary tag.",
-        ) {
-            GlassTokenEditor(
-                values = uiState.genres,
-                suggestions = uiState.genreSuggestions,
-                placeholder = "Add a genre",
-                enabled = editingEnabled,
-                onValuesChange = onGenresChange,
-                onSearch = onSearchGenres,
-            )
-        }
-
-        Text(
-            text = "Save writes these tags into the audio file and your library.",
-            style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle().copy(shadow = labelShadow),
-            color = GrooveTheme.colors.muted,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-    }
-}
-
-@Composable
-private fun GlassSection(
-    title: String,
-    subtitle: String,
-    content: @Composable () -> Unit,
-) {
-    val colors = GrooveTheme.colors
-    val typography = GrooveTheme.typography
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = title.uppercase(),
-            style = typography.sectionItemSubtitle.toTextStyle().copy(
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.6.sp,
-                shadow = labelShadow,
-            ),
-            color = colors.onSurface.copy(alpha = 0.92f),
-        )
-        Text(
-            text = subtitle,
-            style = typography.sectionItemSubtitle.toTextStyle().copy(shadow = labelShadow),
-            color = colors.muted,
-        )
-        GlassPanel(content = content)
-    }
-}
-
-@Composable
-private fun GlassPanel(
-    content: @Composable () -> Unit,
-) {
-    val shape = RoundedCornerShape(24.dp)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .frostedPanel(shape)
-            .padding(16.dp)
-            .animateContentSize(animationSpec = tween(280, easing = FastOutSlowInEasing)),
-    ) {
-        content()
     }
 }
 
 @Composable
 private fun GlassTextField(
+    label: String,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Done,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    focusRequester: FocusRequester? = null,
+    onNext: (() -> Unit)? = null,
     onDone: (() -> Unit)? = null,
 ) {
-    val colors = GrooveTheme.colors
-    val typography = GrooveTheme.typography
     val keyboard = LocalSoftwareKeyboardController.current
-    TextField(
-        value = value,
-        onValueChange = onValueChange,
-        enabled = enabled,
-        singleLine = true,
-        modifier = modifier
-            .fillMaxWidth()
-            .defaultMinSize(minWidth = 0.dp, minHeight = 52.dp),
-        textStyle = typography.body.toTextStyle().copy(color = colors.onSurface),
-        placeholder = {
-            Text(
-                text = placeholder,
-                style = typography.body.toTextStyle(),
-                color = colors.muted.copy(alpha = 0.72f),
-            )
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (label.isNotEmpty()) {
+            Text(text = label, style = LabelStyle)
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        TextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = enabled,
+            singleLine = true,
+            interactionSource = interaction,
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minWidth = 0.dp, minHeight = 48.dp)
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .border(
+                    width = 1.dp,
+                    color = if (focused) Color.White.copy(alpha = 0.20f) else GlassBorderColor,
+                    shape = RoundedCornerShape(RadiusControl),
+                ),
+            textStyle = ValueStyle,
+            placeholder = {
+                Text(text = placeholder, style = ValueStyle.copy(color = TokenMuted.copy(alpha = 0.45f)))
+            },
+            shape = RoundedCornerShape(RadiusControl),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+            keyboardActions = KeyboardActions(
+                onNext = { onNext?.invoke() },
+                onDone = {
+                    onDone?.invoke()
+                    keyboard?.hide()
+                },
+            ),
+            colors = glassFieldColors(),
+        )
+    }
+}
+
+@Composable
+private fun NumberGlassField(
+    label: String,
+    value: Int?,
+    placeholder: String,
+    enabled: Boolean,
+    onValueChange: (Int?) -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    imeAction: ImeAction = ImeAction.Done,
+    onNext: (() -> Unit)? = null,
+) {
+    var text by remember { mutableStateOf(value?.toString().orEmpty()) }
+    GlassTextField(
+        label = label,
+        value = text,
+        onValueChange = {
+            text = it
+            onValueChange(it.toIntOrNull())
         },
-        shape = RoundedCornerShape(14.dp),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = keyboardType,
-            imeAction = imeAction,
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = {
-                onDone?.invoke()
-                keyboard?.hide()
-            }
-        ),
-        colors = TextFieldDefaults.colors(
-            focusedTextColor = colors.onSurface,
-            unfocusedTextColor = colors.onSurface,
-            disabledTextColor = colors.onSurface.copy(alpha = 0.45f),
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-            disabledContainerColor = Color.White.copy(alpha = 0.03f),
-            cursorColor = colors.onSurface,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-            focusedPlaceholderColor = colors.muted.copy(alpha = 0.72f),
-            unfocusedPlaceholderColor = colors.muted.copy(alpha = 0.60f),
-        ),
+        placeholder = placeholder,
+        enabled = enabled,
+        modifier = modifier,
+        keyboardType = KeyboardType.Number,
+        imeAction = imeAction,
+        focusRequester = focusRequester,
+        onNext = onNext,
     )
 }
 
 @Composable
-private fun GlassTokenEditor(
+private fun TokenMenuField(
+    label: String,
+    placeholder: String,
     values: List<String>,
     suggestions: List<String>,
-    placeholder: String,
     enabled: Boolean,
     onValuesChange: (List<String>) -> Unit,
     onSearch: (String) -> Unit,
+    focusRequester: FocusRequester? = null,
 ) {
     var query by remember { mutableStateOf("") }
+    var menuOpen by remember { mutableStateOf(false) }
     val pending = query.trim()
-    val available = suggestions
-        .filter { it.isNotBlank() && it !in values }
-        .distinct()
-        .take(8)
-    val canAddCustom = pending.isNotEmpty() &&
-        pending !in values &&
-        available.none { it.equals(pending, ignoreCase = true) }
-    val showSuggestions = pending.isNotEmpty() && (available.isNotEmpty() || canAddCustom)
+    val available = suggestions.filter { it.isNotBlank() && it !in values }.distinct().take(8)
+    val canAdd = pending.isNotEmpty() && pending !in values
+    val showMenu = menuOpen && pending.isNotEmpty() && (available.isNotEmpty() || canAdd)
 
     fun commit(token: String) {
         val cleaned = token.trim()
         if (cleaned.isEmpty() || cleaned in values) return
         onValuesChange(values + cleaned)
         query = ""
+        menuOpen = false
         onSearch("")
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(text = label, style = LabelStyle)
         if (values.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
             FlowRow(
-                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 values.forEach { token ->
-                    TokenChip(
-                        label = token,
+                    FilterChip(
+                        selected = true,
+                        onClick = { if (enabled) onValuesChange(values.filterNot { it == token }) },
                         enabled = enabled,
-                        onRemove = { onValuesChange(values.filterNot { it == token }) },
+                        label = {
+                            Text(
+                                text = token,
+                                fontFamily = PoppinsFontFamily,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = XClose,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                            )
+                        },
+                        shape = RoundedCornerShape(RadiusControl),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color.White,
+                            selectedLabelColor = Color.Black,
+                            selectedTrailingIconColor = Color.Black,
+                            containerColor = TokenSurface,
+                            labelColor = TokenMuted,
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = enabled,
+                            selected = true,
+                            borderColor = Color.Transparent,
+                            selectedBorderColor = Color.Transparent,
+                            disabledBorderColor = Color.Transparent,
+                            disabledSelectedBorderColor = Color.Transparent,
+                        ),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .semantics { contentDescription = "Remove $token" },
                     )
                 }
             }
         }
-        GlassTextField(
-            value = query,
-            onValueChange = {
-                query = it
-                onSearch(it)
-            },
-            placeholder = placeholder,
-            enabled = enabled,
-            onDone = { commit(query) },
-        )
-        AnimatedVisibility(
-            visible = showSuggestions,
-            enter = fadeIn(tween(180)) + expandVertically(),
-            exit = fadeOut(tween(120)),
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Suggestions",
-                    style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                    color = GrooveTheme.colors.muted,
+        Spacer(modifier = Modifier.height(4.dp))
+        SuggestionMenu(
+            expanded = showMenu,
+            onDismiss = { menuOpen = false },
+            field = {
+                GlassTextField(
+                    label = "",
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        onSearch(it)
+                        menuOpen = it.isNotBlank()
+                    },
+                    placeholder = placeholder,
+                    enabled = enabled,
+                    focusRequester = focusRequester,
+                    onDone = { commit(query) },
                 )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (canAddCustom) {
-                        GlassPill(
-                            label = "Add “$pending”",
-                            enabled = enabled,
-                            emphasized = true,
-                            onClick = { commit(pending) },
-                            contentDescription = "Add $pending",
-                        )
-                    }
-                    available.forEach { suggestion ->
-                        GlassPill(
-                            label = suggestion,
-                            enabled = enabled,
-                            onClick = { commit(suggestion) },
-                            contentDescription = "Add $suggestion",
-                        )
-                    }
-                }
+            },
+        ) {
+            if (canAdd) {
+                GlassMenuItem(text = "Add “$pending”", onClick = { commit(pending) })
+            }
+            available.forEach { suggestion ->
+                GlassMenuItem(text = suggestion, onClick = { commit(suggestion) })
             }
         }
     }
 }
 
 @Composable
-private fun AlbumGlassField(
+private fun AlbumMenuField(
     album: String?,
     suggestions: List<String>,
     enabled: Boolean,
     onAlbumChange: (String?) -> Unit,
-    onSearchAlbums: (String) -> Unit,
+    onSearch: (String) -> Unit,
+    onNext: () -> Unit,
 ) {
     var text by remember { mutableStateOf(album.orEmpty()) }
-    val pending = text.trim()
+    var menuOpen by remember { mutableStateOf(false) }
     val available = suggestions
         .filter { it.isNotBlank() && !it.equals(text, ignoreCase = true) }
         .distinct()
         .take(8)
-    val showSuggestions = pending.isNotEmpty() && available.isNotEmpty()
+    val showMenu = menuOpen && text.isNotBlank() && available.isNotEmpty()
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        GlassTextField(
-            value = text,
-            onValueChange = {
-                text = it
-                onAlbumChange(it.ifBlank { null })
-                onSearchAlbums(it)
-            },
-            placeholder = "Album name",
-            enabled = enabled,
-        )
-        AnimatedVisibility(
-            visible = showSuggestions,
-            enter = fadeIn(tween(180)) + expandVertically(),
-            exit = fadeOut(tween(120)),
+    SuggestionMenu(
+        expanded = showMenu,
+        onDismiss = { menuOpen = false },
+        field = {
+            GlassTextField(
+                label = "Album",
+                value = text,
+                onValueChange = {
+                    text = it
+                    onAlbumChange(it.ifBlank { null })
+                    onSearch(it)
+                    menuOpen = it.isNotBlank()
+                },
+                placeholder = "Album name",
+                enabled = enabled,
+                imeAction = ImeAction.Next,
+                onNext = onNext,
+            )
+        },
+    ) {
+        available.forEach { suggestion ->
+            GlassMenuItem(
+                text = suggestion,
+                onClick = {
+                    text = suggestion
+                    onAlbumChange(suggestion)
+                    menuOpen = false
+                    onSearch(suggestion)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuggestionMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    field: @Composable () -> Unit,
+    items: @Composable () -> Unit,
+) {
+    var fieldWidth by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { fieldWidth = it.width },
+    ) {
+        field()
+        DropdownMenu(
+            expanded = expanded && fieldWidth > 0,
+            onDismissRequest = onDismiss,
+            modifier = Modifier.width(with(density) { fieldWidth.toDp() }),
+            shape = RoundedCornerShape(RadiusCard),
+            containerColor = TokenEdge,
+            tonalElevation = 0.dp,
+            shadowElevation = 6.dp,
+            border = BorderStroke(1.dp, GlassBorderColor),
+            properties = PopupProperties(focusable = false),
         ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            items()
+        }
+    }
+}
+
+@Composable
+private fun GlassMenuItem(
+    text: String,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = text,
+                fontFamily = PoppinsFontFamily,
+                fontSize = 14.sp,
+                color = TokenMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = 48.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun GlassPanel(
+    artworkModel: Any?,
+    modifier: Modifier = Modifier,
+    fill: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val shape = RoundedCornerShape(RadiusCard)
+    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    Box(
+        modifier = modifier
+            .shadow(
+                elevation = 4.dp,
+                shape = shape,
+                ambientColor = Color.Black.copy(alpha = 0.28f),
+                spotColor = Color.Black.copy(alpha = 0.35f),
+            )
+            .border(1.dp, GlassBorderColor, shape)
+            .clip(shape),
+    ) {
+        if (artworkModel != null && canBlur) {
+            AsyncImage(
+                model = ImageRequest.Builder(context).data(artworkModel).build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(28.dp),
+            )
+        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(TokenSurface.copy(alpha = GlassFillAlpha)),
+        )
+        Box(
+            modifier = Modifier
+                .padding(16.dp)
+                .then(if (fill) Modifier.fillMaxSize() else Modifier),
+        ) {
+            content()
+        }
+    }
+}
+
+@Composable
+private fun GlassFooter(
+    canSave: Boolean,
+    isSaving: Boolean,
+    onDiscard: () -> Unit,
+    onSave: () -> Unit,
+    inset: Boolean = false,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (inset) {
+                    Modifier
+                } else {
+                    Modifier.background(TokenSurface.copy(alpha = 0.70f))
+                },
+            ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(GlassBorderColor),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            TextButton(
+                onClick = onDiscard,
+                enabled = !isSaving,
+                modifier = Modifier.heightIn(min = 48.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = TokenMuted,
+                    disabledContentColor = TokenMuted.copy(alpha = 0.38f),
+                ),
             ) {
-                available.forEach { suggestion ->
-                    GlassPill(
-                        label = suggestion,
-                        enabled = enabled,
-                        onClick = {
-                            text = suggestion
-                            onAlbumChange(suggestion)
-                            onSearchAlbums(suggestion)
-                        },
-                        contentDescription = "Use album $suggestion",
+                Text(
+                    text = "Discard",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Button(
+                onClick = onSave,
+                enabled = canSave,
+                modifier = Modifier.heightIn(min = 48.dp),
+                shape = RoundedCornerShape(RadiusControl),
+                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Black,
+                    disabledContainerColor = Color.White.copy(alpha = 0.28f),
+                    disabledContentColor = Color.Black.copy(alpha = 0.45f),
+                ),
+            ) {
+                Text(
+                    text = if (isSaving) "Saving…" else "Save",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SaveErrorLine(message: String?) {
+    if (message.isNullOrBlank()) return
+    Text(
+        text = message,
+        color = GrooveTheme.colors.error,
+        fontFamily = PoppinsFontFamily,
+        fontSize = 13.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun DiscardConfirmDialog(
+    onNo: () -> Unit,
+    onYes: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onNo,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onNo,
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(horizontal = 32.dp)
+                    .widthIn(max = 340.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
                     )
+                    .shadow(4.dp, RoundedCornerShape(RadiusCard))
+                    .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusCard))
+                    .clip(RoundedCornerShape(RadiusCard))
+                    .background(TokenSurface.copy(alpha = 0.92f))
+                    .padding(20.dp),
+            ) {
+                Text(
+                    text = "Discard changes?",
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp,
+                    color = Color.White,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Your edits will be lost.",
+                    fontFamily = PoppinsFontFamily,
+                    fontSize = 13.sp,
+                    color = TokenMuted,
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = onNo,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        colors = ButtonDefaults.textButtonColors(contentColor = TokenMuted),
+                    ) {
+                        Text(
+                            text = "No",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onYes,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(RadiusControl),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black,
+                        ),
+                    ) {
+                        Text(
+                            text = "Yes",
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
             }
         }
@@ -1124,223 +1521,57 @@ private fun AlbumGlassField(
 }
 
 @Composable
-private fun YearGlassField(
-    year: Int?,
-    enabled: Boolean,
-    onYearChange: (Int?) -> Unit,
-) {
-    var text by remember { mutableStateOf(year?.toString().orEmpty()) }
-    GlassTextField(
-        value = text,
-        onValueChange = {
-            text = it.filter { ch -> ch.isDigit() }.take(4)
-            onYearChange(text.toIntOrNull())
-        },
-        placeholder = "Year",
-        enabled = enabled,
-        keyboardType = KeyboardType.Number,
-    )
-}
-
-@Composable
-private fun TrackGlassField(
-    trackNumber: Int?,
-    enabled: Boolean,
-    onTrackNumberChange: (Int?) -> Unit,
-) {
-    var text by remember { mutableStateOf(trackNumber?.toString().orEmpty()) }
-    GlassTextField(
-        value = text,
-        onValueChange = {
-            text = it.filter { ch -> ch.isDigit() }.take(4)
-            onTrackNumberChange(text.toIntOrNull())
-        },
-        placeholder = "Track number",
-        enabled = enabled,
-        keyboardType = KeyboardType.Number,
-    )
-}
-
-@Composable
-private fun UseAlbumYearRow(
-    useAlbumYear: Boolean,
-    enabled: Boolean,
-    onUseAlbumYearChange: (Boolean) -> Unit,
-) {
-    val colors = GrooveTheme.colors
-    val typography = GrooveTheme.typography
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(
-                text = "Use album year",
-                style = typography.body.toTextStyle(),
-                color = colors.onSurface,
-            )
-            Text(
-                text = if (useAlbumYear) "Year follows the album" else "Set a year on this song",
-                style = typography.sectionItemSubtitle.toTextStyle(),
-                color = colors.muted,
-            )
-        }
-        Switch(
-            checked = useAlbumYear,
-            onCheckedChange = onUseAlbumYearChange,
-            enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = colors.onAccent,
-                checkedTrackColor = colors.accent,
-                uncheckedThumbColor = colors.onSurface,
-                uncheckedTrackColor = colors.onSurface.copy(alpha = 0.22f),
-                uncheckedBorderColor = colors.onSurface.copy(alpha = 0.28f),
-            ),
-        )
-    }
-}
-
-@Composable
-private fun TokenChip(
-    label: String,
-    enabled: Boolean,
-    onRemove: () -> Unit,
-) {
-    val colors = GrooveTheme.colors
-    Row(
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.14f))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(50))
-            .clickable(enabled = enabled, onClick = onRemove)
-            .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
-            .semantics { contentDescription = "Remove $label" },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = label,
-            style = GrooveTheme.typography.buttonLabel.toTextStyle(),
-            color = colors.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Icon(
-            imageVector = XClose,
-            contentDescription = null,
-            tint = colors.onSurface.copy(alpha = 0.75f),
-            modifier = Modifier.size(14.dp),
-        )
-    }
-}
-
-@Composable
-private fun GlassPill(
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    contentDescription: String,
-    emphasized: Boolean = false,
-) {
-    val colors = GrooveTheme.colors
-    val border = if (emphasized) colors.accent.copy(alpha = 0.85f) else Color.White.copy(alpha = 0.22f)
-    val fill = if (emphasized) colors.accent.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.06f)
-    Text(
-        text = label,
-        style = GrooveTheme.typography.buttonLabel.toTextStyle(),
-        color = colors.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .heightIn(min = 40.dp)
-            .clip(RoundedCornerShape(50))
-            .background(fill)
-            .border(1.dp, border, RoundedCornerShape(50))
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-            .semantics { this.contentDescription = contentDescription },
-    )
-}
-
-@Composable
-private fun SaveErrorBanner(
-    message: String,
-    modifier: Modifier = Modifier,
-) {
-    val colors = GrooveTheme.colors
-    Text(
-        text = message,
-        style = GrooveTheme.typography.body.toTextStyle(),
-        color = colors.error,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(colors.error.copy(alpha = 0.16f))
-            .border(1.dp, colors.error.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-    )
-}
-
-private fun Modifier.frostedPanel(shape: Shape): Modifier = this
-    .border(
-        width = 1.dp,
-        brush = Brush.verticalGradient(
-            colors = listOf(
-                Color.White.copy(alpha = 0.38f),
-                Color.White.copy(alpha = 0.08f),
-            )
-        ),
-        shape = shape,
-    )
-    .clip(shape)
-    .drawWithCache {
-        val veil = Brush.verticalGradient(
-            colorStops = arrayOf(
-                0.00f to Color.White.copy(alpha = 0.16f),
-                0.45f to Color.White.copy(alpha = 0.05f),
-                1.00f to Color.Black.copy(alpha = 0.22f),
-            )
-        )
-        onDrawBehind {
-            drawRect(Color.Black.copy(alpha = 0.62f))
-            drawRect(brush = veil)
-            drawRect(
-                color = Color.White.copy(alpha = 0.20f),
-                size = androidx.compose.ui.geometry.Size(size.width, 1.dp.toPx()),
-            )
-        }
-    }
-
-private val labelShadow = Shadow(
-    color = Color.Black.copy(alpha = 0.72f),
-    offset = Offset(0f, 1f),
-    blurRadius = 8f,
+private fun glassFieldColors() = TextFieldDefaults.colors(
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    disabledTextColor = Color.White.copy(alpha = 0.38f),
+    focusedContainerColor = TokenEdge.copy(alpha = 0.72f),
+    unfocusedContainerColor = TokenEdge.copy(alpha = 0.55f),
+    disabledContainerColor = TokenEdge.copy(alpha = 0.35f),
+    cursorColor = Color.White,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+    focusedPlaceholderColor = TokenMuted.copy(alpha = 0.45f),
+    unfocusedPlaceholderColor = TokenMuted.copy(alpha = 0.45f),
 )
 
-private fun Color.deepened(amount: Float = 0.58f): Color = copy(
-    red = red * amount,
-    green = green * amount,
-    blue = blue * amount,
-    alpha = 1f,
-)
+@Composable
+private fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember {
+        val duration = runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        }.getOrDefault(1f)
+        val transition = runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.TRANSITION_ANIMATION_SCALE, 1f)
+        }.getOrDefault(1f)
+        duration == 0f || transition == 0f
+    }
+}
 
 private fun ByteArray?.hasArtwork(): Boolean = this != null && this.isNotEmpty()
 
-private fun List<String>.asCreditLine(): String =
-    if (isEmpty()) "Unknown artist" else joinToString(separator = " · ")
+private fun EditMetadataUiState.sameEdits(other: EditMetadataUiState): Boolean {
+    if (title != other.title) return false
+    if (genres != other.genres) return false
+    if (artists != other.artists) return false
+    if (album != other.album) return false
+    if (year != other.year) return false
+    if (trackNumber != other.trackNumber) return false
+    if (useAlbumYear != other.useAlbumYear) return false
+    if (artworkMimeType != other.artworkMimeType) return false
+    val left = artworkBytes
+    val right = other.artworkBytes
+    if (left == null || right == null) return left == null && right == null
+    return left.contentEquals(right)
+}
 
 private fun Song.withEditedMetadata(state: EditMetadataUiState): Song {
     val newAlbum = state.album?.let { newName ->
         val existing = album
         if (existing != null) {
-            existing.copy(
-                id = makeAlbumId(existing.artist, newName),
-                name = newName,
-            )
+            existing.copy(id = makeAlbumId(existing.artist, newName), name = newName)
         } else {
             Album(
                 id = makeAlbumId(state.artists.firstOrNull() ?: artist, newName),
