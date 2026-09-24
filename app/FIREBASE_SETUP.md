@@ -2,7 +2,7 @@
 
 ## App Distribution
 
-Over-the-air installs and updates (no USB) are documented in [DISTRIBUTE.md](DISTRIBUTE.md).
+Over-the-air installs and updates (no USB) are documented in [DISTRIBUTE.md](DISTRIBUTE.md). Merging or pushing to `test` runs Distribute APK and publishes to Firebase App Tester. `main` is production; do not use it as the OTA target. Mobi and others should land WIP and test builds on `test`.
 
 That checklist covers the Firebase Android app (`com.aethelsoft.grooveplayer`), `app/google-services.json`, the `testers` group, the App Distribution service account, and the GitHub Actions secrets the workflow needs.
 
