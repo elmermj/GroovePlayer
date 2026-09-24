@@ -88,13 +88,19 @@ Back up the `.jks` and the three release passwords somewhere private (for exampl
 
 ## 7. Run the workflow
 
-GitHub → **Actions → Distribute APK → Run workflow**.
+`main` is matured production only. Do not treat it as the OTA or tester target, and do not push tester builds there.
 
-- Branch: `main`
+`test` is the testing branch. A merge or push to `test` that changes `app/**`, Gradle files, or this workflow runs **Distribute APK** and publishes the signed APK to Firebase App Tester. Pushes to `main` do not run this workflow.
+
+A future `launch` branch will handle automated Play Store submission. That pipeline is not built yet.
+
+Mobi and anyone else landing WIP or test builds should put those commits on `test`, not `main`.
+
+You can also run it by hand: GitHub → **Actions → Distribute APK → Run workflow**. Manual runs are unchanged; pick the branch that should be built.
+
+- Branch: `test`
 - `notes`: optional text for testers
 - `groups`: leave as `testers` unless you created another alias
-
-A push to `main` that changes `app/**`, Gradle files, or this workflow also runs it.
 
 When it finishes, open App Tester on the phone and install or update GroovePlayer. The run also keeps a copy of the APK under Actions artifacts, named `grooveplayer-dev-release`.
 
