@@ -194,14 +194,22 @@ fun PlayerQueueComponent(
                         enableDismissFromStartToEnd = false,
                         gesturesEnabled = canEdit && !isPlaying,
                         backgroundContent = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(GrooveTheme.colors.error)
-                                    .padding(horizontal = M_PADDING),
-                                contentAlignment = Alignment.CenterEnd,
-                            ) {
-                                Text("Remove", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                            val revealed =
+                                dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+                            if (revealed) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(GrooveTheme.colors.error)
+                                        .padding(horizontal = M_PADDING),
+                                    contentAlignment = Alignment.CenterEnd,
+                                ) {
+                                    Text(
+                                        "Remove",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
+                                }
                             }
                         },
                     ) {
@@ -210,6 +218,8 @@ fun PlayerQueueComponent(
                             isPlaying = isPlaying,
                             onClick = { onItemClick(index) },
                             handle = handle,
+                            // Covers the red Remove background until the row is actually swiped.
+                            containerColor = GrooveTheme.colors.canvas,
                         )
                     }
                 } else {
@@ -240,8 +250,13 @@ private fun SideQueueRow(
     onClick: () -> Unit,
     handle: Modifier?,
     modifier: Modifier = Modifier,
+    containerColor: Color = Color.Transparent,
 ) {
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(containerColor),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

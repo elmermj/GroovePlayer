@@ -57,8 +57,9 @@ fun EqualizerControlsComponent(
     isSimplified: Boolean = false,
     /**
      * Phone FullPlayer bottom sheet: same logic as Tablet, but changes save automatically (no Save button),
-     * bands are at least 48dp wide and scroll sideways, dB sits above each slider and the frequency below,
-     * and sliders dim while EQ is off. [onSliderDragChange] lets the phone sheet ignore drags that start on a band.
+     * bands are at least 48dp wide and scroll sideways, dB sits above each slider and the frequency below.
+     * [onSliderDragChange] lets the phone sheet ignore drags that start on a band.
+     * Whenever the equalizer switch is off, band sliders (every variant) dim and ignore pointer input.
      */
     isPhoneSheet: Boolean = false,
     onSliderDragChange: (Boolean) -> Unit = {},
@@ -237,9 +238,10 @@ private fun SimplifiedEqualizerControlsComponent(
                 )
             }
 
-            // Frequency bands
+            // Frequency bands stay visible but ignore drags while the equalizer is off.
             FrequencyBands(
                 equalizerState = equalizerState,
+                enabled = equalizerState.isEnabled,
                 onBandLevelChanged = { band, level ->
                     scope.launch {
                         viewModel.setBandLevel(band, level)
@@ -293,7 +295,6 @@ private fun FullEqualizerControlsComponent(
             }
         }
     }
-    val controlsDimmed = isPhoneSheet && !equalizerState.isEnabled
     Column(
         modifier = modifier
             .then(if (isPhoneSheet) Modifier else Modifier.widthIn(max = 360.dp))
@@ -398,9 +399,7 @@ private fun FullEqualizerControlsComponent(
             }
         } else {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .graphicsLayer { alpha = if (controlsDimmed) 0.38f else 1f },
+                modifier = Modifier.fillMaxWidth(),
             ) {
             // Preset selector. Phone sheet puts Reset in the header.
             if (equalizerState.availablePresets.isNotEmpty()) {
@@ -424,9 +423,10 @@ private fun FullEqualizerControlsComponent(
                 Spacer(modifier = Modifier.height(S_PADDING))
             }
 
-            // Frequency bands
+            // Presets and Reset stay usable. Only the bands dim and drop pointer input.
             FrequencyBands(
                 equalizerState = equalizerState,
+                enabled = equalizerState.isEnabled,
                 onBandLevelChanged = { band, level ->
                     scope.launch {
                         viewModel.setBandLevel(band, level)
@@ -605,11 +605,14 @@ private fun presetChipBorder(selected: Boolean) = FilterChipDefaults.filterChipB
 private fun FrequencyBands(
     equalizerState: EqualizerState,
     onBandLevelChanged: (Int, Int) -> Unit,
+    enabled: Boolean,
     isPhoneSheet: Boolean = false,
     onSliderDragChange: (Boolean) -> Unit = {},
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = if (enabled) 1f else DisabledBandAlpha },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -634,6 +637,7 @@ private fun FrequencyBands(
         ) {
             repeat(equalizerState.numberOfBands) { band ->
                 FrequencyBandSlider(
+                    enabled = enabled,
                     isPhoneSheet = isPhoneSheet,
                     onSliderDragChange = onSliderDragChange,
                     band = band,
@@ -655,6 +659,7 @@ private fun FrequencyBands(
 
 @Composable
 private fun FrequencyBandSlider(
+    enabled: Boolean,
     isPhoneSheet: Boolean = false,
     onSliderDragChange: (Boolean) -> Unit = {},
     band: Int,
@@ -734,6 +739,7 @@ private fun FrequencyBandSlider(
             // Slider thumb (interactive area - full width for easier interaction)
             VerticalSlider(
                 value = sliderValue,
+                enabled = enabled,
                 onValueChange = { newValue ->
                     // newValue is 0-1 where 0 = bottom (minLevel), 1 = top (maxLevel)
                     // Convert directly to millibels
@@ -764,19 +770,30 @@ private fun VerticalSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     onDragActiveChange: (Boolean) -> Unit = {},
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val currentOnValueChange = rememberUpdatedState(onValueChange)
     val currentOnDragActiveChange = rememberUpdatedState(onDragActiveChange)
     Box(
         modifier = modifier
-            .nestedScroll(BandSliderScrollLock)
-            .pointerInput(Unit) {
+            .then(if (enabled) Modifier.nestedScroll(BandSliderScrollLock) else Modifier)
+            .pointerInput(enabled) {
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        // Consume so a parent (e.g. the Phone EQ bottom sheet) doesn't treat slider drags as sheet drags.
+                        // Consume so a parent (e.g. the Phone EQ bottom sheet) doesn't treat this as a sheet drag.
                         down.consume()
+                        if (!enabled) {
+                            // Equalizer is off: swallow the gesture without moving the band.
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.first()
+                                change.consume()
+                                if (!change.pressed) break
+                            }
+                            continue
+                        }
                         currentOnDragActiveChange.value(true)
                         try {
                             val height = size.height.toFloat().coerceAtLeast(1f)
@@ -804,6 +821,8 @@ private fun VerticalSlider(
             }
     )
 }
+
+private const val DisabledBandAlpha = 0.38f
 
 private fun formatFrequency(hz: Int): String {
     return when {
