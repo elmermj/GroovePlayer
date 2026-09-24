@@ -8,7 +8,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableFloatStateOf
@@ -33,7 +38,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import kotlinx.coroutines.CoroutineScope
+
+/** Eats vertical drags so a parent bottom sheet does not move while a band slider is dragged. */
+private val BandSliderScrollLock = object : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        return if (source == NestedScrollSource.UserInput) Offset(0f, available.y) else Offset.Zero
+    }
+
+    override suspend fun onPreFling(available: Velocity): Velocity = available
+}
 
 @Composable
 fun EqualizerControlsComponent(
@@ -43,9 +58,10 @@ fun EqualizerControlsComponent(
     /**
      * Phone FullPlayer bottom sheet: same logic as Tablet, but changes save automatically (no Save button),
      * bands are at least 48dp wide and scroll sideways, dB sits above each slider and the frequency below,
-     * and sliders dim while EQ is off.
+     * and sliders dim while EQ is off. [onSliderDragChange] lets the phone sheet ignore drags that start on a band.
      */
     isPhoneSheet: Boolean = false,
+    onSliderDragChange: (Boolean) -> Unit = {},
 ) {
     val equalizerState by viewModel.equalizerState.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
@@ -77,6 +93,7 @@ fun EqualizerControlsComponent(
             hasUnsavedChanges = hasUnsavedChanges,
             scope = scope,
             isPhoneSheet = isPhoneSheet,
+            onSliderDragChange = onSliderDragChange,
         )
     }
 
@@ -265,7 +282,18 @@ private fun FullEqualizerControlsComponent(
     hasUnsavedChanges: Boolean,
     scope: CoroutineScope,
     isPhoneSheet: Boolean = false,
+    onSliderDragChange: (Boolean) -> Unit = {},
 ) {
+    val resetEqualizer: () -> Unit = {
+        scope.launch {
+            try {
+                viewModel.reset()
+            } catch (e: Exception) {
+                Log.e("EqualizerControls", "Error resetting equalizer: ${e.message}", e)
+            }
+        }
+    }
+    val controlsDimmed = isPhoneSheet && !equalizerState.isEnabled
     Column(
         modifier = modifier
             .then(if (isPhoneSheet) Modifier else Modifier.widthIn(max = 360.dp))
@@ -284,17 +312,26 @@ private fun FullEqualizerControlsComponent(
                 "Equalizer",
                 style = MaterialTheme.typography.titleLarge,
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = if (isPhoneSheet) FontWeight.Medium else FontWeight.Bold
             )
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                if (isPhoneSheet) {
+                    TextButton(onClick = resetEqualizer) {
+                        Text(
+                            "Reset",
+                            color = GrooveTheme.colors.muted,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
+                }
                 Text(
                     if (equalizerState.isEnabled) "On" else "Off",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (equalizerState.isEnabled) Color.White else Color.White.copy(alpha = 0.6f)
+                    color = if (equalizerState.isEnabled) Color.White else GrooveTheme.colors.muted
                 )
                 Switch(
                     checked = equalizerState.isEnabled,
@@ -360,7 +397,12 @@ private fun FullEqualizerControlsComponent(
                 )
             }
         } else {
-            // Preset selector
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = if (controlsDimmed) 0.38f else 1f },
+            ) {
+            // Preset selector. Phone sheet puts Reset in the header.
             if (equalizerState.availablePresets.isNotEmpty()) {
                 PresetSelector(
                     presets = equalizerState.availablePresets,
@@ -374,16 +416,10 @@ private fun FullEqualizerControlsComponent(
                             }
                         }
                     },
-                    onReset = {
-                        scope.launch {
-                            try {
-                                viewModel.reset()
-                            } catch (e: Exception) {
-                                Log.e("EqualizerControls", "Error resetting equalizer: ${e.message}", e)
-                            }
-                        }
-                    },
-                    isSimplified = false
+                    onReset = resetEqualizer,
+                    isSimplified = false,
+                    showReset = !isPhoneSheet,
+                    sheetStyle = isPhoneSheet,
                 )
                 Spacer(modifier = Modifier.height(S_PADDING))
             }
@@ -397,7 +433,9 @@ private fun FullEqualizerControlsComponent(
                     }
                 },
                 isPhoneSheet = isPhoneSheet,
+                onSliderDragChange = onSliderDragChange,
             )
+            }
 
             // Save Settings Button (Phone sheet auto-saves instead)
             if (!isPhoneSheet) {
@@ -435,6 +473,8 @@ private fun PresetSelector(
     onPresetSelected: (Int) -> Unit,
     onReset: () -> Unit,
     isSimplified: Boolean,
+    showReset: Boolean = true,
+    sheetStyle: Boolean = false,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -450,7 +490,7 @@ private fun PresetSelector(
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White
             )
-            if (isSimplified){
+            if (showReset && isSimplified){
                 Box(
                     modifier = Modifier
                         .clickable(
@@ -464,7 +504,7 @@ private fun PresetSelector(
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
-            } else {
+            } else if (showReset) {
                 TextButton(
                     onClick = onReset,
                 ) {
@@ -490,15 +530,15 @@ private fun PresetSelector(
                 .horizontalScroll(scrollState)
                 .background(
                     Brush.horizontalGradient(
-                        listOf<Color>(
-                            Color.Black,
+                        listOf(
+                            if (sheetStyle) GrooveTheme.colors.edgeGradient else Color.Black,
                             Color.Transparent,
                             Color.Transparent,
                             Color.Transparent,
                             Color.Transparent,
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black,
+                            if (sheetStyle) GrooveTheme.colors.edgeGradient else Color.Black,
                         )
                     )
                 ),
@@ -516,13 +556,9 @@ private fun PresetSelector(
                             fontSize = 12.sp
                         )
                     },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color.White,
-                        selectedLabelColor = Color.Black,
-                        containerColor = Color.White.copy(alpha = 0.2f),
-                        labelColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(100.dp)
+                    colors = presetChipColors(),
+                    border = presetChipBorder(selected = currentPreset == index),
+                    shape = if (sheetStyle) RoundedCornerShape(GrooveTheme.radii.chip) else RoundedCornerShape(100.dp)
                 )
             }
             
@@ -538,12 +574,9 @@ private fun PresetSelector(
                             fontSize = 12.sp
                         )
                     },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color.White,
-                        selectedLabelColor = Color.Black,
-                        containerColor = Color.White.copy(alpha = 0.2f),
-                        labelColor = Color.White
-                    )
+                    colors = presetChipColors(),
+                    border = presetChipBorder(selected = true),
+                    shape = if (sheetStyle) RoundedCornerShape(GrooveTheme.radii.chip) else RoundedCornerShape(100.dp)
                 )
             }
         }
@@ -551,16 +584,32 @@ private fun PresetSelector(
 }
 
 @Composable
+private fun presetChipColors() = FilterChipDefaults.filterChipColors(
+    selectedContainerColor = Color.White,
+    selectedLabelColor = Color.Black,
+    containerColor = GrooveTheme.colors.inactive,
+    labelColor = Color.White,
+)
+
+@Composable
+private fun presetChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
+    enabled = true,
+    selected = selected,
+    borderColor = Color.Transparent,
+    selectedBorderColor = Color.Transparent,
+    disabledBorderColor = Color.Transparent,
+    disabledSelectedBorderColor = Color.Transparent,
+)
+
+@Composable
 private fun FrequencyBands(
     equalizerState: EqualizerState,
     onBandLevelChanged: (Int, Int) -> Unit,
     isPhoneSheet: Boolean = false,
+    onSliderDragChange: (Boolean) -> Unit = {},
 ) {
-    val dimAlpha = if (isPhoneSheet && !equalizerState.isEnabled) 0.38f else 1f
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .graphicsLayer { alpha = dimAlpha },
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -586,6 +635,7 @@ private fun FrequencyBands(
             repeat(equalizerState.numberOfBands) { band ->
                 FrequencyBandSlider(
                     isPhoneSheet = isPhoneSheet,
+                    onSliderDragChange = onSliderDragChange,
                     band = band,
                     frequency = equalizerState.bandFrequencies.getOrElse(band) { 0 },
                     level = equalizerState.bandLevels.getOrElse(band) { 0 },
@@ -606,6 +656,7 @@ private fun FrequencyBands(
 @Composable
 private fun FrequencyBandSlider(
     isPhoneSheet: Boolean = false,
+    onSliderDragChange: (Boolean) -> Unit = {},
     band: Int,
     frequency: Int,
     level: Int,
@@ -624,7 +675,7 @@ private fun FrequencyBandSlider(
     // This maps directly to the vertical position
     val sliderValue = normalizedLevel
     
-    val bandWidth = if (isPhoneSheet) 48.dp else 40.dp
+    val bandWidth = if (isPhoneSheet) 56.dp else 40.dp
     Column(
         modifier = Modifier.width(bandWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -690,8 +741,10 @@ private fun FrequencyBandSlider(
                     val newLevel = (clampedValue * (maxLevel - minLevel) + minLevel).toInt()
                     onLevelChanged(newLevel)
                 },
+                onDragActiveChange = onSliderDragChange,
                 modifier = Modifier
                     .fillMaxSize()
+                    .widthIn(min = if (isPhoneSheet) 48.dp else 0.dp)
             )
         }
         
@@ -710,38 +763,41 @@ private fun FrequencyBandSlider(
 private fun VerticalSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
+    onDragActiveChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val currentOnValueChange = rememberUpdatedState(onValueChange)
+    val currentOnDragActiveChange = rememberUpdatedState(onDragActiveChange)
     Box(
         modifier = modifier
+            .nestedScroll(BandSliderScrollLock)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         // Consume so a parent (e.g. the Phone EQ bottom sheet) doesn't treat slider drags as sheet drags.
                         down.consume()
-                        val height = size.height.toFloat()
-                        // Convert Y position to slider value: 0 = bottom, 1 = top
-                        // Y increases downward, so we invert: 1 - (y / height)
-                        val newValue = (1f - (down.position.y / height)).coerceIn(0f, 1f)
-                        onValueChange(newValue)
-                        
-                        // Continue tracking drag
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.first()
-                            
-                            if (!change.pressed) {
-                                waitForUpOrCancellation()
-                                break
-                            }
-                            
-                            change.consume()
-                            val currentY = change.position.y
-                            val height = size.height.toFloat()
+                        currentOnDragActiveChange.value(true)
+                        try {
+                            val height = size.height.toFloat().coerceAtLeast(1f)
                             // Convert Y position to slider value: 0 = bottom, 1 = top
-                            val newValue = (1f - (currentY / height)).coerceIn(0f, 1f)
-                            onValueChange(newValue)
+                            currentOnValueChange.value((1f - (down.position.y / height)).coerceIn(0f, 1f))
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.first()
+
+                                if (!change.pressed) {
+                                    waitForUpOrCancellation()
+                                    break
+                                }
+
+                                change.consume()
+                                val currentHeight = size.height.toFloat().coerceAtLeast(1f)
+                                currentOnValueChange.value((1f - (change.position.y / currentHeight)).coerceIn(0f, 1f))
+                            }
+                        } finally {
+                            currentOnDragActiveChange.value(false)
                         }
                     }
                 }

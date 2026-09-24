@@ -72,6 +72,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsCompo
 import com.aethelsoft.grooveplayer.presentation.player.ui.GlowingArtworkContainer
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
+import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneUpNextPeekRow
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
@@ -121,6 +122,43 @@ fun LargeTabletPlayerLayout(
     val songDetailsSheetState by playerViewModel.songDetailsSheetState.collectAsState()
     val overlaysBlockingPullUp = showQueue || showBluetoothSheet || showEqualizer
     val bottomSafeInset = navigationBarsInset()
+    val currentQueueIndex = queue.indexOfFirst { it.id == song?.id }
+    val nextSong = if (currentQueueIndex >= 0) queue.getOrNull(currentQueueIndex + 1) else null
+
+    fun hideSongDetails() {
+        if (playerViewModel.songDetailsSheetState.value != PlayerSongDetailsSheetState.Hidden) {
+            playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Hidden)
+        }
+    }
+
+    // Queue, equalizer and Bluetooth are mutually exclusive. Song Details stays closed while any is open.
+    fun toggleQueue() {
+        val open = !showQueue
+        if (open) {
+            showEqualizer = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
+        showQueue = open
+    }
+    fun toggleEqualizer() {
+        val open = !showEqualizer
+        if (open) {
+            showQueue = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
+        showEqualizer = open
+    }
+    fun toggleBluetooth() {
+        val open = !showBluetoothSheet
+        if (open) {
+            showQueue = false
+            showEqualizer = false
+            hideSongDetails()
+        }
+        showBluetoothSheet = open
+    }
 
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
@@ -155,15 +193,6 @@ fun LargeTabletPlayerLayout(
         }
     }
 
-    // Ensure showBluetoothSheet and showQueue are never true at the same time
-    LaunchedEffect(showBluetoothSheet, showQueue) {
-        if (showBluetoothSheet && showQueue) {
-            // If both are true, close the one that wasn't just opened
-            // This is a safeguard in case both get set to true somehow
-            showQueue = false
-        }
-    }
-    
     // Auto-start scanning when Bluetooth sheet is opened
     LaunchedEffect(showBluetoothSheet, hasBluetoothPermissions) {
         if (showBluetoothSheet &&
@@ -249,15 +278,7 @@ fun LargeTabletPlayerLayout(
                     PlayerShareButton(song = song)
                     ToggledIconButton(
                         state = showBluetoothSheet,
-                        onClick = {
-                            if (!showBluetoothSheet) {
-                                // If opening bluetooth sheet, close queue first
-                                if (showQueue) {
-                                    showQueue = false
-                                }
-                            }
-                            showBluetoothSheet = !showBluetoothSheet
-                        },
+                        onClick = { toggleBluetooth() },
                         activeBackground = Color.White,
                         inactiveBackground = Color.Transparent,
                     ) {
@@ -367,7 +388,7 @@ fun LargeTabletPlayerLayout(
                         horizontalAlignment = Alignment.End
                     ) {
                         Text(
-                            text = "Queue",
+                            text = if (queue.isNotEmpty()) "Queue · ${queue.size}" else "Queue",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(S_PADDING * 2),
@@ -378,17 +399,11 @@ fun LargeTabletPlayerLayout(
                         PlayerQueueComponent(
                             currentSong = song,
                             queue = queue,
-                            onItemClick = { selectedSong ->
-                                playerViewModel.setQueue(
-                                    queue,
-                                    queue.indexOf(selectedSong),
-                                    isEndlessQueue = true
-                                )
-                                showQueue = false
-                            },
+                            onItemClick = { index -> playerViewModel.skipToQueueItem(index) },
                             maxHeight = maxArtworkHeight,
                             onRemove = { index -> playerViewModel.removeQueueItem(index) },
                             onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                            onRestore = { index, removed -> playerViewModel.restoreQueueItem(index, removed) },
                         )
                     }
                 }
@@ -547,7 +562,7 @@ fun LargeTabletPlayerLayout(
                         ) {
                             ToggledIconButton(
                                 state = showEqualizer,
-                                onClick = { showEqualizer = !showEqualizer },
+                                onClick = { toggleEqualizer() },
                                 activeBackground = Color.White,
                                 inactiveBackground = Color.Transparent,
                             ) {
@@ -560,15 +575,7 @@ fun LargeTabletPlayerLayout(
                             Spacer(modifier = Modifier.width(L_PADDING * 2))
                             ToggledIconButton(
                                 state = showQueue,
-                                onClick = { 
-                                    if (!showQueue) {
-                                        // If opening queue, close bluetooth sheet first
-                                        if (showBluetoothSheet) {
-                                            showBluetoothSheet = false
-                                        }
-                                    }
-                                    showQueue = !showQueue
-                                },
+                                onClick = { toggleQueue() },
                                 activeBackground = Color.White,
                                 inactiveBackground = Color.Transparent,
                             ){
@@ -581,6 +588,12 @@ fun LargeTabletPlayerLayout(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(S_PADDING))
+                    PhoneUpNextPeekRow(
+                        nextSong = nextSong,
+                        onClick = { if (!showQueue) toggleQueue() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     Spacer(modifier = Modifier.height(S_PADDING))
                     VisualizationControl(
                         currentMode = visualizationMode,
