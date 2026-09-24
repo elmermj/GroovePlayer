@@ -13,6 +13,7 @@ import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
 import com.aethelsoft.grooveplayer.domain.playback.adjustedQueueStartIndex
 import com.aethelsoft.grooveplayer.domain.playback.playbackDecision
 import com.aethelsoft.grooveplayer.domain.playback.playbackStreamUri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,6 +97,21 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
         song: Song,
         purgeNow: Boolean = true,
     ): ResolvedPlayback {
+        return try {
+            resolveOneOrDrop(song, purgeNow)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // A closed Room pool, a missing sourcePath column, or a lookup failure must
+            // not crash cold start. A file that still opens locally keeps playing.
+            localFallback(song) ?: ResolvedPlayback.Dropped(song.id, PlaybackDropReason.UNAVAILABLE)
+        }
+    }
+
+    private suspend fun resolveOneOrDrop(
+        song: Song,
+        purgeNow: Boolean,
+    ): ResolvedPlayback {
         val logicalPath = song.filePath ?: catalog.sourcePath(song.id)
         val localUri = localPlayableUri(song, logicalPath)
         if (localUri != null) {
@@ -142,6 +158,13 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
                 },
             )
         }
+    }
+
+    private fun localFallback(song: Song): ResolvedPlayback.Playable? {
+        val localUri = runCatching { localPlayableUri(song, song.filePath) }.getOrNull() ?: return null
+        return ResolvedPlayback.Playable(
+            if (localUri == song.uri) song else song.copy(uri = localUri),
+        )
     }
 
     private fun localPlayableUri(song: Song, logicalPath: String?): String? {

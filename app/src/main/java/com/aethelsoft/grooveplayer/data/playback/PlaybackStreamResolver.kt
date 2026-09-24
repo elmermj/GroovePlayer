@@ -34,6 +34,18 @@ class PlaybackStreamResolver @Inject constructor(
     private val signals: PremiumStreamSignals,
 ) {
     fun resolve(spec: DataSpec): DataSpec {
+        return try {
+            resolveOrThrow(spec)
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            // ExoPlayer treats IOException as a failed open. A RuntimeException
+            // from Retrofit/Room on the playback thread kills the process.
+            throw IOException(e.message ?: "playback stream unavailable", e)
+        }
+    }
+
+    private fun resolveOrThrow(spec: DataSpec): DataSpec {
         if (spec.uri.scheme != PLAYBACK_STREAM_SCHEME) return spec
         val songId = spec.uri.host?.takeIf { it.isNotBlank() }
             ?: throw IOException("playback stream song id missing")

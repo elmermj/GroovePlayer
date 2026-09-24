@@ -308,6 +308,37 @@ class ResolvePlaybackSourceUseCaseTest {
     }
 
     @Test
+    fun corruptCatalogKeepsReadableLocalSongAndDropsTheRest() = runBlocking {
+        val useCase = ResolvePlaybackSourceUseCase(
+            localAudio = object : LocalAudioAvailability {
+                override fun isReadable(uri: String, filePath: String?) = uri == "content://local"
+            },
+            cache = FakeCache(),
+            catalog = object : SongCatalog {
+                override suspend fun contains(songId: String): Boolean = error("room closed")
+                override suspend fun sourcePath(songId: String): String? = error("no such column: sourcePath")
+                override suspend fun purge(songIds: List<String>) = error("room closed")
+            },
+            cloud = object : CloudAudioLookup {
+                override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit =
+                    error("playback api failed")
+                override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen =
+                    error("playback api failed")
+            },
+            tickets = FakeTickets(),
+        )
+        val queue = useCase.resolveQueue(
+            songs = listOf(
+                song("local").copy(uri = "content://local", filePath = null),
+                song("cloud").copy(uri = "content://cloud", filePath = null),
+            ),
+            startIndex = 1,
+        )
+        assertEquals(listOf("local"), queue.songs.map { it.id })
+        assertEquals(0, queue.startIndex)
+    }
+
+    @Test
     fun nonPremiumQueueSkipsCloudSongWithoutPurging() = runBlocking {
         val catalog = FakeCatalog(setOf("a", "b"))
         val useCase = ResolvePlaybackSourceUseCase(

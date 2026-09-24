@@ -13,8 +13,8 @@ import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTicket
 import com.aethelsoft.grooveplayer.domain.playback.interpretPlaybackObjects
 import com.aethelsoft.grooveplayer.domain.playback.interpretStreamUrl
 import com.squareup.moshi.Moshi
+import kotlinx.coroutines.CancellationException
 import retrofit2.Response
-import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -59,7 +59,9 @@ class CloudAudioLookupImpl @Inject constructor(
                 logicalPath = dto?.logicalPath ?: path,
                 sizeBytes = dto?.sizeBytes ?: size,
             )
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             Log.w(TAG, "playback objects unreachable for ${song.id}: ${e.message}")
             CloudAudioHit(CloudAudioPresence.UNKNOWN)
         }
@@ -89,7 +91,9 @@ class CloudAudioLookupImpl @Inject constructor(
                 dryRun = dto?.dryRun == true,
                 streamUrl = dto?.streamUrl,
             )
-        } catch (e: IOException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             Log.w(TAG, "stream-url unreachable for ${ticket.songId}: ${e.message}")
             CloudStreamOpen.Unknown
         }

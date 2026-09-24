@@ -33,6 +33,8 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedQueue
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.services.MusicPlaybackServiceManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -127,7 +129,11 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     /** One re-fetch of an expired playback stream_url. A second failure leaves the row. */
     private var streamRetrySongId: String? = null
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, error ->
+            android.util.Log.e("ExoPlayerManager", "Player coroutine failed", error)
+        },
+    )
 
     /**
      * ExoPlayer binds to the current thread's looper at construction time.
@@ -140,7 +146,13 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             val http = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
             val upstream = DefaultDataSource.Factory(ctx, http)
             val resolving = ResolvingDataSource.Factory(upstream) { spec ->
-                playbackStreams.resolve(spec)
+                try {
+                    playbackStreams.resolve(spec)
+                } catch (e: java.io.IOException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw java.io.IOException(e.message ?: "playback stream unavailable", e)
+                }
             }
             return ExoPlayer.Builder(ctx)
                 .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
@@ -707,7 +719,17 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
         // Resolve before any MediaItem is opened: local, entitled stream ticket, or purge on 404.
-        val resolved = resolvePlaybackSource.resolveQueue(songs, startIndex)
+        val resolved = try {
+            resolvePlaybackSource.resolveQueue(songs, startIndex)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("ExoPlayerManager", "Playback resolve failed; keeping the local queue", e)
+            ResolvedQueue(
+                songs = songs,
+                startIndex = startIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0)),
+            )
+        }
         notePremiumGate(resolved)
         val playable = resolved.songs
         val resolvedStart = resolved.startIndex

@@ -91,15 +91,24 @@ private fun FullPlayerSongAvailabilityMark(song: Song) {
 fun rememberSongAvailabilityMark(song: Song): SongAvailabilityMark? {
     val context = LocalContext.current
     val repository = remember(context) {
-        EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            SongAvailabilityEntryPoint::class.java,
-        ).songAvailabilityRepository()
+        runCatching {
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                SongAvailabilityEntryPoint::class.java,
+            ).songAvailabilityRepository()
+        }.getOrNull()
+    } ?: return null
+    val premiumNow = remember(repository) {
+        runCatching { repository.isPremiumNow() }.getOrDefault(false)
     }
-    val premium by repository.showAvailability.collectAsState(initial = repository.isPremiumNow())
+    val premium by repository.showAvailability.collectAsState(initial = premiumNow)
     var mark by remember(song.id) { mutableStateOf<SongAvailabilityMark?>(null) }
     LaunchedEffect(premium, song.id, song.uri, song.filePath, song.fileSizeBytes) {
-        mark = if (!premium) null else repository.markFor(song)
+        mark = try {
+            if (!premium) null else repository.markFor(song)
+        } catch (e: Exception) {
+            null
+        }
     }
     if (!premium) return null
     return mark
