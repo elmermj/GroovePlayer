@@ -77,4 +77,66 @@ class BackupProgressLabelTest {
                 BackupProgressLabel.percent(BackupJobStep.UPLOADING_CATALOG, 1, 1),
         )
     }
+
+    @Test
+    fun consolidateBytesAdvanceTheBarAndNeverMoveItBackwards() {
+        assertEquals(4, BackupProgressLabel.PREPARING_PERCENT_CAP)
+        assertTrue(
+            BackupProgressLabel.PREPARING_PERCENT_CAP <
+                BackupProgressLabel.consolidatePercent(0L, 1_000L),
+        )
+        val total = 1_000_000L
+        var previous = -1
+        for (done in listOf(0L, 1L, 256L * 1024, 500_000L, 750_000L, total - 1, total)) {
+            val next = BackupProgressLabel.consolidatePercent(done, total)
+            assertTrue(next >= previous)
+            previous = next
+        }
+        assertEquals(5, BackupProgressLabel.consolidatePercent(0L, total))
+        assertEquals(40, BackupProgressLabel.consolidatePercent(total, total))
+        assertTrue(
+            BackupProgressLabel.consolidatePercent(total / 2, total) >
+                BackupProgressLabel.consolidatePercent(0L, total),
+        )
+        assertTrue(
+            BackupProgressLabel.consolidatePercent(total, total) <=
+                BackupProgressLabel.percent(BackupJobStep.UPLOADING_FILES, 0, 4),
+        )
+    }
+
+    @Test
+    fun inProgressFileCountDoesNotResetByteProgress() {
+        val progress = ConsolidateByteProgress(fileCount = 2, plannedBytes = 300)
+        val samples = mutableListOf<Int>()
+        progress.beginOperation()
+        progress.onAbsoluteRead(50)
+        samples += progress.percent()
+        val beforeNextFile = progress.percent()
+        progress.showFile(1)
+        assertEquals(1, progress.filesShown)
+        assertEquals(beforeNextFile, progress.percent())
+        progress.beginOperation()
+        progress.onAbsoluteRead(0)
+        progress.onAbsoluteRead(40)
+        samples += progress.percent()
+        progress.credit(80)
+        samples += progress.percent()
+        progress.showFile(2)
+        progress.beginOperation()
+        progress.onAbsoluteRead(30)
+        samples += progress.percent()
+        progress.complete()
+        samples += progress.percent()
+        assertTrue(samples.first() > BackupProgressLabel.PREPARING_PERCENT_CAP)
+        assertTrue(samples.first() < samples.last())
+        assertEquals(40, samples.last())
+        assertEquals(2, progress.filesShown)
+        for (index in 1 until samples.size) {
+            assertTrue(samples[index] >= samples[index - 1])
+        }
+        assertEquals(
+            "Consolidating 1/2 files",
+            BackupProgressLabel.status(BackupJobStep.CONSOLIDATING, 1, 2, 0, 0),
+        )
+    }
 }

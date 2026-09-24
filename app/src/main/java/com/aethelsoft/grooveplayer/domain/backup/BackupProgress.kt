@@ -16,6 +16,9 @@ data class BackupProgressLine(
 )
 
 object BackupProgressLabel {
+    /** Folder scan stays at or below this so consolidate (5–40) cannot jump backward. */
+    const val PREPARING_PERCENT_CAP = 4
+
     fun status(
         step: BackupJobStep,
         consolidateCompleted: Int,
@@ -36,7 +39,7 @@ object BackupProgressLabel {
         total: Int,
     ): Int {
         val (start, end) = when (step) {
-            BackupJobStep.PREPARING -> return 4
+            BackupJobStep.PREPARING -> return PREPARING_PERCENT_CAP
             BackupJobStep.CONSOLIDATING -> 5 to 40
             BackupJobStep.UPLOADING_FILES -> 40 to 90
             BackupJobStep.UPLOADING_CATALOG -> return 95
@@ -44,6 +47,17 @@ object BackupProgressLabel {
         if (total <= 0) return end
         val fraction = completed.coerceIn(0, total).toFloat() / total
         return (start + fraction * (end - start)).toInt().coerceIn(0, 99)
+    }
+
+    /**
+     * Consolidate band is 5–40. [bytesDone] moves the bar inside that band while a file
+     * is still hashing or copying, so one large song is not stuck until it finishes.
+     */
+    fun consolidatePercent(bytesDone: Long, bytesTotal: Long): Int {
+        if (bytesTotal <= 0L) return 5
+        val done = bytesDone.coerceAtLeast(0L).coerceAtMost(bytesTotal)
+        val fraction = done.toDouble() / bytesTotal.toDouble()
+        return (5.0 + fraction * 35.0).toInt().coerceIn(5, 40)
     }
 
     fun failure(
@@ -116,5 +130,51 @@ object BackupProgressLabel {
         if (stage.ordinal < current.ordinal) return BackupProgressTone.DONE
         if (stage == current && phase != CloudBackupPhase.IDLE) return BackupProgressTone.ACTIVE
         return BackupProgressTone.PENDING
+    }
+}
+
+/**
+ * Byte budget for copying approved songs into Groove Downloads.
+ * Bytes only increase, so the bar cannot move backward inside one backup run.
+ * A new run starts a new instance after the preparing step resets the UI to 0.
+ */
+class ConsolidateByteProgress(
+    val fileCount: Int,
+    plannedBytes: Long,
+) {
+    private val planned = plannedBytes.coerceAtLeast(1L)
+    private var bytesDone = 0L
+    private var opRead = 0L
+
+    /** Files whose consolidate work has started. Stays 0 while Groove Downloads is indexed. */
+    var filesShown: Int = 0
+        private set
+
+    fun percent(): Int = BackupProgressLabel.consolidatePercent(bytesDone, planned)
+
+    fun beginOperation() {
+        opRead = 0L
+    }
+
+    /** [bytesRead] is the absolute offset within the current hash or copy. */
+    fun onAbsoluteRead(bytesRead: Long) {
+        val read = bytesRead.coerceAtLeast(0L)
+        val delta = (read - opRead).coerceAtLeast(0L)
+        opRead = read
+        bytesDone += delta
+    }
+
+    /** Count work that will not be performed, such as a skipped copy of a reused file. */
+    fun credit(bytes: Long) {
+        if (bytes > 0L) bytesDone += bytes
+    }
+
+    fun showFile(oneBasedInclusive: Int) {
+        filesShown = oneBasedInclusive.coerceIn(0, fileCount.coerceAtLeast(0))
+    }
+
+    fun complete() {
+        if (bytesDone < planned) bytesDone = planned
+        filesShown = fileCount
     }
 }

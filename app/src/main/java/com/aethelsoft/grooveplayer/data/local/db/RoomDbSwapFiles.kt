@@ -222,7 +222,11 @@ class RoomDbSwapFiles(
             return header.contentEquals(SQLITE_MAGIC)
         }
 
-        fun copyDurable(src: File, dest: File) {
+        fun copyDurable(
+            src: File,
+            dest: File,
+            onBytes: ((copied: Long, total: Long) -> Unit)? = null,
+        ) {
             dest.parentFile?.mkdirs()
             val tmp = File(dest.parentFile, dest.name + ".tmp")
             if (tmp.exists()) tmp.delete()
@@ -230,10 +234,17 @@ class RoomDbSwapFiles(
                 FileOutputStream(tmp).channel.use { output ->
                     var position = 0L
                     val size = input.size()
+                    onBytes?.invoke(0L, size)
                     while (position < size) {
-                        val transferred = input.transferTo(position, size - position, output)
+                        val requested = if (onBytes == null) {
+                            size - position
+                        } else {
+                            minOf(COPY_PROGRESS_BYTES, size - position)
+                        }
+                        val transferred = input.transferTo(position, requested, output)
                         if (transferred <= 0L) break
                         position += transferred
+                        onBytes?.invoke(position, size)
                     }
                     output.force(true)
                 }
@@ -244,6 +255,8 @@ class RoomDbSwapFiles(
                 tmp.delete()
             }
         }
+
+        private const val COPY_PROGRESS_BYTES = 256L * 1024L
 
         fun deleteSidecars(database: File) {
             listOf("-wal", "-shm", "-journal").forEach { suffix ->

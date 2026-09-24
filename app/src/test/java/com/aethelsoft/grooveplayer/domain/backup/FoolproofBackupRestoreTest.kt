@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.domain.backup
 
 import com.aethelsoft.grooveplayer.data.local.db.RecoveryResult
 import com.aethelsoft.grooveplayer.data.local.db.RoomDbSwapFiles
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -37,6 +38,29 @@ class FoolproofBackupRestoreTest {
         assertFalse(collision.reusedExisting)
         assertFalse(collision.destinationPath.contains(" (1)"))
         assertTrue(collision.destinationPath.endsWith("/def.mp3"))
+    }
+
+    @Test
+    fun hashAndCopyReportBytesBeforeTheFileFinishes() {
+        val dir = tempDir()
+        val src = File(dir, "song.mp3")
+        src.writeBytes(ByteArray(600 * 1024) { (it % 251).toByte() })
+        val reads = mutableListOf<Long>()
+        val hashed = ContentHash.sha256(src) { read, _ -> reads += read }
+        assertEquals(ContentHash.sha256(src), hashed)
+        assertEquals(0L, reads.first())
+        assertEquals(src.length(), reads.last())
+        assertTrue(reads.zipWithNext().all { (earlier, later) -> later > earlier })
+        assertTrue(reads.any { it in 1 until src.length() })
+
+        val dest = File(dir, "Groove Downloads/song.mp3")
+        val copied = mutableListOf<Long>()
+        RoomDbSwapFiles.copyDurable(src, dest) { read, _ -> copied += read }
+        assertArrayEquals(src.readBytes(), dest.readBytes())
+        assertEquals(0L, copied.first())
+        assertEquals(src.length(), copied.last())
+        assertTrue(copied.zipWithNext().all { (earlier, later) -> later > earlier })
+        assertTrue(copied.any { it in 1 until src.length() })
     }
 
     @Test
