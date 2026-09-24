@@ -1,18 +1,18 @@
 package com.aethelsoft.grooveplayer.domain.usecase.player_category
 
 import com.aethelsoft.grooveplayer.domain.model.Song
-import com.aethelsoft.grooveplayer.domain.playback.CloudAudioHit
-import com.aethelsoft.grooveplayer.domain.playback.CloudAudioPresence
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
+import com.aethelsoft.grooveplayer.domain.playback.CloudAudioPresence
 import com.aethelsoft.grooveplayer.domain.playback.CloudPlaybackCache
-import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
 import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackDecision
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackDropReason
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTicket
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTickets
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
 import com.aethelsoft.grooveplayer.domain.playback.adjustedQueueStartIndex
-import com.aethelsoft.grooveplayer.domain.playback.looksLikeSignedObjectUrl
 import com.aethelsoft.grooveplayer.domain.playback.playbackDecision
+import com.aethelsoft.grooveplayer.domain.playback.playbackStreamUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -31,7 +31,7 @@ data class ResolvedQueue(
     val songs: List<Song>,
     val startIndex: Int,
     /**
-     * At least one song had cloud audio but the user is not Premium.
+     * At least one song had cloud audio but the user is not entitled to stream.
      * Those songs were skipped. Their catalog rows were not purged.
      */
     val premiumStreamBlocked: Boolean = false,
@@ -40,8 +40,12 @@ data class ResolvedQueue(
 /**
  * Single resolve path for play and enqueue, before any player URI is opened.
  *
- * Local file, Premium whole-object cloud playback, or purge when the object is absent.
- * A non-Premium user who only has a cloud copy is skipped (upgrade), never deleted.
+ * Local file, or a `groove-playback://` ticket when the object exists and the
+ * server says `entitled`. The signed `stream_url` is requested when ExoPlayer
+ * opens that item, not for the rest of the queue.
+ *
+ * Purge only on 404 `{exists:false}`. `entitled:false` (free, basic, open grace)
+ * skips and keeps the row.
  */
 @Singleton
 class ResolvePlaybackSourceUseCase @Inject constructor(
@@ -49,7 +53,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
     private val cache: CloudPlaybackCache,
     private val catalog: SongCatalog,
     private val cloud: CloudAudioLookup,
-    private val entitlement: CloudStreamEntitlement,
+    private val tickets: PlaybackStreamTickets,
 ) {
     suspend fun resolveOne(song: Song): ResolvedPlayback = withContext(Dispatchers.IO) {
         resolveOneLocked(song)
@@ -104,18 +108,26 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             return ResolvedPlayback.Dropped(song.id, PlaybackDropReason.UNAVAILABLE)
         }
         val cloudHit = cloud.lookup(song, logicalPath)
-        // Entitlement is read only after the object is known to exist or not.
-        // It never decides purge.
-        val canStream = entitlement.canStreamFromCloud()
+        // Server `entitled` is the stream gate. It does not decide purge.
         val decision = playbackDecision(
             localAvailable = false,
             inCatalog = true,
             cloud = cloudHit.presence,
-            canStreamCloud = canStream,
+            canStreamCloud = cloudHit.entitled,
         )
         return when (decision) {
             PlaybackDecision.PLAY_LOCAL -> ResolvedPlayback.Playable(song)
-            PlaybackDecision.STREAM_CLOUD -> streamOrSkip(song, cloudHit)
+            PlaybackDecision.STREAM_CLOUD -> {
+                tickets.put(
+                    PlaybackStreamTicket(
+                        songId = song.id,
+                        contentHash = cloudHit.contentHash,
+                        logicalPath = cloudHit.logicalPath ?: logicalPath,
+                        sizeBytes = cloudHit.sizeBytes ?: song.fileSizeBytes,
+                    ),
+                )
+                ResolvedPlayback.Playable(song.copy(uri = playbackStreamUri(song.id)))
+            }
             PlaybackDecision.PURGE -> {
                 cache.delete(song.id)
                 if (purgeNow) purgeQuietly(listOf(song.id))
@@ -123,7 +135,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             }
             PlaybackDecision.SKIP -> ResolvedPlayback.Dropped(
                 song.id,
-                if (cloudHit.presence == CloudAudioPresence.PRESENT && !canStream) {
+                if (cloudHit.presence == CloudAudioPresence.PRESENT && !cloudHit.entitled) {
                     PlaybackDropReason.NOT_ENTITLED
                 } else {
                     PlaybackDropReason.UNAVAILABLE
@@ -141,29 +153,6 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             return song.uri
         }
         return File(logicalPath).toURI().toString()
-    }
-
-    private suspend fun streamOrSkip(song: Song, hit: CloudAudioHit?): ResolvedPlayback {
-        val playUri = materialize(song.id, hit)
-            ?: return ResolvedPlayback.Dropped(song.id, PlaybackDropReason.UNAVAILABLE)
-        return ResolvedPlayback.Playable(song.copy(uri = playUri))
-    }
-
-    /**
-     * Signed object URLs are downloaded once (no Range) and played from disk.
-     * A non-R2 stream URL is the only URL ExoPlayer may open directly.
-     */
-    private suspend fun materialize(songId: String, hit: CloudAudioHit?): String? {
-        if (hit == null) return null
-        val download = hit.downloadUrl?.takeIf { it.isNotBlank() }
-        val stream = hit.streamUrl?.takeIf { it.isNotBlank() }
-        if (download != null) {
-            return cache.storeFromUrl(songId, download)
-        }
-        if (stream != null && looksLikeSignedObjectUrl(stream)) {
-            return cache.storeFromUrl(songId, stream)
-        }
-        return stream
     }
 
     private suspend fun purgeQuietly(songIds: List<String>) {

@@ -1,127 +1,117 @@
 package com.aethelsoft.grooveplayer.data.playback
 
 import android.util.Log
-import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
-import com.aethelsoft.grooveplayer.data.remote.api.PlaybackSourceApi
-import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
-import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackSourceRequestDto
+import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
+import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackObjectDto
+import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackStreamRequestDto
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioHit
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioPresence
-import com.aethelsoft.grooveplayer.domain.playback.cloudObjectMatchesSong
-import retrofit2.HttpException
+import com.aethelsoft.grooveplayer.domain.playback.CloudStreamOpen
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTicket
+import com.aethelsoft.grooveplayer.domain.playback.interpretPlaybackObjects
+import com.aethelsoft.grooveplayer.domain.playback.interpretStreamUrl
+import com.squareup.moshi.Moshi
+import retrofit2.Response
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Prefers POST /v1/playback/source (Benny). Until that route exists, 404/501
- * falls back to the backup object list plus POST /v1/backup/download-url.
+ * GET `/v1/playback/objects`, then POST `/v1/playback/stream-url` only when a
+ * track is about to play. Backup object listing and download-url are not used.
  *
- * 200 `{available:false}` means the audio is really gone. Network and auth
- * failures stay [CloudAudioPresence.UNKNOWN] so the catalog is not purged.
- * Dry-run URLs are not playable audio.
+ * 404 `{exists:false}` is absence. `entitled:false` and stream-url 403 keep the
+ * catalog row. Network, 401, and 5xx are unknown.
  */
 @Singleton
 class CloudAudioLookupImpl @Inject constructor(
-    private val playbackSourceApi: PlaybackSourceApi,
-    private val backupApi: BackupApi,
+    private val playbackApi: PlaybackApi,
+    private val moshi: Moshi,
     private val cloudSongCatalog: CloudSongCatalog,
 ) : CloudAudioLookup {
 
-    @Volatile
-    private var playbackRouteMissing = false
+    private val bodyAdapter = moshi.adapter(PlaybackObjectDto::class.java)
 
     override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit {
-        if (!playbackRouteMissing) {
-            try {
-                val response = playbackSourceApi.resolve(
-                    PlaybackSourceRequestDto(
-                        songId = song.id,
-                        logicalPath = logicalPath,
-                        title = song.title,
-                        artist = song.artist,
-                        album = song.album?.name,
-                        sizeBytes = song.fileSizeBytes,
-                    )
-                )
-                return mapRoute(song.id, response.available, response.dryRun, response.downloadUrl, response.streamUrl)
-            } catch (e: HttpException) {
-                if (e.code() == 404 || e.code() == 501) {
-                    playbackRouteMissing = true
-                    Log.i(TAG, "POST /v1/playback/source unavailable (${e.code()}); using backup objects")
-                } else {
-                    Log.w(TAG, "playback source HTTP ${e.code()} for ${song.id}")
-                    return CloudAudioHit(CloudAudioPresence.UNKNOWN)
-                }
-            } catch (e: IOException) {
-                Log.w(TAG, "playback source unreachable for ${song.id}: ${e.message}")
-                return CloudAudioHit(CloudAudioPresence.UNKNOWN)
-            }
-        }
-        return fallback(song, logicalPath)
-    }
-
-    private fun mapRoute(
-        songId: String,
-        available: Boolean,
-        dryRun: Boolean,
-        downloadUrl: String?,
-        streamUrl: String?,
-    ): CloudAudioHit {
-        if (!available || dryRun) return CloudAudioHit(CloudAudioPresence.ABSENT)
-        val download = downloadUrl?.takeIf { it.isNotBlank() }
-        val stream = streamUrl?.takeIf { it.isNotBlank() }
-        if (download == null && stream == null) {
+        val path = logicalPath?.takeIf { it.isNotBlank() }
+        val size = song.fileSizeBytes?.takeIf { it > 0L }
+        // No sha256 on the device catalog. Path + size is the supported fallback.
+        if (path == null || size == null) {
             return CloudAudioHit(CloudAudioPresence.UNKNOWN)
         }
-        cloudSongCatalog.confirm(songId)
-        return CloudAudioHit(
-            presence = CloudAudioPresence.PRESENT,
-            downloadUrl = download,
-            streamUrl = stream,
-        )
-    }
-
-    private suspend fun fallback(song: Song, logicalPath: String?): CloudAudioHit {
-        val objects = try {
-            cloudSongCatalog.load()
-        } catch (e: IOException) {
-            Log.w(TAG, "backup objects unreachable: ${e.message}")
-            return CloudAudioHit(CloudAudioPresence.UNKNOWN)
-        } ?: return CloudAudioHit(CloudAudioPresence.UNKNOWN)
-
-        if (logicalPath.isNullOrBlank()) {
-            // Cannot prove the object is missing without a path or the playback route.
-            return CloudAudioHit(CloudAudioPresence.UNKNOWN)
-        }
-        val match = objects.firstOrNull { obj ->
-            cloudObjectMatchesSong(logicalPath, song.fileSizeBytes, obj.logicalPath, obj.sizeBytes)
-        } ?: return CloudAudioHit(CloudAudioPresence.ABSENT)
-
         return try {
-            val url = backupApi.requestDownloadUrl(
-                BackupDownloadUrlRequestDto(
-                    contentHash = match.contentHash,
-                    r2Key = match.r2Key,
-                )
+            val response = playbackApi.getObject(logicalPath = path, sizeBytes = size)
+            val dto = readBody(response)
+            val (presence, entitled) = interpretPlaybackObjects(
+                httpCode = response.code(),
+                exists = dto?.exists,
+                entitled = dto?.entitled,
             )
-            if (url.dryRun || url.downloadUrl.isNullOrBlank()) {
-                CloudAudioHit(CloudAudioPresence.ABSENT)
-            } else {
+            if (presence == CloudAudioPresence.PRESENT) {
                 cloudSongCatalog.confirm(song.id)
-                CloudAudioHit(
-                    presence = CloudAudioPresence.PRESENT,
-                    downloadUrl = url.downloadUrl,
-                )
             }
-        } catch (e: HttpException) {
-            Log.w(TAG, "download-url HTTP ${e.code()} for ${song.id}")
-            CloudAudioHit(CloudAudioPresence.UNKNOWN)
+            CloudAudioHit(
+                presence = presence,
+                entitled = entitled,
+                contentHash = dto?.contentHash,
+                logicalPath = dto?.logicalPath ?: path,
+                sizeBytes = dto?.sizeBytes ?: size,
+            )
         } catch (e: IOException) {
-            Log.w(TAG, "download-url unreachable for ${song.id}: ${e.message}")
+            Log.w(TAG, "playback objects unreachable for ${song.id}: ${e.message}")
             CloudAudioHit(CloudAudioPresence.UNKNOWN)
+        }
+    }
+
+    override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen {
+        val hash = ticket.contentHash?.takeIf { it.isNotBlank() }
+        val path = ticket.logicalPath?.takeIf { it.isNotBlank() }
+        val size = ticket.sizeBytes?.takeIf { it > 0L }
+        if (hash == null && (path == null || size == null)) {
+            return CloudStreamOpen.Unknown
+        }
+        return try {
+            val response = playbackApi.streamUrl(
+                PlaybackStreamRequestDto(
+                    contentHash = hash,
+                    logicalPath = path,
+                    sizeBytes = size,
+                    contentType = audioContentType(path),
+                ),
+            )
+            val dto = readBody(response)
+            interpretStreamUrl(
+                httpCode = response.code(),
+                exists = dto?.exists,
+                entitled = dto?.entitled == true,
+                dryRun = dto?.dryRun == true,
+                streamUrl = dto?.streamUrl,
+            )
+        } catch (e: IOException) {
+            Log.w(TAG, "stream-url unreachable for ${ticket.songId}: ${e.message}")
+            CloudStreamOpen.Unknown
+        }
+    }
+
+    private fun readBody(response: Response<PlaybackObjectDto>): PlaybackObjectDto? {
+        response.body()?.let { return it }
+        val raw = response.errorBody()?.use { it.string() } ?: return null
+        return runCatching { bodyAdapter.fromJson(raw) }.getOrNull()
+    }
+
+    private fun audioContentType(path: String?): String? {
+        val ext = path?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotBlank() && it.length <= 5 }
+            ?: return null
+        return when (ext) {
+            "mp3" -> "audio/mpeg"
+            "m4a", "mp4" -> "audio/mp4"
+            "flac" -> "audio/flac"
+            "ogg", "opus" -> "audio/ogg"
+            "wav" -> "audio/wav"
+            "aac" -> "audio/aac"
+            else -> null
         }
     }
 

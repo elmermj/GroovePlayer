@@ -10,9 +10,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * In-memory view of GET /v1/backup/objects?kind=song.
- * Shared by cloud fallback lookup and premium availability badges so rows
- * do not each mint a request. Not loaded for Free/Basic.
+ * In-memory view of GET /v1/backup/objects?kind=song for premium availability
+ * badges. Playback does not use this list. Not loaded for Free/Basic.
  */
 @Singleton
 class CloudSongCatalog @Inject constructor(

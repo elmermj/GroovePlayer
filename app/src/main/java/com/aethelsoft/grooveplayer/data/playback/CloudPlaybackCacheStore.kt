@@ -15,8 +15,9 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 /**
- * Whole-object copies of cloud audio. Playback uses the file URI so ExoPlayer
- * never issues Range GETs against signed R2 URLs.
+ * Leftover whole-object copies. A file already here still plays as local.
+ * New cloud playback uses ExoPlayer on `stream_url` (Range allowed) and does
+ * not download through this store. Purge still deletes the file.
  */
 @Singleton
 class CloudPlaybackCacheStore @Inject constructor(

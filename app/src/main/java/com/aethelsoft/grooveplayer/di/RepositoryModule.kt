@@ -17,11 +17,13 @@ import com.aethelsoft.grooveplayer.data.playback.CloudAudioLookupImpl
 import com.aethelsoft.grooveplayer.data.playback.CloudPlaybackCacheStore
 import com.aethelsoft.grooveplayer.data.playback.LocalAudioProbe
 import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
+import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
 import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
 import com.aethelsoft.grooveplayer.domain.playback.CloudPlaybackCache
 import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
 import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTickets
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
 import com.aethelsoft.grooveplayer.data.ads.StartupAdQuotaStore
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
@@ -151,4 +153,9 @@ abstract class RepositoryModule {
     abstract fun bindCloudStreamEntitlement(
         impl: PremiumCloudEntitlement
     ): CloudStreamEntitlement
+
+    @Binds
+    abstract fun bindPlaybackStreamTickets(
+        impl: PlaybackStreamTicketStore
+    ): PlaybackStreamTickets
 }

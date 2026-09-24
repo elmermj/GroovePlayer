@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.domain.playback
 
+import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedPlayback
@@ -34,7 +35,7 @@ class PlaybackSourcePolicyTest {
     }
 
     @Test
-    fun catalogSongStreamsOnlyForPremiumWhenCloudExists() {
+    fun catalogSongStreamsOnlyWhenServerSaysEntitled() {
         assertEquals(
             PlaybackDecision.STREAM_CLOUD,
             playbackDecision(false, true, CloudAudioPresence.PRESENT, canStreamCloud = true),
@@ -43,6 +44,69 @@ class PlaybackSourcePolicyTest {
             PlaybackDecision.SKIP,
             playbackDecision(false, true, CloudAudioPresence.PRESENT, canStreamCloud = false),
         )
+    }
+
+    @Test
+    fun openGraceIsNotAnActiveStreamEntitlement() {
+        val now = 1_000L
+        assertTrue(activeCloudStreamEntitled(PrivilegeTier.PREMIUM, graceUntilEpochMs = null, now))
+        assertTrue(activeCloudStreamEntitled(PrivilegeTier.PREMIUM, graceUntilEpochMs = now, now))
+        assertTrue(!activeCloudStreamEntitled(PrivilegeTier.PREMIUM, graceUntilEpochMs = now + 1, now))
+        assertTrue(!activeCloudStreamEntitled(PrivilegeTier.FREE, graceUntilEpochMs = null, now))
+        assertTrue(!activeCloudStreamEntitled(PrivilegeTier.BASIC, graceUntilEpochMs = null, now))
+    }
+
+    @Test
+    fun objects404IsTheOnlyPurgeSignal() {
+        assertEquals(
+            CloudAudioPresence.ABSENT,
+            interpretPlaybackObjects(404, exists = false, entitled = true).first,
+        )
+        assertEquals(
+            CloudAudioPresence.PRESENT to false,
+            interpretPlaybackObjects(200, exists = true, entitled = false),
+        )
+        assertEquals(
+            CloudAudioPresence.PRESENT to true,
+            interpretPlaybackObjects(200, exists = true, entitled = true),
+        )
+        assertEquals(
+            CloudAudioPresence.UNKNOWN,
+            interpretPlaybackObjects(401, exists = null, entitled = null).first,
+        )
+        assertEquals(
+            CloudAudioPresence.UNKNOWN,
+            interpretPlaybackObjects(503, exists = null, entitled = null).first,
+        )
+    }
+
+    @Test
+    fun streamUrl403KeepsTheRowAndDryRunIsNotPlayable() {
+        assertTrue(interpretStreamUrl(403, exists = true, entitled = false, dryRun = false, streamUrl = null) is CloudStreamOpen.NotEntitled)
+        assertTrue(interpretStreamUrl(404, exists = false, entitled = true, dryRun = false, streamUrl = null) is CloudStreamOpen.Absent)
+        assertTrue(
+            interpretStreamUrl(
+                200,
+                exists = true,
+                entitled = true,
+                dryRun = true,
+                streamUrl = "https://dry-run.r2.local/x",
+            ) is CloudStreamOpen.Unusable,
+        )
+        val play = interpretStreamUrl(
+            200,
+            exists = true,
+            entitled = true,
+            dryRun = false,
+            streamUrl = "https://bucket.r2.cloudflarestorage.com/o?X-Amz-Signature=1",
+        )
+        assertTrue(play is CloudStreamOpen.Play)
+        assertEquals(
+            "https://bucket.r2.cloudflarestorage.com/o?X-Amz-Signature=1",
+            (play as CloudStreamOpen.Play).url,
+        )
+        assertTrue(interpretStreamUrl(401, exists = null, entitled = true, dryRun = false, streamUrl = null) is CloudStreamOpen.Unknown)
+        assertTrue(interpretStreamUrl(500, exists = null, entitled = true, dryRun = false, streamUrl = null) is CloudStreamOpen.Unknown)
     }
 
     @Test
@@ -79,9 +143,11 @@ class PlaybackSourcePolicyTest {
     }
 
     @Test
-    fun signedObjectUrlsAreNotDirectStreams() {
+    fun signedPlaybackUrlsAreRecognizedAndDryRunIsNot() {
         assertTrue(looksLikeSignedObjectUrl("https://bucket.r2.cloudflarestorage.com/a?X-Amz-Signature=abc"))
         assertTrue(!looksLikeSignedObjectUrl("https://stream.example.com/audio.mp3"))
+        assertTrue(isDryRunPlaybackUrl("https://dry-run.r2.local/backups/u/h"))
+        assertTrue(!isDryRunPlaybackUrl("https://bucket.r2.cloudflarestorage.com/a?X-Amz-Signature=abc"))
     }
 
     @Test
@@ -148,7 +214,7 @@ class ResolvePlaybackSourceUseCaseTest {
     fun localPlayDoesNotCallCloudOrPurge() = runBlocking {
         val cloud = FakeCloud()
         val catalog = FakeCatalog(ids = setOf("1"))
-        val useCase = useCase(local = true, cloud = cloud, catalog = catalog, premium = true)
+        val useCase = useCase(local = true, cloud = cloud, catalog = catalog)
         val resolved = useCase.resolveOne(song("1"))
         assertTrue(resolved is ResolvedPlayback.Playable)
         assertEquals("content://1", (resolved as ResolvedPlayback.Playable).song.uri)
@@ -157,30 +223,39 @@ class ResolvePlaybackSourceUseCaseTest {
     }
 
     @Test
-    fun premiumStreamsCloudWithoutPassingSignedUrlThrough() = runBlocking {
+    fun entitledCloudSongDefersStreamUrlUntilOpen() = runBlocking {
         val cloud = FakeCloud(
             CloudAudioHit(
                 presence = CloudAudioPresence.PRESENT,
-                downloadUrl = "https://x.r2.cloudflarestorage.com/o?X-Amz-Signature=1",
+                entitled = true,
+                contentHash = "abc",
             ),
         )
         val cache = FakeCache()
-        val useCase = useCase(local = false, cloud = cloud, catalog = FakeCatalog(setOf("1")), premium = true, cache = cache)
+        val tickets = FakeTickets()
+        val useCase = useCase(
+            local = false,
+            cloud = cloud,
+            catalog = FakeCatalog(setOf("1")),
+            cache = cache,
+            tickets = tickets,
+        )
         val resolved = useCase.resolveOne(song("1"))
         assertTrue(resolved is ResolvedPlayback.Playable)
-        assertEquals("file:///cache/1", (resolved as ResolvedPlayback.Playable).song.uri)
-        assertEquals(listOf("1"), cache.stored)
+        assertEquals(playbackStreamUri("1"), (resolved as ResolvedPlayback.Playable).song.uri)
+        assertEquals(0, cloud.streamOpens)
+        assertTrue(cache.stored.isEmpty())
+        assertEquals("abc", tickets.get("1")?.contentHash)
     }
 
     @Test
-    fun nonPremiumKeepsCatalogWhenCloudExists() = runBlocking {
+    fun openGraceKeepsCatalogWhenCloudExists() = runBlocking {
         val catalog = FakeCatalog(setOf("1"))
         val cache = FakeCache()
         val useCase = useCase(
             local = false,
-            cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.PRESENT, downloadUrl = "https://cdn.example/a.mp3")),
+            cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.PRESENT, entitled = false)),
             catalog = catalog,
-            premium = false,
             cache = cache,
         )
         val resolved = useCase.resolveOne(song("1"))
@@ -199,7 +274,6 @@ class ResolvePlaybackSourceUseCaseTest {
             local = false,
             cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.ABSENT)),
             catalog = catalog,
-            premium = true,
             cache = cache,
         )
         // Cache file counts as local and must win. Use a cache that is empty so purge runs.
@@ -221,9 +295,7 @@ class ResolvePlaybackSourceUseCaseTest {
             cache = FakeCache(),
             catalog = catalog,
             cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.ABSENT)),
-            entitlement = object : CloudStreamEntitlement {
-                override suspend fun canStreamFromCloud() = true
-            },
+            tickets = FakeTickets(),
         )
         val queue = useCase.resolveQueue(
             songs = listOf(song("a"), song("b"), song("c")),
@@ -244,12 +316,8 @@ class ResolvePlaybackSourceUseCaseTest {
             },
             cache = FakeCache(),
             catalog = catalog,
-            cloud = FakeCloud(
-                CloudAudioHit(CloudAudioPresence.PRESENT, downloadUrl = "https://cdn.example/b.mp3"),
-            ),
-            entitlement = object : CloudStreamEntitlement {
-                override suspend fun canStreamFromCloud() = false
-            },
+            cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.PRESENT, entitled = false)),
+            tickets = FakeTickets(),
         )
         val queue = useCase.resolveQueue(listOf(song("a"), song("b")), startIndex = 1)
         assertEquals(listOf("a"), queue.songs.map { it.id })
@@ -262,8 +330,8 @@ class ResolvePlaybackSourceUseCaseTest {
         local: Boolean,
         cloud: FakeCloud,
         catalog: FakeCatalog,
-        premium: Boolean,
         cache: FakeCache = FakeCache(),
+        tickets: FakeTickets = FakeTickets(),
     ) = ResolvePlaybackSourceUseCase(
         localAudio = object : LocalAudioAvailability {
             override fun isReadable(uri: String, filePath: String?) = local
@@ -271,9 +339,7 @@ class ResolvePlaybackSourceUseCaseTest {
         cache = cache,
         catalog = catalog,
         cloud = cloud,
-        entitlement = object : CloudStreamEntitlement {
-            override suspend fun canStreamFromCloud() = premium
-        },
+        tickets = tickets,
     )
 
     private fun song(id: String) = Song(
@@ -290,10 +356,23 @@ class ResolvePlaybackSourceUseCaseTest {
         private val hit: CloudAudioHit = CloudAudioHit(CloudAudioPresence.UNKNOWN),
     ) : CloudAudioLookup {
         var calls = 0
+        var streamOpens = 0
         override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit {
             calls++
             return hit
         }
+        override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen {
+            streamOpens++
+            return CloudStreamOpen.Unknown
+        }
+    }
+
+    private class FakeTickets : PlaybackStreamTickets {
+        private val saved = mutableMapOf<String, PlaybackStreamTicket>()
+        override fun put(ticket: PlaybackStreamTicket) {
+            saved[ticket.songId] = ticket
+        }
+        override fun get(songId: String): PlaybackStreamTicket? = saved[songId]
     }
 
     private class FakeCatalog(ids: Set<String>) : SongCatalog {

@@ -11,13 +11,21 @@ import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamResolver
+import com.aethelsoft.grooveplayer.data.playback.PremiumStreamSignals
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.playback.PLAYBACK_STREAM_SCHEME
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackDropReason
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedPlayback
@@ -30,7 +38,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -74,6 +81,8 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val equalizerManager: EqualizerManager,
     private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository,
     private val resolvePlaybackSource: ResolvePlaybackSourceUseCase,
+    private val playbackStreams: PlaybackStreamResolver,
+    private val premiumStreamSignals: PremiumStreamSignals,
 ) : PlayerRepository {
 
     private val player: ExoPlayer = createPlayerOnMainThread()
@@ -90,8 +99,6 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val _isFullScreenPlayerOpen = MutableStateFlow(false)
     private val _isPlayerMuted = MutableStateFlow(false)
     private val _audioVisualization = MutableStateFlow(AudioVisualizationData())
-    private val _premiumStreamRequired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    
     private var lastRecordedSongId: String? = null
     private var lastRecordedTimestamp: Long = 0L
     private var visualizer: Visualizer? = null
@@ -117,6 +124,8 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     /** Queue order from before shuffle was turned on; kept in sync with edits made while shuffled. Null when shuffle is off. */
     private var preShuffleOrder: MutableList<Song>? = null
     private var allAvailableSongs = listOf<Song>()
+    /** One re-fetch of an expired playback stream_url. A second failure leaves the row. */
+    private var streamRetrySongId: String? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
@@ -125,17 +134,27 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
      * Always build on the main looper, even if Hilt injects this singleton off-main.
      */
     private fun createPlayerOnMainThread(): ExoPlayer {
-        fun build(): ExoPlayer = ExoPlayer.Builder(ctx)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                /* handleAudioFocus = */ true,
-            )
-            // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
-            .setHandleAudioBecomingNoisy(true)
-            .build()
+        fun build(): ExoPlayer {
+            // Playback stream_url may be a signed R2 GET. Range is allowed here so
+            // ExoPlayer can seek. Backup restore uses a different client that strips Range.
+            val http = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+            val upstream = DefaultDataSource.Factory(ctx, http)
+            val resolving = ResolvingDataSource.Factory(upstream) { spec ->
+                playbackStreams.resolve(spec)
+            }
+            return ExoPlayer.Builder(ctx)
+                .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    /* handleAudioFocus = */ true,
+                )
+                // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
+                .setHandleAudioBecomingNoisy(true)
+                .build()
+        }
         return if (Looper.myLooper() == Looper.getMainLooper()) {
             build()
         } else {
@@ -203,6 +222,27 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 if (state == Player.STATE_ENDED) {
                     _isPlaying.value = false
                 }
+                if (state == Player.STATE_READY) {
+                    streamRetrySongId = null
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val song = _currentSong.value ?: return
+                if (!song.uri.startsWith("$PLAYBACK_STREAM_SCHEME://")) return
+                val detail = generateSequence<Throwable>(error) { it.cause }
+                    .joinToString(" ") { it.message.orEmpty() }
+                // 403 and 404 are terminal for this open. Expiry and network get one new URL.
+                if ("premium required" in detail || "object not found" in detail) {
+                    if (player.hasNextMediaItem()) player.seekToNext()
+                    return
+                }
+                if (streamRetrySongId == song.id) return
+                streamRetrySongId = song.id
+                val position = player.currentPosition
+                player.seekTo(position)
+                player.prepare()
+                player.playWhenReady = true
             }
         })
     }
@@ -623,28 +663,11 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
     
     /**
-     * Local MediaItem builder.
-     *
-     * R2 cost rule 2: do **not** set signed R2 URLs as the
-     * playback URI. Media3 issues HTTP Range requests by default, which would
-     * Class-B spam GetObject. Download whole-object via BackupRepository first.
+     * Local file, or `groove-playback://` which [PlaybackStreamResolver] turns
+     * into `stream_url` on open. Range GET on that playback URL is allowed.
+     * Backup restore still must not Range-GET R2.
      */
     private fun buildMediaItem(uri: Uri): MediaItem {
-        val scheme = uri.scheme?.lowercase()
-        if (scheme == "http" || scheme == "https") {
-            val host = uri.host.orEmpty().lowercase()
-            val q = uri.query.orEmpty()
-            val looksLikeR2 = "r2.cloudflarestorage" in host ||
-                "X-Amz-Algorithm" in q ||
-                "X-Amz-Signature" in q
-            if (looksLikeR2) {
-                throw IllegalArgumentException(
-                    "R2 cost rule: ExoPlayer must not stream signed R2 URLs " +
-                        "(Range GET spam). Download the whole object locally first.",
-                )
-            }
-        }
-
         val mimeType = if (uri.scheme == "content") {
             try {
                 ctx.contentResolver.getType(uri)
@@ -670,20 +693,20 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _duration.value = song.durationMs
     }
 
-    override fun observePremiumStreamRequired(): Flow<Unit> = _premiumStreamRequired
+    override fun observePremiumStreamRequired(): Flow<Unit> = premiumStreamSignals.events
 
     private fun notePremiumGate(resolved: ResolvedQueue) {
-        if (resolved.premiumStreamBlocked) _premiumStreamRequired.tryEmit(Unit)
+        if (resolved.premiumStreamBlocked) premiumStreamSignals.notifyRequired()
     }
 
     private fun notePremiumGate(resolved: ResolvedPlayback) {
         if (resolved is ResolvedPlayback.Dropped && resolved.reason == PlaybackDropReason.NOT_ENTITLED) {
-            _premiumStreamRequired.tryEmit(Unit)
+            premiumStreamSignals.notifyRequired()
         }
     }
 
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
-        // Resolve before any MediaItem is opened: local, Premium stream, or purge-if-absent.
+        // Resolve before any MediaItem is opened: local, entitled stream ticket, or purge on 404.
         val resolved = resolvePlaybackSource.resolveQueue(songs, startIndex)
         notePremiumGate(resolved)
         val playable = resolved.songs
