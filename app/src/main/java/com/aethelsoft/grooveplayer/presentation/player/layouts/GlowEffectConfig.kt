@@ -159,6 +159,15 @@ data class GlowEffectConfig(
      * - 0.45f = Strong strobe-like beat flash
      */
     val beatAlphaBoost: Float = 0.2f,
+
+    /**
+     * Maximum glow-opacity change between Compose frames.
+     *
+     * Stops a single frame from jumping the artwork halo into a bright flash.
+     * Comfort uses a small step. 1f leaves other presets free to move across
+     * the full 0–1 opacity range in one frame.
+     */
+    val maxGlowAlphaStep: Float = 1f,
     
     /**
      * Relative opacity of the bass frequency layer.
@@ -375,7 +384,34 @@ data class GlowEffectConfig(
      */
     val beatFlashThreshold: Float = 0.2f
 ) {
+    /**
+     * Move [previous] toward [target] by at most [maxGlowAlphaStep].
+     * Keeps frame-to-frame brightness changes inside the preset's comfort limit.
+     */
+    fun limitGlowAlphaStep(previous: Float, target: Float): Float {
+        val step = maxGlowAlphaStep.coerceAtLeast(0f)
+        val delta = (target - previous).coerceIn(-step, step)
+        return (previous + delta).coerceIn(0f, maxAlpha)
+    }
+
     companion object {
+        /**
+         * Photosensitive-safer product default.
+         * No white beat strobe, a small beat brightness lift, and a tight
+         * frame-to-frame opacity step so the halo cannot flash.
+         */
+        val Comfort = GlowEffectConfig(
+            bassExpansionMultiplier = 0.35f,
+            beatExpansionMultiplier = 0.12f,
+            minAlpha = 0.28f,
+            maxAlpha = 0.62f,
+            intensityAlphaRange = 0.28f,
+            beatAlphaBoost = 0.08f,
+            enableBeatFlash = false,
+            beatFlashAlpha = 0f,
+            maxGlowAlphaStep = 0.08f,
+        )
+
         /**
          * Default configuration for phone-sized screens.
          * Optimized for smaller displays with moderate glow.

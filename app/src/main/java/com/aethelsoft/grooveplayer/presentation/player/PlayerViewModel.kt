@@ -92,7 +92,7 @@ class PlayerViewModel @Inject constructor(
         _songDetailsSheetState.value = state
     }
 
-    private val _glowEffectConfig = MutableStateFlow<GlowEffectConfig>(GlowEffectConfig.Dramatic)
+    private val _glowEffectConfig = MutableStateFlow(GlowEffectConfig.Comfort)
 
     val glowEffectConfig: StateFlow<GlowEffectConfig> = _glowEffectConfig.asStateFlow()
 

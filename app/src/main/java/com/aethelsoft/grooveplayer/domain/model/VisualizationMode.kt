@@ -1,11 +1,12 @@
 package com.aethelsoft.grooveplayer.domain.model
 
 /**
- * Visualization mode for the audio-reactive glow / waveform.
+ * Visualization mode for the audio-reactive glow.
  *
  * - OFF: no visualization (glow uses neutral/default values)
- * - SIMULATED: time-based template animation (no RECORD_AUDIO needed)
- * - REAL_TIME: real waveform/FFT data (requires RECORD_AUDIO + Visualizer)
+ * - SIMULATED: time-based template animation. Not live audio analysis.
+ *   User-facing label: "Simulated".
+ * - REAL_TIME: Visualizer FFT (requires RECORD_AUDIO). User-facing label: "Dynamic".
  */
 enum class VisualizationMode {
     OFF,

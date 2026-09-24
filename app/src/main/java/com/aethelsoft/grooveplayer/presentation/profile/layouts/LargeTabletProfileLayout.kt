@@ -564,7 +564,7 @@ fun VisualizationModeRow(
             val options = listOf(
                 VisualizationMode.OFF to "Off",
                 VisualizationMode.SIMULATED to "Simulated",
-                VisualizationMode.REAL_TIME to "Real-time"
+                VisualizationMode.REAL_TIME to "Dynamic"
             )
 
             Row(
