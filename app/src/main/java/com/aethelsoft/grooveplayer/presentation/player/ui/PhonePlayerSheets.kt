@@ -278,25 +278,37 @@ fun PhoneQueueSheet(
 
                         SwipeToDismissBox(
                             state = dismissState,
-                            modifier = itemModifier,
+                            modifier = itemModifier.fillMaxWidth(),
                             enableDismissFromStartToEnd = false,
                             gesturesEnabled = draggingId == null,
                             backgroundContent = {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(GrooveTheme.colors.error)
-                                        .padding(horizontal = M_PADDING),
-                                    contentAlignment = Alignment.CenterEnd,
-                                ) {
-                                    Text("Remove", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                                val revealed =
+                                    dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+                                if (revealed) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(GrooveTheme.colors.error)
+                                            .padding(horizontal = M_PADDING),
+                                        contentAlignment = Alignment.CenterEnd,
+                                    ) {
+                                        Text(
+                                            "Remove",
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelLarge,
+                                        )
+                                    }
                                 }
                             },
                         ) {
+                            // The dismiss background is always composed behind the row. An opaque
+                            // sheet color covers it at rest; a left swipe translates this row and
+                            // reveals Remove. A transparent row leaves the red fill visible.
                             QueueSongRow(
                                 song = song,
                                 isNowPlaying = false,
                                 onClick = { onSkipTo(upNextStart + localIndex) },
+                                containerColor = sheetColor,
                                 handle = Modifier.pointerInputReorder(
                                     key = entry.key,
                                     onStart = {
@@ -419,13 +431,14 @@ private fun QueueSongRow(
     onClick: (() -> Unit)?,
     handle: Modifier?,
     pinned: Boolean = false,
+    containerColor: Color = Color.Transparent,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = if (pinned) M_PADDING else 0.dp)
             .clip(RoundedCornerShape(if (pinned) GrooveTheme.radii.card else 0.dp))
-            .background(if (pinned) GrooveTheme.colors.surface else Color.Transparent)
+            .background(if (pinned) GrooveTheme.colors.surface else containerColor)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = M_PADDING, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
