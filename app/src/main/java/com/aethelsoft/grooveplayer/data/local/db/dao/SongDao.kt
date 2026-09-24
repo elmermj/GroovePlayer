@@ -26,6 +26,12 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE songId = :songId")
     suspend fun getSong(songId: String): SongEntity?
 
+    @Query("SELECT songId FROM songs WHERE songId = :songId LIMIT 1")
+    suspend fun findSongId(songId: String): String?
+
+    @Query("SELECT sourcePath FROM songs WHERE songId = :songId")
+    suspend fun getSourcePath(songId: String): String?
+
     @Query("DELETE FROM songs WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
 }

@@ -5,6 +5,7 @@ import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
+import com.aethelsoft.grooveplayer.data.remote.api.PlaybackSourceApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -144,4 +145,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideBackupApi(retrofit: Retrofit): BackupApi = retrofit.create(BackupApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePlaybackSourceApi(retrofit: Retrofit): PlaybackSourceApi =
+        retrofit.create(PlaybackSourceApi::class.java)
 }

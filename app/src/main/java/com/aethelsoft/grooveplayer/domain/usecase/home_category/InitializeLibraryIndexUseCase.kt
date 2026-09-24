@@ -104,7 +104,8 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 uri = song.uri,
                 title = song.title,
                 trackNumber = null,
-                durationMs = song.durationMs
+                durationMs = song.durationMs,
+                sourcePath = song.filePath,
             )
             songDao.insertOrUpdate(songEntity)
 

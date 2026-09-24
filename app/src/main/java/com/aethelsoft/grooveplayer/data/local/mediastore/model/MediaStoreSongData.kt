@@ -12,5 +12,7 @@ data class MediaStoreSongData(
     val genre: String,
     val durationMs: Long,
     val artworkUrl: String? = null,
-    val album: String? = null
+    val album: String? = null,
+    val filePath: String? = null,
+    val fileSizeBytes: Long? = null,
 )

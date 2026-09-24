@@ -50,5 +50,15 @@ interface AlbumDao {
         """
     )
     suspend fun getLatestAlbumByArtist(artistName: String): AlbumEntity?
+
+    @Query(
+        """
+        DELETE FROM albums
+        WHERE albumId NOT IN (
+            SELECT albumId FROM songs WHERE albumId IS NOT NULL
+        )
+        """
+    )
+    suspend fun deleteWithoutSongs()
 }
 

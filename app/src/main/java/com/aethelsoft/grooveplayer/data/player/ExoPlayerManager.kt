@@ -18,6 +18,8 @@ import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedPlayback
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.services.MusicPlaybackServiceManager
@@ -67,7 +69,8 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val userRepository: UserRepository,
     private val serviceManager: MusicPlaybackServiceManager,
     private val equalizerManager: EqualizerManager,
-    private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
+    private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository,
+    private val resolvePlaybackSource: ResolvePlaybackSourceUseCase,
 ) : PlayerRepository {
 
     private val player: ExoPlayer = createPlayerOnMainThread()
@@ -664,16 +667,24 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
-        if (_shuffle.value && songs.size > 1) {
+        val resolved = resolvePlaybackSource.resolveQueue(songs, startIndex)
+        val playable = resolved.songs
+        val resolvedStart = resolved.startIndex
+        if (playable.isEmpty()) {
+            preShuffleOrder = null
+            setQueueInternal(emptyList(), 0, isEndlessQueue = false, autoPlay = false)
+            return
+        }
+        if (_shuffle.value && playable.size > 1) {
             // Shuffle is on: the chosen song plays first, the rest follow in a shuffled (real) order.
-            val start = startIndex.coerceIn(0, songs.lastIndex)
-            val chosen = songs[start]
-            val rest = songs.filterIndexed { i, _ -> i != start }.shuffled()
-            preShuffleOrder = songs.toMutableList()
+            val start = resolvedStart.coerceIn(0, playable.lastIndex)
+            val chosen = playable[start]
+            val rest = playable.filterIndexed { i, _ -> i != start }.shuffled()
+            preShuffleOrder = playable.toMutableList()
             return setQueueInternal(listOf(chosen) + rest, 0, isEndlessQueue, autoPlay)
         }
-        preShuffleOrder = if (_shuffle.value) songs.toMutableList() else null
-        setQueueInternal(songs, startIndex, isEndlessQueue, autoPlay)
+        preShuffleOrder = if (_shuffle.value) playable.toMutableList() else null
+        setQueueInternal(playable, resolvedStart, isEndlessQueue, autoPlay)
     }
 
     private suspend fun setQueueInternal(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
@@ -783,15 +794,17 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun insertQueueItem(index: Int, song: Song) {
+        val resolved = resolvePlaybackSource.resolveOne(song)
+        val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
         val q = _queue.value
         val at = index.coerceIn(0, q.size)
         val inserted = withContext(Dispatchers.Main.immediate) {
             if (at > player.mediaItemCount) return@withContext false
-            player.addMediaItem(at, buildMediaItem(song.uri.toUri()))
+            player.addMediaItem(at, buildMediaItem(playable.uri.toUri()))
             true
         }
         if (!inserted) return
-        val newQueue = q.toMutableList().apply { add(at, song) }
+        val newQueue = q.toMutableList().apply { add(at, playable) }
         _queue.value = newQueue
         preShuffleOrder?.let { orig -> placeAfterPredecessor(orig, newQueue, at) }
         persistQueueState()
@@ -968,7 +981,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
         
         // Pick 10 random songs
-        val randomSongs = songsToPickFrom.shuffled().take(10)
+        val randomSongs = songsToPickFrom.shuffled().take(10).mapNotNull { song ->
+            (resolvePlaybackSource.resolveOne(song) as? ResolvedPlayback.Playable)?.song
+        }
+        if (randomSongs.isEmpty()) return
         
         // Add to queue
         val newQueue = currentQueue + randomSongs
@@ -1006,7 +1022,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun playSong(song: Song) {
-        prepareFromSong(song)
+        val resolved = resolvePlaybackSource.resolveOne(song)
+        val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
+        prepareFromSong(playable)
         withContext(Dispatchers.Main.immediate) {
             player.playWhenReady = true
             player.play()
