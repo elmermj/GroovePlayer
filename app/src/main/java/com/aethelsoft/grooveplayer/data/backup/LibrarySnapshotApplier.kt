@@ -20,8 +20,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Copies favourites, recents, metadata, and settings from a staged snapshot into the
- * already-open Room database. The Hilt database is not closed and its file is not replaced.
+ * Row copy used before atomic file swap. Restore no longer calls this: the staged
+ * snapshot replaces the live database file, then the process restarts onto it.
  */
 @Singleton
 class LibrarySnapshotApplier @Inject constructor(

@@ -57,22 +57,34 @@ class RestoreApplyRecoveryTest {
     }
 
     @Test
-    fun coldStartResumesOnlyAValidatedStagedSnapshot() {
+    fun coldStartResumesDownloadUntilFilesAreReadyThenSwaps() {
         assertEquals(
             ColdStartAction.OPEN_HOME,
             RestoreApplyRecovery.coldStartAction(RestorePhase.IDLE, null),
         )
         assertEquals(
-            ColdStartAction.DISCARD_AND_HOME,
+            ColdStartAction.OPEN_HOME,
+            RestoreApplyRecovery.coldStartAction(RestorePhase.COMMITTED, StagingVerdict.VALID),
+        )
+        assertEquals(
+            ColdStartAction.RESUME_DOWNLOAD,
             RestoreApplyRecovery.coldStartAction(RestorePhase.DOWNLOADING, StagingVerdict.VALID),
         )
         assertEquals(
-            ColdStartAction.RESUME_APPLY,
+            ColdStartAction.RESUME_DOWNLOAD,
             RestoreApplyRecovery.coldStartAction(RestorePhase.STAGED, StagingVerdict.VALID),
         )
         assertEquals(
-            ColdStartAction.RESUME_APPLY,
+            ColdStartAction.RESUME_DOWNLOAD,
             RestoreApplyRecovery.coldStartAction(RestorePhase.APPLYING, StagingVerdict.VALID),
+        )
+        assertEquals(
+            ColdStartAction.RESUME_APPLY,
+            RestoreApplyRecovery.coldStartAction(RestorePhase.FILES_READY, StagingVerdict.VALID),
+        )
+        assertEquals(
+            ColdStartAction.RESUME_APPLY,
+            RestoreApplyRecovery.coldStartAction(RestorePhase.SWAPPING, StagingVerdict.VALID),
         )
         assertEquals(
             ColdStartAction.DISCARD_AND_HOME,
@@ -81,6 +93,10 @@ class RestoreApplyRecoveryTest {
         assertEquals(
             ColdStartAction.DISCARD_AND_HOME,
             RestoreApplyRecovery.coldStartAction(RestorePhase.STAGED, null),
+        )
+        assertEquals(
+            ColdStartAction.DISCARD_AND_HOME,
+            RestoreApplyRecovery.coldStartAction(RestorePhase.FILES_READY, StagingVerdict.NEWER_THAN_APP),
         )
         assertEquals(
             ColdStartAction.DISCARD_AND_HOME,

@@ -4,14 +4,24 @@ package com.aethelsoft.grooveplayer.domain.backup
  * Decisions for cloud library restore that must not depend on a live Room connection.
  *
  * The live database file is never the download destination. A process death mid-download
- * discards the partial file and opens Home. A process death after the snapshot is validated
- * resumes apply.
+ * resumes the download and does not apply a partial snapshot. A process death after the
+ * required audio is on disk resumes the swap. A process death during the rename finishes
+ * it or rolls back to the previous database before Room opens.
  */
 enum class RestorePhase {
     IDLE,
+    /** Room snapshot or audio is still downloading. A partial SQLite file is not applied. */
     DOWNLOADING,
+    /** Snapshot verified; cloud audio may still be missing. */
     STAGED,
+    /** Legacy in-place apply. Resumed as a download so files are confirmed before swap. */
     APPLYING,
+    /** Every required cloud song has bytes on disk and the snapshot is ready to swap. */
+    FILES_READY,
+    /** Rename of the live database is in progress. Cold start finishes or rolls back. */
+    SWAPPING,
+    /** Incoming database is at the live path. Next process opens it; do not swap again. */
+    COMMITTED,
 }
 
 enum class StagingVerdict {
@@ -23,6 +33,9 @@ enum class StagingVerdict {
 
 enum class ColdStartAction {
     OPEN_HOME,
+    /** Continue downloads, then swap. Does not apply a partial snapshot. */
+    RESUME_DOWNLOAD,
+    /** Audio is already confirmed. Swap the staged database, or finish a parked swap. */
     RESUME_APPLY,
     DISCARD_AND_HOME,
 }
@@ -64,14 +77,19 @@ object RestoreApplyRecovery {
     }
 
     /**
-     * [RestorePhase.DOWNLOADING] always discards, even if a partial file already has a SQLite
-     * header. Only a fully staged snapshot is safe to apply.
+     * [RestorePhase.DOWNLOADING] resumes the download even if a partial file already has a
+     * SQLite header. Only [RestorePhase.FILES_READY] (or a swap already in progress) may
+     * replace the live database. [RestorePhase.COMMITTED] opens Home on the swapped file.
      */
     fun coldStartAction(phase: RestorePhase, verdict: StagingVerdict?): ColdStartAction {
         return when (phase) {
-            RestorePhase.IDLE -> ColdStartAction.OPEN_HOME
-            RestorePhase.DOWNLOADING -> ColdStartAction.DISCARD_AND_HOME
+            RestorePhase.IDLE, RestorePhase.COMMITTED -> ColdStartAction.OPEN_HOME
+            RestorePhase.DOWNLOADING -> ColdStartAction.RESUME_DOWNLOAD
             RestorePhase.STAGED, RestorePhase.APPLYING -> when (verdict) {
+                StagingVerdict.VALID -> ColdStartAction.RESUME_DOWNLOAD
+                else -> ColdStartAction.DISCARD_AND_HOME
+            }
+            RestorePhase.FILES_READY, RestorePhase.SWAPPING -> when (verdict) {
                 StagingVerdict.VALID -> ColdStartAction.RESUME_APPLY
                 else -> ColdStartAction.DISCARD_AND_HOME
             }

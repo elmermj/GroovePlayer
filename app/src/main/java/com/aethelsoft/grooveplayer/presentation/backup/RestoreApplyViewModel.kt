@@ -24,7 +24,11 @@ data class RestoreApplyUiState(
 class RestoreLaunchViewModel @Inject constructor(
     gate: LibraryRestoreGate,
 ) : ViewModel() {
-    val startOnApplyScreen: Boolean = gate.launchAction == ColdStartAction.RESUME_APPLY
+    val launchAction: ColdStartAction = gate.launchAction
+    val startOnApplyScreen: Boolean =
+        launchAction == ColdStartAction.RESUME_APPLY ||
+            launchAction == ColdStartAction.RESUME_DOWNLOAD
+    val resumeDownload: Boolean = launchAction == ColdStartAction.RESUME_DOWNLOAD
 }
 
 @HiltViewModel
