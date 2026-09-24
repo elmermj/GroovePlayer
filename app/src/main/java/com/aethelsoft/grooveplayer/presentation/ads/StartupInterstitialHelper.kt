@@ -12,7 +12,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 
 /**
  * Startup "video" interstitial (max 2/day, FREE tier only).
- * Uses ADMOB_INTERSTITIAL_UNIT_ID from BuildConfig — see app/ADS_SETUP.md.
+ * Uses ADMOB_INTERSTITIAL_UNIT_ID from BuildConfig.
  * Failures are non-fatal so Sign-In is never blocked on ads.
  */
 object StartupInterstitialHelper {

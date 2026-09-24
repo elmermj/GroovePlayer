@@ -53,7 +53,7 @@ import javax.inject.Singleton
  * else SHA-256 → upload-url (honor deduped) → PUT → complete.
  * Room DB snapshot always runs first. Refresh `/v1/me` storage from complete.user.
  *
- * R2 cost rules: see app/R2_COST_RULES.md — skip never remints upload-url;
+ * R2 cost rules: skip never remints upload-url;
  * one whole-object GetObject; reuse download signed URLs until near expiry;
  * no S3 ListObjects; HeadObject only via complete; room.db skip-if-unchanged.
  */

@@ -18,7 +18,7 @@ import com.google.android.gms.ads.AdView
 
 /**
  * Banner ad slot — only loads when privilege tier is FREE.
- * Unit ID from BuildConfig (local.properties ADMOB_BANNER_UNIT_ID). See app/ADS_SETUP.md.
+ * Unit ID from BuildConfig (local.properties ADMOB_BANNER_UNIT_ID).
  */
 @Composable
 fun BannerAdSlot(

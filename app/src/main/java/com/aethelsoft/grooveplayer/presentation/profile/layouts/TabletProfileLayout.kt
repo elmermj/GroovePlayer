@@ -96,7 +96,7 @@ fun TabletProfileLayout(
                 Spacer(Modifier.height(S_PADDING))
                 AccountSection(viewModel = viewModel, onNavigateToBackup = onNavigateToBackup)
                 Spacer(Modifier.height(S_PADDING))
-                // FREE-tier only; no-op when Basic/Premium. See app/ADS_SETUP.md
+                // FREE-tier only; no-op when Basic/Premium.
                 com.aethelsoft.grooveplayer.presentation.ads.BannerAdSlot()
             }
         }

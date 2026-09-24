@@ -27,3 +27,8 @@ keystore/firebase-service-account.json
 # Local layout QA screenshots (not for remote)
 grooveplayer-layout-qa/
 grooveplayer-tablet-shots/
+
+# Setup guides stay on disk. Only README.md may be committed.
+*.md
+!README.md
+!**/README.md
