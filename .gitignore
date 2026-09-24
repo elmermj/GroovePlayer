@@ -22,3 +22,8 @@ local.properties
 keystore/
 *.jks
 *.keystore
+
+# Setup guides stay on disk. Only README.md may be committed.
+*.md
+!README.md
+!**/README.md
