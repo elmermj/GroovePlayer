@@ -11,12 +11,14 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.library.LibraryGenreIndex
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadataRepository
 import com.aethelsoft.grooveplayer.utils.ArtistParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 /**
@@ -30,6 +32,7 @@ class InitializeLibraryIndexUseCase @Inject constructor(
     private val genreDao: GenreDao,
     private val songDao: SongDao,
     private val songMetadataRepository: SongMetadataRepository,
+    private val appLibraryPaths: AppLibraryPaths,
 ) {
 
     suspend operator fun invoke() = withContext(Dispatchers.IO) {
@@ -98,6 +101,7 @@ class InitializeLibraryIndexUseCase @Inject constructor(
             }
 
             // Ensure SongEntity + song-artist links
+            val existingPath = songDao.getSourcePath(song.id)
             val songEntity = SongEntity(
                 songId = song.id,
                 albumId = albumId,
@@ -105,7 +109,7 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 title = song.title,
                 trackNumber = null,
                 durationMs = song.durationMs,
-                sourcePath = song.filePath,
+                sourcePath = if (keepsAppLibraryFile(existingPath)) existingPath else song.filePath,
             )
             songDao.insertOrUpdate(songEntity)
 
@@ -130,6 +134,12 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun keepsAppLibraryFile(path: String?): Boolean {
+        if (path.isNullOrBlank() || !appLibraryPaths.isInside(path)) return false
+        val file = File(path)
+        return file.isFile && file.length() > 0L
     }
 
     private suspend fun ensureGenreId(

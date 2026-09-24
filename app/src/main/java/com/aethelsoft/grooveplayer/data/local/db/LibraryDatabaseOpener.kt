@@ -38,7 +38,7 @@ object LibraryDatabaseOpener {
                             context,
                             RestorePhase.IDLE,
                             error = "Restore could not open the new library, so the previous library was kept. " +
-                                "Songs already in Groove Downloads were left in place.",
+                                "Songs already in the app library were left in place.",
                         )
                         RoomDbSwapFiles.forContext(context).acknowledgeOpen()
                         return retry
@@ -76,7 +76,7 @@ object LibraryDatabaseOpener {
 
     /**
      * Finish or undo a database rename before Room opens the live file.
-     * Groove Downloads audio is not touched.
+     * App library audio is not touched.
      */
     private fun reconcileInterruptedSwap(context: Context) {
         val swap = RoomDbSwapFiles.forContext(context)
@@ -93,7 +93,7 @@ object LibraryDatabaseOpener {
                     context,
                     phase,
                     error = "Restore rolled back to the previous library. " +
-                        "Songs already in Groove Downloads were left in place.",
+                        "Songs already in the app library were left in place.",
                 )
             }
             RecoveryResult.UNCHANGED -> Unit

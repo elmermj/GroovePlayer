@@ -14,12 +14,14 @@ import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.AuthRepositoryImpl
 import com.aethelsoft.grooveplayer.data.billing.BillingRepositoryImpl
 import com.aethelsoft.grooveplayer.data.backup.BackupRepositoryImpl
+import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
 import com.aethelsoft.grooveplayer.data.playback.CloudAudioLookupImpl
 import com.aethelsoft.grooveplayer.data.playback.CloudPlaybackCacheStore
 import com.aethelsoft.grooveplayer.data.playback.LocalAudioProbe
 import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
 import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
 import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
 import com.aethelsoft.grooveplayer.domain.playback.CloudPlaybackCache
 import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
@@ -46,6 +48,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
 /**
  * Dagger Hilt module for binding repository interfaces to their implementations.
@@ -160,6 +163,12 @@ abstract class RepositoryModule {
     abstract fun bindCloudStreamEntitlement(
         impl: PremiumCloudEntitlement
     ): CloudStreamEntitlement
+
+    @Binds
+    @Singleton
+    abstract fun bindAppLibraryPaths(
+        impl: GrooveDownloadsLocator,
+    ): AppLibraryPaths
 
     @Binds
     abstract fun bindPlaybackStreamTickets(

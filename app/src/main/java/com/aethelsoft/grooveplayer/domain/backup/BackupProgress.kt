@@ -134,7 +134,7 @@ object BackupProgressLabel {
 }
 
 /**
- * Byte budget for copying approved songs into Groove Downloads.
+ * Byte budget for copying approved songs into the app library.
  * Bytes only increase, so the bar cannot move backward inside one backup run.
  * A new run starts a new instance after the preparing step resets the UI to 0.
  */
@@ -146,7 +146,7 @@ class ConsolidateByteProgress(
     private var bytesDone = 0L
     private var opRead = 0L
 
-    /** Files whose consolidate work has started. Stays 0 while Groove Downloads is indexed. */
+    /** Files whose consolidate work has started. Stays 0 while the app library is indexed. */
     var filesShown: Int = 0
         private set
 

@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.domain.usecase.player_category
 
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioPresence
@@ -55,6 +56,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
     private val catalog: SongCatalog,
     private val cloud: CloudAudioLookup,
     private val tickets: PlaybackStreamTickets,
+    private val appLibraryPaths: AppLibraryPaths,
 ) {
     suspend fun resolveOne(song: Song): ResolvedPlayback = withContext(Dispatchers.IO) {
         resolveOneLocked(song)
@@ -112,7 +114,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
         song: Song,
         purgeNow: Boolean,
     ): ResolvedPlayback {
-        val logicalPath = song.filePath ?: catalog.sourcePath(song.id)
+        val logicalPath = logicalPathFor(song)
         val localUri = localPlayableUri(song, logicalPath)
         if (localUri != null) {
             return ResolvedPlayback.Playable(
@@ -160,6 +162,21 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
         }
     }
 
+    private suspend fun logicalPathFor(song: Song): String? {
+        val stored = try {
+            catalog.sourcePath(song.id)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        if (!stored.isNullOrBlank() && appLibraryPaths.isInside(stored)) {
+            val file = File(stored)
+            if (file.isFile && file.length() > 0L) return stored
+        }
+        return song.filePath ?: stored
+    }
+
     private fun localFallback(song: Song): ResolvedPlayback.Playable? {
         val localUri = runCatching { localPlayableUri(song, song.filePath) }.getOrNull() ?: return null
         return ResolvedPlayback.Playable(
@@ -170,6 +187,10 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
     private fun localPlayableUri(song: Song, logicalPath: String?): String? {
         if (!localAudio.isReadable(song.uri, logicalPath)) {
             return cache.existingUri(song.id)
+        }
+        if (!logicalPath.isNullOrBlank() && appLibraryPaths.isInside(logicalPath)) {
+            val file = File(logicalPath)
+            if (file.isFile && file.length() > 0L) return file.toURI().toString()
         }
         // Library content URI when it opens. If only the indexed path still exists, play that file.
         if (localAudio.isReadable(song.uri, filePath = null) || logicalPath.isNullOrBlank()) {

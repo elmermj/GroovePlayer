@@ -6,7 +6,7 @@ package com.aethelsoft.grooveplayer.domain.model
 enum class CloudBackupPhase {
     IDLE,
     PREPARING,
-    /** Copying included-folder audio into Groove Downloads and updating Room paths. */
+    /** Copying included-folder audio into the app library and updating Room paths. */
     CONSOLIDATING,
     UPLOADING,
     SUCCESS,
@@ -37,7 +37,7 @@ data class CloudBackupState(
     val bytesUploaded: Long = 0L,
     val filesTotal: Int = 0,
     val filesCompleted: Int = 0,
-    /** Songs copied into Groove Downloads with Room paths updated. */
+    /** Songs copied into the app library with Room paths updated. */
     val consolidateCompleted: Int = 0,
     val consolidateTotal: Int = 0,
     /** Song files finished (uploaded or hash-skipped). Catalog upload is separate. */
