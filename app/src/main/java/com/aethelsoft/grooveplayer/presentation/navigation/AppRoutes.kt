@@ -30,6 +30,9 @@ object AppRoutes {
     const val TRANSFER_STATUS = "transfer_status"
     const val UI_CUSTOMISATION = "ui_styling"
     const val BACKUP = "backup"
+    const val RESTORE_APPLY = "restore_apply?start={start}"
+
+    fun restoreApplyRoute(startDownload: Boolean) = "restore_apply?start=$startDownload"
 
     fun searchRoute(query: String) = "search/${Uri.encode(query)}"
     fun shareConfirmationRoute(shareMethod: String) = "share_confirmation/$shareMethod"

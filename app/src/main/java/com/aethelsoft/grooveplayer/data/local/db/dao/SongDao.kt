@@ -32,6 +32,9 @@ interface SongDao {
     @Query("SELECT sourcePath FROM songs WHERE songId = :songId")
     suspend fun getSourcePath(songId: String): String?
 
+    @Query("UPDATE songs SET sourcePath = :sourcePath WHERE songId = :songId")
+    suspend fun updateSourcePath(songId: String, sourcePath: String)
+
     @Query("DELETE FROM songs WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
 }

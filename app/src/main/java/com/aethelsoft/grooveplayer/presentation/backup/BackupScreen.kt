@@ -16,6 +16,7 @@ import com.aethelsoft.grooveplayer.presentation.common.BasePageTemplate
 @Composable
 fun BackupScreen(
     onNavigateBack: () -> Unit,
+    onRestoreLibrary: () -> Unit,
     viewModel: BackupViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onNavigateBack)
@@ -39,9 +40,9 @@ fun BackupScreen(
     }
 
     BasePageTemplate(
-        phoneLayout = { PhoneBackupLayout(viewModel) },
-        tabletLayout = { TabletBackupLayout(viewModel) },
-        largeTabletLayout = { LargeTabletBackupLayout(viewModel) },
+        phoneLayout = { PhoneBackupLayout(viewModel, onRestoreLibrary) },
+        tabletLayout = { TabletBackupLayout(viewModel, onRestoreLibrary) },
+        largeTabletLayout = { LargeTabletBackupLayout(viewModel, onRestoreLibrary) },
         onNavigateToSearch = {},
         viewModel = viewModel,
         isSearchEnabled = false,

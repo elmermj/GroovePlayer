@@ -914,7 +914,7 @@ private fun RestoreLibrarySection(
             val schema = librarySnapshot?.schemaVersion?.toString() ?: "?"
             val size = librarySnapshot?.sizeBytes ?: 0L
             "Cloud Room DB ready · schema $schema · ${StorageFormatUtils.formatBytes(size, size.coerceAtLeast(1L))}. " +
-                "Restores favourites/recents/playlists/settings. Force-stop the app after restore."
+                "Restores favourites, recents, and settings. Songs already on this device stay put."
         } else {
             emptyHint
         },

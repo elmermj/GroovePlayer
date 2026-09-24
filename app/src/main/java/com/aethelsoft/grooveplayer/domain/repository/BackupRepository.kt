@@ -44,13 +44,19 @@ interface BackupRepository {
      */
     suspend fun trimCloudBackup(request: TrimCloudBackupRequest): Result<TrimCloudBackupResult>
 
-    /**
-     * GET /v1/backup/library → download gzip → gunzip → replace local Room DB after close.
-     * Validates schema_version. Room singleton is closed — restart app before further DB use.
-     */
     /** GET /v1/backup/library — null when no room_db snapshot yet. */
     suspend fun fetchCloudLibraryMetadata(): Result<CloudLibrarySnapshot?>
 
-    suspend fun restoreLibraryFromCloud(): Result<Unit>
+    /**
+     * Download the cloud Room snapshot into a staging file.
+     * Does not close Room and does not replace the live database.
+     */
+    suspend fun stageLibraryRestore(): Result<Unit>
+
+    /**
+     * Copy settings, history, and metadata from the staged snapshot into the open database,
+     * then clear the staging file.
+     */
+    suspend fun applyStagedLibraryRestore(): Result<Unit>
 }
 

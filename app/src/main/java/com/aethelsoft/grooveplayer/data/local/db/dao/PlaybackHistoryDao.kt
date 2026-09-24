@@ -101,6 +101,9 @@ interface PlaybackHistoryDao {
 
     @Query("DELETE FROM playback_history WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
+
+    @Query("DELETE FROM playback_history")
+    suspend fun deleteAll()
     
     @Query("""
         SELECT 

@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,6 +29,7 @@ import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
 import com.aethelsoft.grooveplayer.presentation.ui_customisation.UiCustomisationScreen
 import com.aethelsoft.grooveplayer.presentation.backup.BackupScreen
+import com.aethelsoft.grooveplayer.presentation.backup.RestoreApplyScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 import com.aethelsoft.grooveplayer.presentation.share.ReceiveApprovalScreen
 import com.aethelsoft.grooveplayer.presentation.transfer.DeviceDiscoveryScreen
@@ -44,11 +46,12 @@ import com.aethelsoft.grooveplayer.presentation.share.ShareViaNearbyScreen
  */
 @Composable
 fun AppNavHost(
-    navController: NavHostController
+    navController: NavHostController,
+    startDestination: String = AppRoutes.HOME,
 ) {
     NavHost(
         navController = navController,
-        startDestination = AppRoutes.HOME,
+        startDestination = startDestination,
         enterTransition = {
             slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth },
@@ -521,6 +524,31 @@ fun AppNavHost(
         composable(route = AppRoutes.BACKUP) {
             BackupScreen(
                 onNavigateBack = { navController.popBackStack() },
+                onRestoreLibrary = {
+                    navController.navigate(AppRoutes.restoreApplyRoute(startDownload = true))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.RESTORE_APPLY,
+            arguments = listOf(
+                navArgument("start") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+            ),
+        ) { entry ->
+            val startDownload = entry.arguments?.getBoolean("start") ?: false
+            RestoreApplyScreen(
+                startDownload = startDownload,
+                onFinished = {
+                    navController.navigate(AppRoutes.HOME) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                },
             )
         }
         composable(route = AppRoutes.SHARE_OPTIONS) {

@@ -47,6 +47,7 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
+import com.aethelsoft.grooveplayer.presentation.backup.RestoreLaunchViewModel
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
@@ -86,6 +87,7 @@ private sealed interface BottomBarState {
             currentRoute?.startsWith("share_confirmation") == true -> None
             currentRoute?.startsWith("nearby_discovery") == true -> None
             currentRoute == AppRoutes.TRANSFER_PROGRESS -> None
+            currentRoute?.startsWith("restore_apply") == true -> None
             // Screens that set secondary content (e.g. SongsScreen selection mode)
             hasSecondaryContent -> Confirmation
             // Show mini player when playing and not in full-screen
@@ -370,7 +372,15 @@ fun GroovePlayerAppMain() {
                         bottom = 0.dp
                     )
             ) {
-                AppNavHost(navController = navController)
+                val restoreLaunch: RestoreLaunchViewModel = hiltViewModel()
+                AppNavHost(
+                    navController = navController,
+                    startDestination = if (restoreLaunch.startOnApplyScreen) {
+                        AppRoutes.restoreApplyRoute(startDownload = false)
+                    } else {
+                        AppRoutes.HOME
+                    },
+                )
                 val bottomBarState = BottomBarState.resolve(
                     currentRoute = currentRoute,
                     hasSecondaryContent = secondaryBottomContent.value != null,
