@@ -20,6 +20,9 @@ interface SongDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSongGenreCrossRef(crossRef: SongGenreCrossRef)
 
+    @Query("DELETE FROM song_genres WHERE songId = :songId")
+    suspend fun deleteSongGenreCrossRefs(songId: String)
+
     @Query("SELECT * FROM songs WHERE songId = :songId")
     suspend fun getSong(songId: String): SongEntity?
 

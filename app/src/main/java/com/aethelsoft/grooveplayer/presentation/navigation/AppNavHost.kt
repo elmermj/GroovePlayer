@@ -19,6 +19,9 @@ import com.aethelsoft.grooveplayer.presentation.library.artists.ArtistDetailScre
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteAlbumsScreen
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteArtistsScreen
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteTracksScreen
+import com.aethelsoft.grooveplayer.presentation.library.genres.GenreTracksScreen
+import com.aethelsoft.grooveplayer.presentation.library.genres.GenresScreen
+import com.aethelsoft.grooveplayer.presentation.library.mostplayed.MostPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
@@ -104,7 +107,9 @@ fun AppNavHost(
         ) {
             HomeScreen(
                 onNavigateToSongs = { navController.navigate(AppRoutes.SONGS) },
+                onNavigateToGenres = { navController.navigate(AppRoutes.GENRES) },
                 onNavigateToRecentlyPlayed = { navController.navigate(AppRoutes.RECENTLY_PLAYED) },
+                onNavigateToMostPlayed = { navController.navigate(AppRoutes.MOST_PLAYED) },
                 onNavigateToFavoriteTracks = { navController.navigate(AppRoutes.FAVORITE_TRACKS) },
                 onNavigateToFavoriteArtists = { navController.navigate(AppRoutes.FAVORITE_ARTISTS) },
                 onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) },
@@ -182,6 +187,32 @@ fun AppNavHost(
             }
         ) {
             RecentlyPlayedScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = AppRoutes.MOST_PLAYED) {
+            MostPlayedScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = AppRoutes.GENRES) {
+            GenresScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onGenreClick = { genreName ->
+                    navController.navigate(AppRoutes.genreTracksRoute(genreName))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.GENRE_TRACKS,
+            arguments = listOf(
+                navArgument("genreName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            ),
+        ) {
+            GenreTracksScreen(
                 onNavigateBack = { navController.popBackStack() }
             )
         }

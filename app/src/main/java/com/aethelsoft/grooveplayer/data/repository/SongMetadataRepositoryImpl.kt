@@ -14,6 +14,7 @@ import com.aethelsoft.grooveplayer.domain.repository.AlbumMetadata
 import com.aethelsoft.grooveplayer.domain.repository.ArtistMetadata
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadata
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadataRepository
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,6 +31,9 @@ class SongMetadataRepositoryImpl @Inject constructor(
         val entity = songMetadataDao.getMetadata(songId) ?: return null
         return entity.toDomain()
     }
+
+    override suspend fun getAllMetadata(): List<SongMetadata> =
+        songMetadataDao.getAllMetadata().first().map { it.toDomain() }
     
     override suspend fun saveMetadata(metadata: SongMetadata) {
         val entity = SongMetadataEntity(

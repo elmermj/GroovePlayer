@@ -369,6 +369,7 @@ fun SongItemComponent(
     onLongPress: (Song) -> Unit = {},
     padding: Dp = DefaultSPadding,
     selectionConfig: ItemSelectionConfig? = null,
+    metaText: String? = null,
     secondaryContent: (@Composable () -> Unit)? = null
 ) {
     val navigation = rememberNavigationActions()
@@ -376,7 +377,7 @@ fun SongItemComponent(
         title = song.title,
         subtitle = song.artist,
         artworkUrl = song.artworkUrl,
-        metaText = formatDuration(song.durationMs),
+        metaText = metaText ?: formatDuration(song.durationMs),
         onClick = onClick,
         padding = padding,
         artworkKind = MediaArtworkKind.SONG,
