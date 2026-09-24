@@ -44,7 +44,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         TransferEntity::class,
         TransferFileEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,7 +53,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
         /** Room SQLite file name under Context.getDatabasePath. */
         const val DATABASE_NAME = "grooveplayer_database"
         /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
-        const val SCHEMA_VERSION = 15
+        const val SCHEMA_VERSION = 16
     }
 
     abstract fun playbackHistoryDao(): PlaybackHistoryDao

@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge
+import com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.utils.DefaultSPadding
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -48,6 +50,7 @@ fun SongItemComponent(
     padding: Dp = DefaultSPadding
 ) {
     var showOptionsMenu by remember { mutableStateOf(false) }
+    val availability = rememberSongAvailabilityMark(song)
 
     Card(
         modifier = Modifier
@@ -88,6 +91,9 @@ fun SongItemComponent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (availability != null) {
+                    SongAvailabilityBadge(mark = availability, iconSize = 16.dp)
+                }
                 Text(
                     text = formatDuration(song.durationMs),
                     style = GrooveTheme.typography.menuSongAlbum.toTextStyle(),

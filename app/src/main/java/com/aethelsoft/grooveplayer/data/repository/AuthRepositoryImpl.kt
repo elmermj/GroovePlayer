@@ -46,6 +46,9 @@ class AuthRepositoryImpl @Inject constructor(
     override fun observePrivilegeTier(): Flow<PrivilegeTier> =
         _authUser.map { it?.privilegeTier ?: PrivilegeTier.FREE }
 
+    override fun currentPrivilegeTier(): PrivilegeTier =
+        _authUser.value?.privilegeTier ?: PrivilegeTier.FREE
+
     override fun observeServerSyncError(): Flow<String?> = _serverSyncError.asStateFlow()
 
     override suspend fun getAuthUser(): AuthUser? = _authUser.value

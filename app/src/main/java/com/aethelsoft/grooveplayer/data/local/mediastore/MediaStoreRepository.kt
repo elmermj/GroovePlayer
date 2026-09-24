@@ -116,7 +116,8 @@ class MediaStoreRepository @Inject constructor(
             MediaStore.Audio.Media.DATA,
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.GENRE
+            MediaStore.Audio.Media.GENRE,
+            MediaStore.Audio.Media.SIZE,
         )
 
         val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
@@ -138,6 +139,7 @@ class MediaStoreRepository @Inject constructor(
             val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
             val genreColumn = cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
+            val sizeColumn = cursor.getColumnIndex(MediaStore.Audio.Media.SIZE)
 
             var index = 0
             while (cursor.moveToNext()) {
@@ -165,6 +167,11 @@ class MediaStoreRepository @Inject constructor(
                 } else {
                     ""
                 }
+                val sizeBytes = if (sizeColumn >= 0 && !cursor.isNull(sizeColumn)) {
+                    cursor.getLong(sizeColumn).takeIf { it > 0L }
+                } else {
+                    null
+                }
 
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -188,7 +195,9 @@ class MediaStoreRepository @Inject constructor(
                         genre = genre,
                         durationMs = duration,
                         artworkUrl = artworkUri,
-                        album = album
+                        album = album,
+                        filePath = dataPath.takeIf { it.isNotBlank() },
+                        fileSizeBytes = sizeBytes,
                     )
                 )
                 index++

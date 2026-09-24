@@ -5,6 +5,7 @@ import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
+import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -76,9 +77,11 @@ object NetworkModule {
      * Plain client for R2 signed PUT/GET — must NOT attach Bearer.
      * Longer timeouts for large audio uploads.
      *
-     * R2 cost rules:
+     * R2 cost rules for backup restore only:
      * - One whole-object GetObject (no Range spam)
      * - No client HeadObject (HEAD rejected; complete does server Head once)
+     *
+     * Playback `stream_url` does not use this client. ExoPlayer may Range-GET it.
      */
     @Provides
     @Singleton
@@ -144,4 +147,9 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideBackupApi(retrofit: Retrofit): BackupApi = retrofit.create(BackupApi::class.java)
+
+    @Provides
+    @Singleton
+    fun providePlaybackApi(retrofit: Retrofit): PlaybackApi =
+        retrofit.create(PlaybackApi::class.java)
 }

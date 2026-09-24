@@ -52,6 +52,8 @@ import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.Artist
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
+import com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge
+import com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.rememberNavigationActions
 import com.aethelsoft.grooveplayer.utils.DefaultSPadding
@@ -110,6 +112,8 @@ fun GeneralItemComponent(
     selectionConfig: ItemSelectionConfig? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    /** Decorative trailing content drawn before [metaText]. Null draws nothing and no spacer. */
+    beforeMeta: (@Composable () -> Unit)? = null,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val hasOptions = optionsConfig != null && (
@@ -215,6 +219,7 @@ fun GeneralItemComponent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                beforeMeta?.invoke()
                 if (metaText != null) {
                     Text(
                         text = metaText,
@@ -373,6 +378,7 @@ fun SongItemComponent(
     secondaryContent: (@Composable () -> Unit)? = null
 ) {
     val navigation = rememberNavigationActions()
+    val availability = rememberSongAvailabilityMark(song)
     GeneralItemComponent(
         title = song.title,
         subtitle = song.artist,
@@ -390,7 +396,10 @@ fun SongItemComponent(
         ),
         selectionConfig = selectionConfig,
         onLongClick = { onLongPress(song) },
-        secondaryContent = secondaryContent
+        secondaryContent = secondaryContent,
+        beforeMeta = availability?.let { mark ->
+            { SongAvailabilityBadge(mark = mark, iconSize = 16.dp) }
+        },
     )
 }
 

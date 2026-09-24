@@ -30,5 +30,6 @@ class ObservePlayerStateUseCase @Inject constructor(
     fun observeIsPlayerMuted(): Flow<Boolean> = playerRepository.observeIsPlayerMuted()
     fun observeAudioAmplitude(): Flow<Float> = playerRepository.observeAudioAmplitude()
     fun observeAudioVisualization(): Flow<AudioVisualizationData> = playerRepository.observeAudioVisualization()
+    fun observePremiumStreamRequired(): Flow<Unit> = playerRepository.observePremiumStreamRequired()
 }
 

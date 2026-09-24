@@ -20,5 +20,13 @@ interface GenreDao {
 
     @Query("SELECT name FROM genres ORDER BY name ASC")
     suspend fun getAllGenres(): List<String>
+
+    @Query(
+        """
+        DELETE FROM genres
+        WHERE genreId NOT IN (SELECT genreId FROM song_genres)
+        """
+    )
+    suspend fun deleteWithoutSongs()
 }
 

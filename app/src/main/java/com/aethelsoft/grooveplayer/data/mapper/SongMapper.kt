@@ -36,7 +36,9 @@ object SongMapper {
                     songs = emptyList(),
                     year = null
                 )
-            }
+            },
+            filePath = data.filePath,
+            fileSizeBytes = data.fileSizeBytes,
         )
     }
     

@@ -22,6 +22,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCa
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.presentation.player.layouts.GlowEffectConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -87,6 +88,9 @@ class PlayerViewModel @Inject constructor(
         MutableStateFlow(PlayerSongDetailsSheetState.Hidden)
     val songDetailsSheetState: StateFlow<PlayerSongDetailsSheetState> =
         _songDetailsSheetState.asStateFlow()
+
+    /** Cloud audio exists, but this user is not Premium. Catalog was not purged. */
+    val premiumStreamRequired: Flow<Unit> = observePlayerStateUseCase.observePremiumStreamRequired()
 
     fun setSongDetailsSheetState(state: PlayerSongDetailsSheetState) {
         _songDetailsSheetState.value = state
