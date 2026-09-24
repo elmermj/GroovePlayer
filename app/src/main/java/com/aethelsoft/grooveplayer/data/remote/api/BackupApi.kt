@@ -2,6 +2,8 @@ package com.aethelsoft.grooveplayer.data.remote.api
 
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteResponseDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseRequestDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseResponseDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDeleteResponseDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlResponseDto
@@ -54,4 +56,29 @@ interface BackupApi {
 
     @POST("/v1/backup/trim")
     suspend fun trimBackup(@Body body: BackupTrimRequestDto): BackupTrimResponseDto
+
+    /**
+     * Cross-device backup lease (SCRUM-73).
+     *
+     * - GET  /v1/backup/lease?device_id= — status. `device_id` lets the server set
+     *   held_by_this_device; the client also compares device_id itself.
+     * - POST /v1/backup/lease — acquire. Same device_id may re-acquire (200).
+     *   Another device holding a non-expired lease → 409.
+     * - POST /v1/backup/lease/heartbeat — extend TTL while consolidating/uploading.
+     * - POST /v1/backup/lease/release — idempotent release for this device_id.
+     *
+     * Assumed lease TTL is at least 45s. The client heartbeats every 15s.
+     * 404/405/501 means the route is not deployed yet; backup then proceeds without the lock.
+     */
+    @GET("/v1/backup/lease")
+    suspend fun getLease(@Query("device_id") deviceId: String): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease")
+    suspend fun acquireLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease/heartbeat")
+    suspend fun heartbeatLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease/release")
+    suspend fun releaseLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
 }

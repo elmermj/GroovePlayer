@@ -146,6 +146,33 @@ data class BackupTrimResponseDto(
     @param:Json(name = "user") val user: PublicUserDto? = null,
 )
 
+/**
+ * Backup lease body.
+ * POST /v1/backup/lease, /heartbeat, and /release.
+ * [deviceName] is optional and only meaningful on acquire.
+ */
+data class BackupLeaseRequestDto(
+    @param:Json(name = "device_id") val deviceId: String,
+    @param:Json(name = "device_name") val deviceName: String? = null,
+)
+
+/**
+ * GET/POST /v1/backup/lease response.
+ * 409 from acquire uses the same shape, often only `{ "error": "..." }`.
+ * [heldByThisDevice] stays null when the server omits it — the client compares [deviceId].
+ */
+data class BackupLeaseResponseDto(
+    @param:Json(name = "active") val active: Boolean = false,
+    @param:Json(name = "acquired") val acquired: Boolean = false,
+    @param:Json(name = "released") val released: Boolean = false,
+    @param:Json(name = "held_by_this_device") val heldByThisDevice: Boolean? = null,
+    @param:Json(name = "device_id") val deviceId: String? = null,
+    @param:Json(name = "device_name") val deviceName: String? = null,
+    @param:Json(name = "expires_at") val expiresAt: String? = null,
+    @param:Json(name = "expires_in_sec") val expiresInSec: Int? = null,
+    @param:Json(name = "error") val error: String? = null,
+)
+
 /** DELETE /v1/backup/objects/{id} — cloud catalog + R2 only; may return refreshed user. */
 data class BackupDeleteResponseDto(
     @param:Json(name = "deleted") val deleted: Boolean = true,

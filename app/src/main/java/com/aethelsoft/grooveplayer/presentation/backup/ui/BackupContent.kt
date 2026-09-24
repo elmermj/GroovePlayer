@@ -54,6 +54,7 @@ import com.aethelsoft.grooveplayer.utils.StorageFormatUtils
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingsButton
+import com.aethelsoft.grooveplayer.domain.backup.BackupPrimaryAction
 import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
 import com.aethelsoft.grooveplayer.domain.backup.BackupProgressTone
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
@@ -826,24 +827,33 @@ private fun BackupNowSection(
         }
     }
 
-    val buttonEnabled = canStart ||
-        (backupState.canRetry && !busy && !blockedQuota && !readOnlyGrace &&
-            tier == PrivilegeTier.PREMIUM && storage != null && !storage.isOptimisticStub)
+    val retryEligible = backupState.canRetry && !busy && !blockedQuota && !readOnlyGrace &&
+        tier == PrivilegeTier.PREMIUM && storage != null && !storage.isOptimisticStub
+    val otherDevice = backupState.otherDeviceHoldingLease
+    val progressLabel = BackupProgressLabel.status(
+        backupState.jobStep,
+        backupState.consolidateCompleted,
+        backupState.consolidateTotal,
+        backupState.uploadCompleted,
+        backupState.uploadTotal,
+    )
+    val buttonEnabled = BackupPrimaryAction.enabled(
+        otherDeviceHoldingLease = otherDevice,
+        busy = busy,
+        canStart = canStart,
+        canRetry = retryEligible,
+    )
     Spacer(Modifier.height(8.dp))
     ProfileSettingsButton(
         onClick = { if (buttonEnabled) onStartBackup() },
-        title = when {
-            busy -> BackupProgressLabel.status(
-                backupState.jobStep,
-                backupState.consolidateCompleted,
-                backupState.consolidateTotal,
-                backupState.uploadCompleted,
-                backupState.uploadTotal,
-            )
-            backupState.canRetry -> "Retry backup"
-            else -> "Back up now"
-        },
+        title = BackupPrimaryAction.label(
+            otherDeviceHoldingLease = otherDevice,
+            busy = busy,
+            canRetry = backupState.canRetry,
+            progressLabel = progressLabel,
+        ),
         isActive = buttonEnabled,
+        enabled = buttonEnabled,
         modifier = Modifier.fillMaxWidth(),
     )
 
@@ -1012,4 +1022,5 @@ private fun CloudBackupState.asSignedOut(): CloudBackupState = copy(
     canRetry = false,
     lastError = null,
     lastRunDryRun = false,
+    otherDeviceHoldingLease = false,
 )

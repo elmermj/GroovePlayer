@@ -58,6 +58,11 @@ data class CloudBackupState(
      * Local files are untouched — UI should offer Retry (re-PUT + complete / Back up now).
      */
     val canRetry: Boolean = false,
+    /**
+     * Another install holds a non-expired backup lease.
+     * The primary backup button stays disabled with the exact other-device label.
+     */
+    val otherDeviceHoldingLease: Boolean = false,
 )
 
 /** Backup object kinds (Benny docs/backup-library.md). */
