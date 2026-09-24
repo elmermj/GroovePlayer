@@ -24,7 +24,7 @@ internal class AudioBandAnalyzer {
     private var trebleEnv = 0f
     private var previousBass = 0f
     private var beatLevel = 0f
-    private var lastOnsetMs = Long.MIN_VALUE
+    private var lastOnsetMs: Long? = null
     private val bassHistory = ArrayDeque<Float>()
 
     fun reset() {
@@ -37,7 +37,7 @@ internal class AudioBandAnalyzer {
             trebleEnv = 0f
             previousBass = 0f
             beatLevel = 0f
-            lastOnsetMs = Long.MIN_VALUE
+            lastOnsetMs = null
             bassHistory.clear()
         }
     }
@@ -58,9 +58,10 @@ internal class AudioBandAnalyzer {
 
             val localMean = meanOf(bassHistory)
             val delta = bass - previousBass
+            val sinceOnset = lastOnsetMs?.let { nowMs - it } ?: Long.MAX_VALUE
             val onset = bass > localMean * BEAT_MEAN_RATIO &&
                 delta > BEAT_MIN_DELTA &&
-                nowMs - lastOnsetMs >= BEAT_REFRACTORY_MS
+                sinceOnset >= BEAT_REFRACTORY_MS
             if (onset) {
                 lastOnsetMs = nowMs
                 beatLevel = 1f

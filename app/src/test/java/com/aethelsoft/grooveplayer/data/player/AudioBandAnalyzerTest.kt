@@ -19,23 +19,23 @@ class AudioBandAnalyzerTest {
         val analyzer = AudioBandAnalyzer()
         val binHz = 100f
 
-        val bassOnly = analyzer.analyze(tone(bin = 1, binHz = binHz), binHz, nowMs = 0L)
+        val bassOnly = analyzer.analyze(fillBand(binHz, 60f, 250f), binHz, nowMs = 0L)
         assertEquals(AudioBandAnalyzer.ATTACK_BASS, bassOnly.bass, 0.001f)
         assertEquals(0f, bassOnly.mid, 0.001f)
         assertEquals(0f, bassOnly.treble, 0.001f)
 
-        val presence = AudioBandAnalyzer().analyze(tone(bin = 15, binHz = binHz), binHz, nowMs = 0L)
+        val presence = AudioBandAnalyzer().analyze(fillBand(binHz, 1000f, 3000f), binHz, nowMs = 0L)
         assertEquals(0f, presence.bass, 0.001f)
         assertEquals(0.6f * AudioBandAnalyzer.ATTACK_PRESENCE, presence.mid, 0.001f)
         assertEquals(0f, presence.treble, 0.001f)
 
-        val highMid = AudioBandAnalyzer().analyze(tone(bin = 40, binHz = binHz), binHz, nowMs = 0L)
+        val highMid = AudioBandAnalyzer().analyze(fillBand(binHz, 3000f, 6000f), binHz, nowMs = 0L)
         assertEquals(0.35f * AudioBandAnalyzer.ATTACK_HIGH_MID, highMid.treble, 0.001f)
 
-        val treble = AudioBandAnalyzer().analyze(tone(bin = 80, binHz = binHz), binHz, nowMs = 0L)
+        val treble = AudioBandAnalyzer().analyze(fillBand(binHz, 6000f, 16000f), binHz, nowMs = 0L)
         assertEquals(0.65f * AudioBandAnalyzer.ATTACK_TREBLE, treble.treble, 0.001f)
 
-        val aboveRange = AudioBandAnalyzer().analyze(tone(bin = 200, binHz = binHz), binHz, nowMs = 0L)
+        val aboveRange = AudioBandAnalyzer().analyze(fillBand(binHz, 16000f, 22000f), binHz, nowMs = 0L)
         assertEquals(0f, aboveRange.bass, 0.001f)
         assertEquals(0f, aboveRange.mid, 0.001f)
         assertEquals(0f, aboveRange.treble, 0.001f)
@@ -44,7 +44,7 @@ class AudioBandAnalyzerTest {
     @Test
     fun bassUi_usesTheLouderOfSubAndBass() {
         val binHz = 20f
-        val sub = AudioBandAnalyzer().analyze(tone(bin = 2, binHz = binHz), binHz, nowMs = 0L)
+        val sub = AudioBandAnalyzer().analyze(fillBand(binHz, 20f, 60f), binHz, nowMs = 0L)
         assertEquals(AudioBandAnalyzer.ATTACK_SUB, sub.bass, 0.001f)
     }
 
@@ -52,7 +52,7 @@ class AudioBandAnalyzerTest {
     fun envelope_attacksFasterThanItReleases() {
         val analyzer = AudioBandAnalyzer()
         val binHz = 100f
-        val hit = analyzer.analyze(tone(bin = 1, binHz = binHz), binHz, nowMs = 0L)
+        val hit = analyzer.analyze(fillBand(binHz, 60f, 250f), binHz, nowMs = 0L)
         val release = analyzer.analyze(FloatArray(0), binHz, nowMs = 30L)
         val rise = hit.bass
         val fall = hit.bass - release.bass
@@ -64,7 +64,7 @@ class AudioBandAnalyzerTest {
     fun beat_requiresDeltaAndRefractory_andDecaysWithoutPowerCurve() {
         val analyzer = AudioBandAnalyzer()
         val binHz = 100f
-        val loud = tone(bin = 1, binHz = binHz)
+        val loud = fillBand(binHz, 60f, 250f)
 
         val onset = analyzer.analyze(loud, binHz, nowMs = 1_000L)
         assertEquals(1f, onset.beat, 0.0001f)
@@ -85,8 +85,13 @@ class AudioBandAnalyzerTest {
         assertEquals(1f, again.beat, 0.0001f)
     }
 
-    private fun tone(bin: Int, binHz: Float): FloatArray {
-        val size = (20_000f / binHz).toInt() + 1
-        return FloatArray(size).also { it[bin] = 128f }
+    private fun fillBand(binHz: Float, lowHz: Float, highHz: Float): FloatArray {
+        val size = (22_000f / binHz).toInt() + 1
+        return FloatArray(size).also { magnitudes ->
+            for (i in magnitudes.indices) {
+                val freq = i * binHz
+                if (freq >= lowHz && freq < highHz) magnitudes[i] = 128f
+            }
+        }
     }
 }
