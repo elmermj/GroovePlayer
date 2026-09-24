@@ -56,21 +56,21 @@ fun LastPlayedSectionComponent(
         }
 
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            // Same inner width as the library grid. Four tiles plus the gaps between
-            // them fill that width (~¼ of the content, about four across).
+            // Phone: four tiles plus the gaps fill the library content width.
+            // Tablet and large tablet: pre-#16 square from the full window width,
+            // (screen - 8 * spacing) / 8. DeviceType picks the formula.
             val contentWidthDp = if (constraints.hasBoundedWidth) {
                 maxWidth.value
             } else {
                 windowInfo.widthDp - (M_PADDING.value * 2f)
             }
-            val tileWidth = continueTileWidthDp(
-                contentWidthDp = contentWidthDp,
-                gapDp = S_PADDING.value,
-            ).dp
             val typography = GrooveTheme.typography
             val density = LocalDensity.current
-            val tileHeight = continueTileHeightDp(
-                tileWidthDp = tileWidth.value,
+            val tile = continueTileSpec(
+                deviceType = windowInfo.deviceType,
+                contentWidthDp = contentWidthDp,
+                screenWidthDp = windowInfo.widthDp,
+                gapDp = S_PADDING.value,
                 overlayPaddingDp = LibraryCardOverlayPadding.value,
                 titleLineHeightDp = with(density) {
                     typography.cardTitle.toTextStyle().lineHeight.toDp().value
@@ -78,7 +78,9 @@ fun LastPlayedSectionComponent(
                 subtitleLineHeightDp = with(density) {
                     typography.cardSubtitle.toTextStyle().lineHeight.toDp().value
                 },
-            ).dp
+            )
+            val tileWidth = tile.widthDp.dp
+            val tileHeight = tile.heightDp.dp
 
             LazyHorizontalGrid(
                 rows = GridCells.Fixed(1),
@@ -92,9 +94,9 @@ fun LastPlayedSectionComponent(
                         modifier = Modifier
                             .width(tileWidth)
                             .height(tileHeight),
-                        square = false,
-                        titleMaxLines = CONTINUE_TITLE_MAX_LINES,
-                        subtitleMaxLines = CONTINUE_SUBTITLE_MAX_LINES,
+                        square = tile.square,
+                        titleMaxLines = tile.titleMaxLines,
+                        subtitleMaxLines = tile.subtitleMaxLines,
                         title = song.title,
                         subtitle = song.artist,
                         artworks = singleArtworkUrl,
