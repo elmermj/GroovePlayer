@@ -352,13 +352,19 @@ GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The
 
 ### Building
 ```bash
-./gradlew assembleDebug
+./gradlew :app:assembleDevDebug
 ```
+
+`dev` and `prod` are product flavors with the same application id. Use `dev` for day-to-day and test-track builds. `assembleDebug` still builds every debug variant.
 
 ### Running
 ```bash
-./gradlew installDebug
+./gradlew :app:installDevDebug
 ```
+
+### Test APK on a phone (no USB)
+
+See [app/DISTRIBUTE.md](app/DISTRIBUTE.md) and [app/FIREBASE_SETUP.md](app/FIREBASE_SETUP.md). After the one-time Firebase and GitHub secrets setup, run **Actions → Distribute APK**.
 
 ## 📝 License
 
