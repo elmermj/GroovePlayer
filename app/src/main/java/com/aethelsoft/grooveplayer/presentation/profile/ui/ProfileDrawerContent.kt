@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.presentation.profile.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -10,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.presentation.common.GradientAppBar
+import com.aethelsoft.grooveplayer.presentation.common.grooveOverlayTopScrim
 import com.aethelsoft.grooveplayer.presentation.common.rememberSearchBarViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.presentation.profile.layouts.LargeTabletProfileLayout
@@ -27,6 +29,7 @@ fun ProfileDrawerContent(
     deviceType: DeviceType,
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiStyling: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
     onClose: () -> Unit = {},
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -49,13 +52,19 @@ fun ProfileDrawerContent(
 
     val searchViewModel: SearchBarViewModel = rememberSearchBarViewModel()
 
-    Box {
-        if (deviceType == DeviceType.LARGE_TABLET) {
-            LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling)
-        } else {
-            TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling)
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .grooveOverlayTopScrim(),
+        ) {
+            if (deviceType == DeviceType.LARGE_TABLET) {
+                LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling, onNavigateToBackup)
+            } else {
+                TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling, onNavigateToBackup)
+            }
         }
-        // GradientAppBar owns statusBarsPadding + APP_BAR_HEIGHT (same as Home / Profile route).
+        // Transparent control row; veil is drawn on the content box above.
         GradientAppBar(
             title = "Profile",
             deviceType = deviceType,

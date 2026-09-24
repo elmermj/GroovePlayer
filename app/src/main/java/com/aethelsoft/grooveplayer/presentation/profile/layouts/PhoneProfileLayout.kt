@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
@@ -29,6 +30,7 @@ import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAppVersion
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCopyright
+import com.aethelsoft.grooveplayer.utils.LegalUrls
 import com.aethelsoft.grooveplayer.utils.theme.icons.XPrivacyPolicy
 import com.aethelsoft.grooveplayer.utils.theme.icons.XRecentUpdates
 import com.aethelsoft.grooveplayer.utils.theme.icons.XUiStyle
@@ -40,7 +42,9 @@ fun PhoneProfileLayout(
     viewModel: ProfileViewModel,
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiStyling: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val canvas = GrooveTheme.colors.canvas
     LazyColumn(
         modifier = Modifier
@@ -93,7 +97,10 @@ fun PhoneProfileLayout(
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
-                AccountSection(viewModel = viewModel)
+                AccountSection(viewModel = viewModel, onNavigateToBackup = onNavigateToBackup)
+                Spacer(Modifier.height(S_PADDING))
+                // FREE-tier only; no-op when Basic/Premium. See app/ADS_SETUP.md
+                com.aethelsoft.grooveplayer.presentation.ads.BannerAdSlot()
             }
         }
 
@@ -129,13 +136,7 @@ fun PhoneProfileLayout(
                 )
                 Spacer(Modifier.height(S_PADDING))
 
-                CrossFadeModeRow(
-                    viewModel = viewModel,
-                    isExpanded = activeRowId == "fade",
-                    onExpandedChange = { expanded ->
-                        viewModel.setActiveRowId(if (expanded) "fade" else null)
-                    }
-                )
+                // Cross-fade UI hidden until real overlapping crossfade ships (fadeTimer path is stubbed).
                 Spacer(Modifier.height(S_PADDING))
 
                 MiniPlayerOnStartRow(
@@ -208,8 +209,18 @@ fun PhoneProfileLayout(
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XPrivacyPolicy) },
+                    actionType = ActionType.LINK,
                     title = "Privacy policy",
-                    subtitle = "How your data is handled"
+                    subtitle = "How your data is handled",
+                    onClick = { LegalUrls.open(context, LegalUrls.PRIVACY) },
+                )
+                Spacer(Modifier.height(S_PADDING))
+                ProfileSettingRow(
+                    icon = { ProfileRowIcon(XCopyright) },
+                    actionType = ActionType.LINK,
+                    title = "Terms of service",
+                    subtitle = "Rules for using GroovePlayer",
+                    onClick = { LegalUrls.open(context, LegalUrls.TERMS) },
                 )
             }
         }

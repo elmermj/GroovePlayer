@@ -25,7 +25,8 @@ object AppRoutes {
     const val TRANSFER_PROGRESS = "transfer_progress"
     const val RECEIVE_APPROVAL = "receive_approval"
     const val TRANSFER_STATUS = "transfer_status"
-    const val UI_STYLING = "ui_styling"
+    const val UI_CUSTOMISATION = "ui_styling"
+    const val BACKUP = "backup"
 
     fun searchRoute(query: String) = "search/${Uri.encode(query)}"
     fun shareConfirmationRoute(shareMethod: String) = "share_confirmation/$shareMethod"

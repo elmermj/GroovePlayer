@@ -49,6 +49,13 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
 )
 @TypeConverters(Converters::class)
 abstract class GroovePlayerDatabase : RoomDatabase() {
+    companion object {
+        /** Room SQLite file name under Context.getDatabasePath. */
+        const val DATABASE_NAME = "grooveplayer_database"
+        /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
+        const val SCHEMA_VERSION = 15
+    }
+
     abstract fun playbackHistoryDao(): PlaybackHistoryDao
     abstract fun songMetadataDao(): SongMetadataDao
     abstract fun artistDao(): ArtistDao

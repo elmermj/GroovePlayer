@@ -30,6 +30,7 @@ import android.util.Log
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +40,12 @@ fun EqualizerControlsComponent(
     modifier: Modifier = Modifier,
     viewModel: EqualizerViewModel = hiltViewModel(),
     isSimplified: Boolean = false,
+    /**
+     * Phone FullPlayer bottom sheet: same logic as Tablet, but changes save automatically (no Save button),
+     * bands are at least 48dp wide and scroll sideways, dB sits above each slider and the frequency below,
+     * and sliders dim while EQ is off.
+     */
+    isPhoneSheet: Boolean = false,
 ) {
     val equalizerState by viewModel.equalizerState.collectAsState()
     val hasUnsavedChanges by viewModel.hasUnsavedChanges.collectAsState()
@@ -68,8 +75,23 @@ fun EqualizerControlsComponent(
             viewModel = viewModel,
             equalizerState = equalizerState,
             hasUnsavedChanges = hasUnsavedChanges,
-            scope = scope
+            scope = scope,
+            isPhoneSheet = isPhoneSheet,
         )
+    }
+
+    if (isPhoneSheet) {
+        // Live apply is already handled by the ViewModel; persist shortly after the last change.
+        LaunchedEffect(hasUnsavedChanges, equalizerState) {
+            if (hasUnsavedChanges) {
+                kotlinx.coroutines.delay(600)
+                try {
+                    viewModel.saveSettings()
+                } catch (e: Exception) {
+                    Log.e("EqualizerControls", "Error auto-saving settings: ${e.message}", e)
+                }
+            }
+        }
     }
 }
 
@@ -242,10 +264,11 @@ private fun FullEqualizerControlsComponent(
     equalizerState: EqualizerState,
     hasUnsavedChanges: Boolean,
     scope: CoroutineScope,
+    isPhoneSheet: Boolean = false,
 ) {
     Column(
         modifier = modifier
-            .widthIn(max = 360.dp)
+            .then(if (isPhoneSheet) Modifier else Modifier.widthIn(max = 360.dp))
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp),
@@ -372,10 +395,12 @@ private fun FullEqualizerControlsComponent(
                     scope.launch {
                         viewModel.setBandLevel(band, level)
                     }
-                }
+                },
+                isPhoneSheet = isPhoneSheet,
             )
 
-            // Save Settings Button
+            // Save Settings Button (Phone sheet auto-saves instead)
+            if (!isPhoneSheet) {
             Spacer(modifier = Modifier.height(S_PADDING))
             ToggledTextButton(
                 state = hasUnsavedChanges,
@@ -398,6 +423,7 @@ private fun FullEqualizerControlsComponent(
                 enabled = hasUnsavedChanges,
                 shape = RoundedCornerShape(100.dp)
             )
+            }
         }
     }
 }
@@ -527,10 +553,14 @@ private fun PresetSelector(
 @Composable
 private fun FrequencyBands(
     equalizerState: EqualizerState,
-    onBandLevelChanged: (Int, Int) -> Unit
+    onBandLevelChanged: (Int, Int) -> Unit,
+    isPhoneSheet: Boolean = false,
 ) {
+    val dimAlpha = if (isPhoneSheet && !equalizerState.isEnabled) 0.38f else 1f
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = dimAlpha },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -543,12 +573,19 @@ private fun FrequencyBands(
         Spacer(modifier = Modifier.height(S_PADDING))
         
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = if (isPhoneSheet) {
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            } else {
+                Modifier.fillMaxWidth()
+            },
+            horizontalArrangement = if (isPhoneSheet) Arrangement.spacedBy(4.dp) else Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom
         ) {
             repeat(equalizerState.numberOfBands) { band ->
                 FrequencyBandSlider(
+                    isPhoneSheet = isPhoneSheet,
                     band = band,
                     frequency = equalizerState.bandFrequencies.getOrElse(band) { 0 },
                     level = equalizerState.bandLevels.getOrElse(band) { 0 },
@@ -568,6 +605,7 @@ private fun FrequencyBands(
 
 @Composable
 private fun FrequencyBandSlider(
+    isPhoneSheet: Boolean = false,
     band: Int,
     frequency: Int,
     level: Int,
@@ -586,14 +624,15 @@ private fun FrequencyBandSlider(
     // This maps directly to the vertical position
     val sliderValue = normalizedLevel
     
+    val bandWidth = if (isPhoneSheet) 48.dp else 40.dp
     Column(
-        modifier = Modifier.width(40.dp),
+        modifier = Modifier.width(bandWidth),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Frequency label
+        // Top label: Tablet shows frequency, Phone sheet shows dB
         Text(
-            text = formatFrequency(frequency),
+            text = if (isPhoneSheet) formatLevel(level) else formatFrequency(frequency),
             style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 10.sp,
@@ -603,7 +642,7 @@ private fun FrequencyBandSlider(
         // Vertical slider
         Box(
             modifier = Modifier
-                .width(40.dp)
+                .width(bandWidth)
                 .height(200.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -656,9 +695,9 @@ private fun FrequencyBandSlider(
             )
         }
         
-        // Level label (dB)
+        // Bottom label: Tablet shows dB, Phone sheet shows frequency
         Text(
-            text = formatLevel(level),
+            text = if (isPhoneSheet) formatFrequency(frequency) else formatLevel(level),
             style = MaterialTheme.typography.bodySmall,
             color = Color.White.copy(alpha = 0.7f),
             fontSize = 10.sp,
@@ -679,6 +718,8 @@ private fun VerticalSlider(
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        // Consume so a parent (e.g. the Phone EQ bottom sheet) doesn't treat slider drags as sheet drags.
+                        down.consume()
                         val height = size.height.toFloat()
                         // Convert Y position to slider value: 0 = bottom, 1 = top
                         // Y increases downward, so we invert: 1 - (y / height)
@@ -695,6 +736,7 @@ private fun VerticalSlider(
                                 break
                             }
                             
+                            change.consume()
                             val currentY = change.position.y
                             val height = size.height.toFloat()
                             // Convert Y position to slider value: 0 = bottom, 1 = top

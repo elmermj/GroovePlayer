@@ -58,6 +58,7 @@ import com.aethelsoft.grooveplayer.utils.DefaultSPadding
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCircle
 import com.aethelsoft.grooveplayer.utils.theme.icons.XEdit
+import com.aethelsoft.grooveplayer.utils.theme.icons.XPlay
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
 import com.aethelsoft.grooveplayer.utils.theme.icons.XNFC
 import com.aethelsoft.grooveplayer.utils.theme.icons.XWifiSync
@@ -70,6 +71,7 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
  * Pass non-null callbacks to show the corresponding option when expanded.
  */
 data class ItemOptionsConfig(
+    val onPlayNext: (() -> Unit)? = null,
     val onEditMetadata: (() -> Unit)? = null,
     val onShareViaTap: (() -> Unit)? = null,
     val onShareViaNearby: (() -> Unit)? = null,
@@ -111,6 +113,7 @@ fun GeneralItemComponent(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val hasOptions = optionsConfig != null && (
+        optionsConfig.onPlayNext != null ||
         optionsConfig.onEditMetadata != null ||
         optionsConfig.onShareViaTap != null ||
         optionsConfig.onShareViaNearby != null
@@ -284,6 +287,15 @@ private fun DefaultOptionsContent(optionsConfig: ItemOptionsConfig) {
         horizontalArrangement = Arrangement.spacedBy(S_PADDING)
     ) {
         item {
+            optionsConfig.onPlayNext?.let { onPlayNext ->
+                ExpandableOption(
+                    label = "Play next",
+                    icon = XPlay,
+                    onClick = onPlayNext
+                )
+            }
+        }
+        item {
             optionsConfig.onEditMetadata?.let { onEdit ->
                 ExpandableOption(
                     label = "Edit song metadata",
@@ -353,6 +365,7 @@ fun SongItemComponent(
     song: Song,
     onClick: () -> Unit,
     onEditMetadata: (Song) -> Unit = {},
+    onPlayNext: ((Song) -> Unit)? = null,
     onLongPress: (Song) -> Unit = {},
     padding: Dp = DefaultSPadding,
     selectionConfig: ItemSelectionConfig? = null,
@@ -369,6 +382,7 @@ fun SongItemComponent(
         artworkKind = MediaArtworkKind.SONG,
         contentDescription = "${song.title} by ${song.artist}",
         optionsConfig = ItemOptionsConfig(
+            onPlayNext = onPlayNext?.let { cb -> { cb(song) } },
             onEditMetadata = { onEditMetadata(song) },
             onShareViaTap = { navigation.openShareViaNfcWithSongs(listOf(song)) },
             onShareViaNearby = { navigation.openShareViaNearbyWithSongs(listOf(song)) }

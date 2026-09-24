@@ -13,7 +13,8 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
     onNavigateToSearch: (String) -> Unit,
     onNavigateToShare: () -> Unit = {},
-    onNavigateToUiStyling: () -> Unit = {},
+    onNavigateToUiCustomisation: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
 ){
 
     /**
@@ -30,9 +31,9 @@ fun ProfileScreen(
     }
 
     BasePageTemplate(
-        phoneLayout = { PhoneProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling) },
-        tabletLayout = { TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling) },
-        largeTabletLayout = { LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiStyling) },
+        phoneLayout = { PhoneProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
+        tabletLayout = { TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
+        largeTabletLayout = { LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
         onNavigateToSearch = onNavigateToSearch,
         viewModel = viewModel,
         isSearchEnabled = false,

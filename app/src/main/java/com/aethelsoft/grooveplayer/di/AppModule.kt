@@ -27,7 +27,7 @@ object AppModule {
         return Room.databaseBuilder(
             context,
             GroovePlayerDatabase::class.java,
-            "grooveplayer_database"
+            GroovePlayerDatabase.DATABASE_NAME
         )
         .fallbackToDestructiveMigration()  // Allow destructive migration during development
         .build()

@@ -1,8 +1,16 @@
 package com.aethelsoft.grooveplayer.presentation.profile
 
 import android.app.Application
+import android.app.Activity
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.domain.model.UserProfile
+import com.aethelsoft.grooveplayer.domain.model.AuthUser
+import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
+import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
+import com.aethelsoft.grooveplayer.domain.usecase.auth_category.SignInWithGoogleUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.auth_category.DeleteAccountUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.auth_category.SignOutUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.auth_category.RestoreAuthSessionUseCase
 import com.aethelsoft.grooveplayer.domain.model.UserSettings
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
@@ -42,6 +50,11 @@ class ProfileViewModel @Inject constructor(
     private val getMusicFolderPathsUseCase: GetMusicFolderPathsUseCase,
     private val getStorageUsageUseCase: GetStorageUsageUseCase,
     private val refreshMusicCatalogUseCase: RefreshMusicCatalogUseCase,
+    private val authRepository: AuthRepository,
+    private val signInWithGoogleUseCase: SignInWithGoogleUseCase,
+    private val signOutUseCase: SignOutUseCase,
+    private val deleteAccountUseCase: DeleteAccountUseCase,
+    private val restoreAuthSessionUseCase: RestoreAuthSessionUseCase,
 ) : BaseViewModel(application) {
 
     /** Draft exclusions edited in-session; committed when Profile closes. */
@@ -65,6 +78,26 @@ class ProfileViewModel @Inject constructor(
 
     private val _isClearingCache = MutableStateFlow(false)
     val isClearingCache: StateFlow<Boolean> = _isClearingCache.asStateFlow()
+
+
+    private val _authLoading = MutableStateFlow(false)
+    val authLoading: StateFlow<Boolean> = _authLoading.asStateFlow()
+
+    private val _authError = MutableStateFlow<String?>(null)
+    val authError: StateFlow<String?> = _authError.asStateFlow()
+
+    val authUser: StateFlow<AuthUser?> =
+        authRepository.observeAuthUser()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** Set when /v1/me (or auth) cannot reach the API — signed-in UI may still show local Google session. */
+    val serverSyncError: StateFlow<String?> =
+        authRepository.observeServerSyncError()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val privilegeTier: StateFlow<PrivilegeTier> =
+        authRepository.observePrivilegeTier()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, PrivilegeTier.FREE)
 
     private val _activeRowId = MutableStateFlow<String?>(null)
     val activeRowId: StateFlow<String?> = _activeRowId.asStateFlow()
@@ -106,6 +139,54 @@ class ProfileViewModel @Inject constructor(
             committedExcludedFolders = initial
             _pendingExcludedFolders.value = initial
         }
+        viewModelScope.launch {
+            restoreAuthSessionUseCase().onFailure { e ->
+                if (!e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
+                    _authError.value = e.message?.takeIf { it.isNotBlank() }
+                        ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
+                }
+            }
+        }
+    }
+
+    fun signInWithGoogle(activity: Activity) = viewModelScope.launch {
+        _authError.value = null
+        _authLoading.value = true
+        val result = signInWithGoogleUseCase(activity)
+        _authLoading.value = false
+        result.onFailure { e ->
+            // User cancelled — don't surface as error
+            if (e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
+                _authError.value = null
+            } else {
+                val msg = e.message?.takeIf { it.isNotBlank() } ?: "Sign-in failed"
+                _authError.value = msg
+            }
+        }
+    }
+
+    fun signOut() = viewModelScope.launch {
+        _authError.value = null
+        _authLoading.value = true
+        val result = signOutUseCase()
+        _authLoading.value = false
+        result.onFailure { e ->
+            _authError.value = e.message ?: "Sign-out failed"
+        }
+    }
+
+    fun deleteAccount() = viewModelScope.launch {
+        _authError.value = null
+        _authLoading.value = true
+        val result = deleteAccountUseCase()
+        _authLoading.value = false
+        result.onFailure { e ->
+            _authError.value = e.message ?: "Couldn't delete account. Try again."
+        }
+    }
+
+    fun clearAuthError() {
+        _authError.value = null
     }
 
     override fun refresh() {
@@ -155,16 +236,18 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    private suspend fun commitPendingExcludedFoldersInternal() = commitMutex.withLock {
-        val pending = _pendingExcludedFolders.value
-        if (pending.toSet() == committedExcludedFolders.toSet()) return
+    private suspend fun commitPendingExcludedFoldersInternal() {
+        commitMutex.withLock {
+            val pending = _pendingExcludedFolders.value
+            if (pending.toSet() == committedExcludedFolders.toSet()) return@withLock
 
-        val beforeIds = musicRepository.getAllSongs().map { it.id }.toSet()
-        userRepository.updateExcludedFolders(pending)
-        committedExcludedFolders = pending
-        val afterIds = musicRepository.getAllSongs().map { it.id }.toSet()
-        // Refresh for both newly excluded (before - after) and newly included (after - before) folders.
-        refreshMusicCatalogUseCase(removedSongIds = beforeIds - afterIds)
+            val beforeIds = musicRepository.getAllSongs().map { it.id }.toSet()
+            userRepository.updateExcludedFolders(pending)
+            committedExcludedFolders = pending
+            val afterIds = musicRepository.getAllSongs().map { it.id }.toSet()
+            // Refresh for both newly excluded (before - after) and newly included (after - before) folders.
+            refreshMusicCatalogUseCase(removedSongIds = beforeIds - afterIds)
+        }
     }
 
     /** Loads storage usage only when row is expanded. Uses cache if available. */

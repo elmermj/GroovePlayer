@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer
 
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -31,7 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -50,9 +50,16 @@ import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.data.share.NfcShareDiscovery
 import com.aethelsoft.grooveplayer.presentation.share.ShareNfcReceiver
 import com.aethelsoft.grooveplayer.presentation.player.ui.MiniPlayerBar
+import com.aethelsoft.grooveplayer.utils.LocalAdaptiveWindowInfo
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
+import com.aethelsoft.grooveplayer.utils.requestedOrientationFor
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.ui.GroovePlayerTheme
+import com.aethelsoft.grooveplayer.presentation.ads.AdsConsentHelper
+import com.aethelsoft.grooveplayer.presentation.ads.AdsViewModel
+import com.aethelsoft.grooveplayer.presentation.ads.StartupInterstitialHelper
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
@@ -104,14 +111,29 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        // UMP consent (EEA/UK) before MobileAds / showing ads
+        AdsConsentHelper.requestConsentThenInitAds(this)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         handleNfcIntent(intent)
 
         setContent {
             val grooveStyle by appThemeViewModel.style.collectAsState()
             GroovePlayerTheme(style = grooveStyle) {
-                // Provide shared ViewModels to entire app via CompositionLocal (single instance)
+                val adaptiveWindowInfo = rememberAdaptiveWindowInfo()
+
+                // Compact windows are portrait-only. Crossing into either tablet bucket removes
+                // the app-level lock; configChanges keeps this Activity/NavController alive.
+                LaunchedEffect(adaptiveWindowInfo.deviceType) {
+                    val target = requestedOrientationFor(adaptiveWindowInfo.deviceType)
+                    if (requestedOrientation != target) requestedOrientation = target
+                }
+
+                // One live window snapshot and shared activity-scoped player are used by all routes.
                 CompositionLocalProvider(
+                    LocalAdaptiveWindowInfo provides adaptiveWindowInfo,
                     LocalPlayerViewModel provides playerViewModel,
                     LocalBluetoothViewModel provides bluetoothViewModel
                 ) {
@@ -142,6 +164,16 @@ fun GroovePlayerAppMain() {
     // Access activity-scoped PlayerViewModel from CompositionLocal
     val playerViewModel = LocalPlayerViewModel.current!!
     val navController = rememberNavController()
+    val adsViewModel: AdsViewModel = hiltViewModel()
+    val activity = LocalActivity.current
+    LaunchedEffect(Unit) {
+        // Delay so first frame / permissions settle; never blocks Sign-In.
+        delay(1800)
+        val act = activity as? android.app.Activity
+        if (act != null) {
+            StartupInterstitialHelper.maybeShow(act, adsViewModel)
+        }
+    }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
     val showMiniPlayerOnStart by playerViewModel.showMiniPlayerOnStart.collectAsState()
@@ -275,7 +307,10 @@ fun GroovePlayerAppMain() {
             navController.navigate(AppRoutes.nearbyDiscoveryRoute(isSender = true))
         },
         openUiStyling = {
-            navController.navigate(AppRoutes.UI_STYLING)
+            navController.navigate(AppRoutes.UI_CUSTOMISATION)
+        },
+        openBackup = {
+            navController.navigate(AppRoutes.BACKUP)
         },
     )
 

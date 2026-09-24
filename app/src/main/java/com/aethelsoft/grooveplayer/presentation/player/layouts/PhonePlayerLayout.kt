@@ -12,6 +12,8 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,7 +52,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -73,9 +74,10 @@ import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
-import com.aethelsoft.grooveplayer.presentation.player.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
-import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerQueueComponent
+import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneEqualizerSheet
+import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneQueueSheet
+import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneUpNextPeekRow
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
 import com.aethelsoft.grooveplayer.presentation.player.ui.SongDetails
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
@@ -84,9 +86,12 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDeta
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
+import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
 import com.aethelsoft.grooveplayer.utils.theme.icons.XBack
+import com.aethelsoft.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledIconButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -150,14 +155,19 @@ fun PhonePlayerLayout(
         }
     }
 
-    // Ensure showBluetoothSheet and showQueue are never true at the same time
-    LaunchedEffect(showBluetoothSheet, showQueue) {
-        if (showBluetoothSheet && showQueue) {
-            // If both are true, close the one that wasn't just opened
-            // This is a safeguard in case both get set to true somehow
-            showQueue = false
-        }
+    // Only one overlay at a time on Phone: queue, equalizer or Bluetooth.
+    fun toggleQueue() {
+        val open = !showQueue
+        if (open) { showEqualizer = false; showBluetoothSheet = false }
+        showQueue = open
     }
+    fun toggleEqualizer() {
+        val open = !showEqualizer
+        if (open) { showQueue = false; showBluetoothSheet = false }
+        showEqualizer = open
+    }
+    val currentQueueIndex = queue.indexOfFirst { it.id == song?.id }
+    val nextSong = if (currentQueueIndex >= 0) queue.getOrNull(currentQueueIndex + 1) else null
 
     // Auto-start scanning when Bluetooth sheet is opened
     LaunchedEffect(showBluetoothSheet, hasBluetoothPermissions) {
@@ -170,9 +180,9 @@ fun PhonePlayerLayout(
         }
     }
     val context = LocalContext.current
-    val configuration = LocalWindowInfo.current
-    val screenHeight = configuration.containerSize.height.dp
-    val screenWidth = configuration.containerSize.width.dp
+    val windowInfo = rememberAdaptiveWindowInfo()
+    val screenHeight = windowInfo.heightDp.dp
+    val screenWidth = windowInfo.widthDp.dp
     val maxArtworkHeight = minOf(screenHeight * 0.6f, screenWidth * 0.8f)
     
     // Extract dominant color from artwork (off main thread to avoid hitch on song change)
@@ -239,10 +249,9 @@ fun PhonePlayerLayout(
                         state = showBluetoothSheet,
                         onClick = {
                             if (!showBluetoothSheet) {
-                                // If opening bluetooth sheet, close queue first
-                                if (showQueue) {
-                                    showQueue = false
-                                }
+                                // If opening bluetooth, close queue / equalizer sheets first
+                                showQueue = false
+                                showEqualizer = false
                             }
                             showBluetoothSheet = !showBluetoothSheet
                         },
@@ -258,16 +267,13 @@ fun PhonePlayerLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
-
             val density = LocalDensity.current
             val artworkTargetOffsetPx = when {
-                showBluetoothSheet && !showQueue -> with(density) { (-56).dp.toPx() }
-                showQueue && !showBluetoothSheet -> with(density) { (-56).dp.toPx() }
+                showBluetoothSheet -> with(density) { (-56).dp.toPx() }
                 else -> 0f
             }
             val artworkScale by animateFloatAsState(
-                targetValue = if (showBluetoothSheet || showQueue) 0.85f else 1f,
+                targetValue = if (showBluetoothSheet) 0.85f else 1f,
                 animationSpec = spring(
                     dampingRatio = 0.8f,
                     stiffness = 300f
@@ -283,21 +289,25 @@ fun PhonePlayerLayout(
                 label = "PhoneArtworkOffsetX"
             )
 
-            Box(
+            // Artwork takes the space left after the controls, peek row and action row,
+            // capped at the old 480dp band; the 320dp artwork scales down on short screens.
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(480.dp)
+                    .weight(1f)
+                    .heightIn(max = 480.dp)
                     .graphicsLayer { clip = false },
                 contentAlignment = Alignment.Center
             ) {
+                val fitScale = (maxHeight / 320.dp).coerceIn(0.5f, 1f)
                 GlowingArtworkContainerPhone(
                     dominantColor = dominantColor,
                     visualization = effectiveVisualization,
                     modifier = Modifier
                         .graphicsLayer {
                             translationX = artworkOffsetXPx
-                            scaleX = artworkScale
-                            scaleY = artworkScale
+                            scaleX = artworkScale * fitScale
+                            scaleY = artworkScale * fitScale
                         }
                         .size(320.dp)
                         .padding(24.dp) // Add padding for glow to extend outward
@@ -360,7 +370,6 @@ fun PhonePlayerLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -407,6 +416,19 @@ fun PhonePlayerLayout(
 
             Spacer(modifier = Modifier.height(S_PADDING))
 
+            PhoneUpNextPeekRow(
+                nextSong = nextSong,
+                onClick = { if (!showQueue) toggleQueue() },
+            )
+
+            Spacer(modifier = Modifier.height(S_PADDING))
+
+            // Bottom action row: visualization mode on the left, Equalizer + Queue on the right (same toggles as Tablet).
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
             VisualizationControl(
                 currentMode = visualizationMode,
                 onModeSelected = { mode ->
@@ -431,86 +453,51 @@ fun PhonePlayerLayout(
                     }
                 }
             )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ToggledIconButton(
+                        state = showEqualizer,
+                        onClick = { toggleEqualizer() },
+                        activeBackground = Color.White,
+                        inactiveBackground = Color.Transparent,
+                    ) {
+                        Icon(
+                            XAudioLines,
+                            contentDescription = "Equalizer",
+                            tint = if (showEqualizer) Color.Black else Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(S_PADDING))
+                    ToggledIconButton(
+                        state = showQueue,
+                        onClick = { toggleQueue() },
+                        activeBackground = Color.White,
+                        inactiveBackground = Color.Transparent,
+                    ) {
+                        Icon(
+                            XListMusic,
+                            contentDescription = "Queue",
+                            tint = if (showQueue) Color.Black else Color.White
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(S_PADDING + bottomSafeInset))
         }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showQueue,
-            enter = slideInHorizontally(
-                initialOffsetX = { it },
-                animationSpec = spring(
-                    dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-        ) {
-            OverlayEffectComponentPhone(
-                modifier = Modifier.fillMaxSize(),
-                screenSize = configuration.containerSize
+        if (showQueue) {
+            PhoneQueueSheet(
+                currentSong = song,
+                queue = queue,
+                onDismiss = { showQueue = false },
+                onSkipTo = { index -> playerViewModel.skipToQueueItem(index) },
+                onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                onRemove = { index -> playerViewModel.removeQueueItem(index) },
+                onRestore = { index, removed -> playerViewModel.restoreQueueItem(index, removed) },
             )
-            Column(
-                modifier = Modifier
-                    .height(maxArtworkHeight)
-                    .width(360.dp),
-                horizontalAlignment = Alignment.End
-            ) {
-                Text(
-                    text = "Queue",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(S_PADDING * 2),
-                    textAlign = TextAlign.End,
-                    style = MaterialTheme.typography.titleLarge
-                )
-
-                PlayerQueueComponent(
-                    currentSong = song,
-                    queue = queue,
-                    onItemClick = { selectedSong ->
-                        playerViewModel.setQueue(
-                            queue,
-                            queue.indexOf(selectedSong),
-                            isEndlessQueue = true
-                        )
-                        showQueue = false
-                    },
-                    maxHeight = maxArtworkHeight
-                )
-            }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showEqualizer,
-            enter = slideInHorizontally(
-                initialOffsetX = { -it },
-                animationSpec = spring(
-                    dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeIn(),
-            exit = slideOutHorizontally(
-                targetOffsetX = { -it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioNoBouncy,
-                    stiffness = Spring.StiffnessMedium
-                )
-            ) + fadeOut(),
-            modifier = Modifier.align(Alignment.CenterStart)
-        ) {
-            EqualizerControlsComponent(
-                modifier = Modifier
-                    .width(360.dp)
-                    .padding(top = 24.dp)
-            )
+        if (showEqualizer) {
+            PhoneEqualizerSheet(onDismiss = { showEqualizer = false })
         }
 
     }

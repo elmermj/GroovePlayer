@@ -53,10 +53,10 @@ import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSectionCompone
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingRow
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingsButton
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileStorageSection
+import com.aethelsoft.grooveplayer.utils.LegalUrls
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
-import com.aethelsoft.grooveplayer.utils.theme.icons.XAccountType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAppVersion
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCopyright
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCrossFade
@@ -82,7 +82,9 @@ fun LargeTabletProfileLayout(
     viewModel: ProfileViewModel,
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiStyling: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
 ){
+    val context = LocalContext.current
     val canvas = GrooveTheme.colors.canvas
     LazyColumn(
         modifier = Modifier
@@ -135,7 +137,10 @@ fun LargeTabletProfileLayout(
                     }
                 )
                 Spacer(Modifier.height(S_PADDING))
-                AccountSection(viewModel = viewModel)
+                AccountSection(viewModel = viewModel, onNavigateToBackup = onNavigateToBackup)
+                Spacer(Modifier.height(S_PADDING))
+                // FREE-tier only; no-op when Basic/Premium. See app/ADS_SETUP.md
+                com.aethelsoft.grooveplayer.presentation.ads.BannerAdSlot()
             }
         }
 
@@ -171,16 +176,10 @@ fun LargeTabletProfileLayout(
                 )
                 Spacer(Modifier.height(S_PADDING))
 
-                CrossFadeModeRow(
-                    viewModel = viewModel,
-                    isExpanded = activeRowId == "fade",
-                    onExpandedChange = { expanded ->
-                        viewModel.setActiveRowId(if (expanded) "fade" else null)
-                    }
-                )
-                Spacer(Modifier.height(S_PADDING))
-
-                MiniPlayerOnStartRow(
+                // Cross-fade UI hidden until real crossfade is implemented (P1).
+                // CrossFadeModeRow(... fade ...)
+                // Spacer(Modifier.height(S_PADDING))
+MiniPlayerOnStartRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "mini_player",
                     onExpandedChange = { expanded ->
@@ -251,7 +250,17 @@ fun LargeTabletProfileLayout(
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XPrivacyPolicy) },
                     title = "Privacy policy",
-                    subtitle = "How your data is handled"
+                    subtitle = "How we handle your data",
+                    actionType = ActionType.LINK,
+                    onClick = { LegalUrls.open(context, LegalUrls.PRIVACY) },
+                )
+                Spacer(Modifier.height(S_PADDING))
+                ProfileSettingRow(
+                    icon = { ProfileRowIcon(XPrivacyPolicy) },
+                    title = "Terms of service",
+                    subtitle = "Rules for using GroovePlayer",
+                    actionType = ActionType.LINK,
+                    onClick = { LegalUrls.open(context, LegalUrls.TERMS) },
                 )
             }
         }
@@ -266,37 +275,13 @@ fun LargeTabletProfileLayout(
 }
 
 @Composable
-fun AccountSection(viewModel: ProfileViewModel) {
-    val profile by viewModel.userProfile.collectAsState()
-    val tier = profile?.privilegeTier ?: com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.FREE
-
-    ProfileSettingRow(
-        icon = { ProfileRowIcon(XAccountType) },
-        title = "Account type",
-        subtitle = when (tier) {
-            com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.FREE -> "Free"
-            com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.BASIC -> "Basic"
-            com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.PREMIUM -> "Premium"
-        }
-    )
-    Spacer(Modifier.height(S_PADDING))
-    ProfileSettingsButton(
-        onClick = {
-            // Placeholder: in future replace with real Google OAuth.
-            // For now, simply indicate that sign-in is not implemented.
-        },
-        modifier = Modifier.fillMaxWidth(),
-        title = "Sign in with Google",
-        isActive = false,
-    )
-    Spacer(Modifier.height(S_PADDING))
-    ProfileSettingsButton(
-        onClick = {
-            // TODO: wire to a real "reset account" flow when available.
-        },
-        modifier = Modifier.fillMaxWidth(),
-        title = "Reset account",
-        isActive = false,
+fun AccountSection(
+    viewModel: ProfileViewModel,
+    onNavigateToBackup: () -> Unit = {},
+) {
+    com.aethelsoft.grooveplayer.presentation.profile.ui.AccountAuthHeader(viewModel = viewModel)
+    com.aethelsoft.grooveplayer.presentation.profile.ui.SubscriptionPaywallSection(
+        onNavigateToBackup = onNavigateToBackup,
     )
 }
 

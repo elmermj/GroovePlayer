@@ -3,8 +3,9 @@
     <!-- Window/splash chrome — matches Compose GrooveBlack always-dark brand. -->
     <style name="Theme.GroovePlayer" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/black</item>
-        <item name="android:statusBarColor">@color/black</item>
-        <item name="android:navigationBarColor">@color/black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:colorBackground">@color/black</item>
     </style>
 </resources>

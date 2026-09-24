@@ -30,6 +30,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveActionButton
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSectionTitle
+import com.aethelsoft.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
@@ -85,6 +86,7 @@ fun TransferProgressScreen(
         title = "Transfer in progress",
         onBackClick = onNavigateBack,
     ) {
+        GrooveBelowAppBarSpacer()
         if (activeTransfers.isEmpty()) {
             Column(
                 modifier = Modifier.fillMaxSize(),

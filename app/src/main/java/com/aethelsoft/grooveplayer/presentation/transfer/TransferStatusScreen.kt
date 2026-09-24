@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.presentation.transfer
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSectionTitle
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
@@ -54,6 +56,7 @@ fun TransferStatusScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(top = topBarContentInset()),
             verticalArrangement = Arrangement.spacedBy(M_PADDING),
         ) {
             if (activeTransfers.isNotEmpty()) {

@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.profile
+package com.aethelsoft.grooveplayer.presentation.ui_customisation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class UiStylingViewModel @Inject constructor(
+class UiCustomisationViewModel @Inject constructor(
     private val userRepository: UserRepository,
 ) : ViewModel() {
 

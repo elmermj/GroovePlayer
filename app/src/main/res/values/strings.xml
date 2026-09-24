@@ -1,3 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Groove Player</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="sign_out">Sign out</string>
+    <string name="account_type">Account type</string>
+    <string name="tier_free">Free</string>
+    <string name="tier_basic">Basic</string>
+    <string name="tier_premium">Premium</string>
 </resources>

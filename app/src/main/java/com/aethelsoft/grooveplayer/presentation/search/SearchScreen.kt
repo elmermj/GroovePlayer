@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.domain.model.makeAlbumId
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.library.ui.AlbumItemComponent
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
@@ -31,6 +32,8 @@ import kotlinx.coroutines.launch
 fun SearchScreen(
     query: String,
     onNavigateBack: () -> Unit,
+    onNavigateToAlbum: (String) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     viewModel: SearchViewModel = hiltViewModel()
 ) {
 
@@ -142,7 +145,8 @@ fun SearchScreen(
                                                 playerViewModel.setQueue(allSongs, songIndex)
                                             }
                                         }
-                                    }
+                                    },
+                                    onPlayNext = { playerViewModel.playNext(it) },
                                 )
                             }
                         }
@@ -162,14 +166,13 @@ fun SearchScreen(
                                     viewModel = viewModel,
                                     onClick = {
                                         scope.launch {
-                                            // Find artist for this album
                                             val allSongs = viewModel.getAllSongs()
                                             val albumSong = allSongs.find { it.album?.name == albumName }
                                             val artistName = albumSong?.artist ?: ""
                                             val artworkUrl = viewModel.getAlbumArtwork(albumName, artistName)
                                             viewModel.searchRepository.saveAlbumClick(albumName, artistName, artworkUrl)
+                                            onNavigateToAlbum(makeAlbumId(artistName, albumName))
                                         }
-                                        // TODO: Navigate to album
                                     }
                                 )
                             }
@@ -192,8 +195,8 @@ fun SearchScreen(
                                         scope.launch {
                                             val artworkUrl = viewModel.getArtistArtwork(artistName)
                                             viewModel.searchRepository.saveArtistClick(artistName, artworkUrl)
+                                            onNavigateToArtist(artistName)
                                         }
-                                        // TODO: Navigate to artist
                                     }
                                 )
                             }
@@ -244,7 +247,8 @@ fun SearchScreen(
                                                 playerViewModel.setQueue(allSongs, songIndex)
                                             }
                                         }
-                                    }
+                                    },
+                                    onPlayNext = { playerViewModel.playNext(it) },
                                 )
                             }
                         }
@@ -276,6 +280,7 @@ fun SearchScreen(
                                             val artistName = albumSong?.artist ?: ""
                                             val artworkUrl = viewModel.getAlbumArtwork(albumName, artistName)
                                             viewModel.searchRepository.saveAlbumClick(albumName, artistName, artworkUrl)
+                                            onNavigateToAlbum(makeAlbumId(artistName, albumName))
                                         }
                                     }
                                 )
@@ -306,6 +311,7 @@ fun SearchScreen(
                                         scope.launch {
                                             val artworkUrl = viewModel.getArtistArtwork(artistName)
                                             viewModel.searchRepository.saveArtistClick(artistName, artworkUrl)
+                                            onNavigateToArtist(artistName)
                                         }
                                     }
                                 )

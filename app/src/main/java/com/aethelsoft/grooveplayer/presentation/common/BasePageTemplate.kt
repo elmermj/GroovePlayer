@@ -42,7 +42,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +56,7 @@ import com.aethelsoft.grooveplayer.presentation.search.SearchBarViewModel
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XSearch
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
@@ -69,6 +69,8 @@ fun BasePageTemplate(
     tabletLayout: @Composable () -> Unit,
     largeTabletLayout: @Composable () -> Unit,
     onNavigateToSearch: (String) -> Unit,
+    onNavigateToAlbum: (String) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     baseBackgroundColor: Color = Color.Black,
     uiError: (@Composable (String) -> Unit)? = null,
     uiLoading: (@Composable (String) -> Unit)? = null,
@@ -118,83 +120,89 @@ fun BasePageTemplate(
             .background(GrooveTheme.colors.canvas)
             .padding()
     ) {
-        if (isSearchExpanded) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(997f)
-                    .background(GrooveTheme.colors.canvas.copy(alpha = 0.6f))
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { MutableInteractionSource() }
-                    ) {
-                        focusManager.clearFocus()
-                        requestDismissSearchKey++
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .grooveOverlayTopScrim(),
+        ) {
+            if (isSearchExpanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(997f)
+                        .background(GrooveTheme.colors.canvas.copy(alpha = 0.6f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) {
+                            focusManager.clearFocus()
+                            requestDismissSearchKey++
+                        }
+                )
+            }
+
+            // Intercept native back button when search is expanded so that
+            // the first back press closes search instead of navigating away.
+            BackHandler(enabled = isSearchExpanded) {
+                isSearchExpanded = false
+                focusManager.clearFocus()
+                requestDismissSearchKey++
+            }
+
+            /* ---------- CONTENT ---------- */
+            if (!hasPermission) {
+                PermissionRequiredComponent(requestPermission)
+            } else {
+                when (val state = uiState) {
+                    is UiState.Loading -> {
+                        if(uiLoading != null) uiLoading("Loading...")
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
                     }
-            )
-        }
 
-        // Intercept native back button when search is expanded so that
-        // the first back press closes search instead of navigating away.
-        BackHandler(enabled = isSearchExpanded) {
-            isSearchExpanded = false
-            focusManager.clearFocus()
-            requestDismissSearchKey++
-        }
-
-        /* ---------- CONTENT ---------- */
-        if (!hasPermission) {
-            PermissionRequiredComponent(requestPermission)
-        } else {
-            when (val state = uiState) {
-                is UiState.Loading -> {
-                    if(uiLoading != null) uiLoading("Loading...")
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-
-                is UiState.Error -> {
-                    if(uiError != null) uiError(state.message)
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Error: ${state.message}")
-                            Spacer(Modifier.height(16.dp))
-                            Button(onClick = viewModel::refresh) {
-                                Text("Retry")
+                    is UiState.Error -> {
+                        if(uiError != null) uiError(state.message)
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Error: ${state.message}")
+                                Spacer(Modifier.height(16.dp))
+                                Button(onClick = viewModel::refresh) {
+                                    Text("Retry")
+                                }
                             }
                         }
                     }
-                }
 
-                is UiState.Success -> {
-                    when (deviceType) {
-                        DeviceType.PHONE -> {
-                            phoneLayout()
-                        }
+                    is UiState.Success -> {
+                        when (deviceType) {
+                            DeviceType.PHONE -> {
+                                phoneLayout()
+                            }
 
-                        DeviceType.TABLET -> {
-                            tabletLayout()
-                        }
+                            DeviceType.TABLET -> {
+                                tabletLayout()
+                            }
 
-                        DeviceType.LARGE_TABLET -> {
-                            largeTabletLayout()
+                            DeviceType.LARGE_TABLET -> {
+                                largeTabletLayout()
+                            }
                         }
                     }
-                }
 
-                is UiState.Idle -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(GrooveTheme.colors.canvas),
-                    )
+                    is UiState.Idle -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(GrooveTheme.colors.canvas),
+                        )
+                    }
                 }
             }
         }
@@ -241,6 +249,10 @@ fun BasePageTemplate(
                         onNavigateToUiStyling = {
                             isProfileDrawerOpen = false
                             navigation.openUiStyling()
+                        },
+                        onNavigateToBackup = {
+                            isProfileDrawerOpen = false
+                            navigation.openBackup()
                         },
                         deviceType = deviceType,
                     )
@@ -291,10 +303,36 @@ fun BasePageTemplate(
                         }
                     }
                     is SearchSuggestion.ArtistSuggestion -> {
-                        // TODO: Navigate to artist
+                        scope.launch {
+                            try {
+                                searchBarViewModel.saveArtistClick(
+                                    suggestion.artistName,
+                                    suggestion.artworkUrl,
+                                )
+                            } catch (e: Exception) {
+                                Log.e("BasePageTemplate", "Error saving artist click", e)
+                            }
+                        }
+                        onNavigateToArtist(suggestion.artistName)
                     }
                     is SearchSuggestion.AlbumSuggestion -> {
-                        // TODO: Navigate to album
+                        scope.launch {
+                            try {
+                                searchBarViewModel.saveAlbumClick(
+                                    suggestion.albumName,
+                                    suggestion.artistName,
+                                    suggestion.artworkUrl,
+                                )
+                            } catch (e: Exception) {
+                                Log.e("BasePageTemplate", "Error saving album click", e)
+                            }
+                        }
+                        onNavigateToAlbum(
+                            com.aethelsoft.grooveplayer.domain.model.makeAlbumId(
+                                suggestion.artistName,
+                                suggestion.albumName,
+                            )
+                        )
                     }
                 }
             }
@@ -313,8 +351,9 @@ private fun SearchSuggestionDropDown(
 ){
     if(isActive){
         val density = LocalDensity.current
-        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+        val windowInfo = rememberAdaptiveWindowInfo()
+        val screenHeight = windowInfo.heightDp.dp
+        val screenWidth = windowInfo.widthDp.dp
         val maxDropdownHeight = screenHeight * 0.4f // 40% of screen height
 
         // For phone layout, use full screen width minus padding

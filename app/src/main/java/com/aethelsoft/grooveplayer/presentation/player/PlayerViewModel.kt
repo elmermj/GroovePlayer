@@ -1,7 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.player
 
 import android.app.Application
-import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
@@ -15,13 +14,13 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.PlayPauseUseCa
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.PlaySongUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.PreviousSongUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.QueueUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.EditQueueUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SeekUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.presentation.player.layouts.GlowEffectConfig
-import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -42,6 +41,7 @@ class PlayerViewModel @Inject constructor(
     private val nextSongUseCase: NextSongUseCase,
     private val previousSongUseCase: PreviousSongUseCase,
     private val queueUseCase: QueueUseCase,
+    private val editQueueUseCase: EditQueueUseCase,
     private val controlsUseCase: ControlsUseCase,
     private val setVolumeUseCase: SetVolumeUseCase,
     private val setFullScreenPlayerOpenUseCase: SetFullScreenPlayerOpenUseCase,
@@ -103,6 +103,18 @@ class PlayerViewModel @Inject constructor(
     fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = viewModelScope.launch {
         queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
     }
+
+    fun skipToQueueItem(index: Int) = viewModelScope.launch { editQueueUseCase.skipTo(index) }
+
+    fun moveQueueItem(from: Int, to: Int) = viewModelScope.launch { editQueueUseCase.move(from, to) }
+
+    /** Removes the item and reports whether it was removed (the playing item is never removed). */
+    fun removeQueueItem(index: Int, onResult: (Boolean) -> Unit = {}) = viewModelScope.launch {
+        onResult(editQueueUseCase.remove(index))
+    }
+
+    fun restoreQueueItem(index: Int, song: Song) = viewModelScope.launch { editQueueUseCase.insert(index, song) }
+    fun playNext(song: Song) = viewModelScope.launch { editQueueUseCase.playNext(song) }
 
     fun setQueueFromLastPlayedSongs(songs: List<Song>, startSongId: String) = viewModelScope.launch {
         val shuffledSongs = songs.shuffled()
@@ -172,16 +184,17 @@ class PlayerViewModel @Inject constructor(
                 }
                 
                 if (queueSongs.isNotEmpty()) {
-                    // Restore queue without auto-playing
-                    setQueue(
+                    // Restore queue without auto-playing (awaited so the shuffle flag below applies to this queue)
+                    queueUseCase(
                         songs = queueSongs,
                         startIndex = settings.queueStartIndex.coerceIn(0, queueSongs.lastIndex),
                         isEndlessQueue = settings.isEndlessQueue,
                         autoPlay = false // Don't auto-play on restore
                     )
                     
-                    // Restore shuffle and repeat
-                    setShuffle(settings.shuffleEnabled)
+                    // Restore shuffle and repeat. The saved queue is already in real playback order,
+                    // so only restore the flag instead of reshuffling.
+                    controlsUseCase.setShuffle(settings.shuffleEnabled, reorderQueue = false)
                     val repeatMode = try {
                         com.aethelsoft.grooveplayer.domain.model.RepeatMode.valueOf(settings.repeatMode)
                     } catch (e: Exception) {

@@ -18,6 +18,8 @@ fun HomeScreen(
     onNavigateToFavoriteArtists: () -> Unit,
     onNavigateToFavoriteAlbums: () -> Unit,
     onNavigateToSearch: (String) -> Unit,
+    onNavigateToAlbum: (String) -> Unit = {},
+    onNavigateToArtist: (String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     BasePageTemplate(
@@ -52,6 +54,8 @@ fun HomeScreen(
             )
         },
         onNavigateToSearch = onNavigateToSearch,
+        onNavigateToAlbum = onNavigateToAlbum,
+        onNavigateToArtist = onNavigateToArtist,
         viewModel = viewModel,
         isSearchEnabled = true,
         pageTitle = "Your library",

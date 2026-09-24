@@ -55,7 +55,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil3.imageLoader
@@ -85,6 +84,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDeta
 import com.aethelsoft.grooveplayer.presentation.player.ui.extractDominantColor
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.DeviceType
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -165,9 +165,9 @@ fun TabletPlayerLayout(
             bluetoothViewModel.startScanning()
         }
     }
-    val configuration = LocalWindowInfo.current
-    val screenHeight = configuration.containerSize.height.dp
-    val screenWidth = configuration.containerSize.width.dp
+    val windowInfo = rememberAdaptiveWindowInfo()
+    val screenHeight = windowInfo.heightDp.dp
+    val screenWidth = windowInfo.widthDp.dp
     val maxArtworkHeight = minOf(screenHeight * 0.4f, screenWidth * 0.5f)
     val context = LocalContext.current
     var dominantColor by remember { mutableStateOf(Color.White) }
@@ -384,7 +384,9 @@ fun TabletPlayerLayout(
                                 )
                                 showQueue = false
                             },
-                            maxHeight = maxArtworkHeight
+                            maxHeight = maxArtworkHeight,
+                            onRemove = { index -> playerViewModel.removeQueueItem(index) },
+                            onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
                         )
                     }
                 }
@@ -514,6 +516,7 @@ fun TabletPlayerLayout(
                     }
 
                     Spacer(modifier = Modifier.height(S_PADDING))
+                    // Same as LargeTablet: keep Visualization off the transport Box (BUG-001).
                     Box(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -534,31 +537,8 @@ fun TabletPlayerLayout(
                         )
                         Row(
                             modifier = Modifier.align(Alignment.CenterEnd),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            VisualizationControl(
-                                currentMode = visualizationMode,
-                                onModeSelected = { mode ->
-                                    when (mode) {
-                                        VisualizationMode.REAL_TIME -> {
-                                            if (!hasRecordAudioPermission) {
-                                                requestRecordAudioPermission()
-                                            }
-                                            if (!hasRecordAudioPermission) {
-                                                false
-                                            } else {
-                                                playerViewModel.setVisualizationMode(mode)
-                                                true
-                                            }
-                                        }
-                                        VisualizationMode.OFF,
-                                        VisualizationMode.SIMULATED -> {
-                                            playerViewModel.setVisualizationMode(mode)
-                                            true
-                                        }
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(L_PADDING * 2))
                             ToggledIconButton(
                                 state = showEqualizer,
                                 onClick = { showEqualizer = !showEqualizer },
@@ -595,7 +575,30 @@ fun TabletPlayerLayout(
                         }
                     }
 
-
+                    Spacer(modifier = Modifier.height(S_PADDING))
+                    VisualizationControl(
+                        currentMode = visualizationMode,
+                        onModeSelected = { mode ->
+                            when (mode) {
+                                VisualizationMode.REAL_TIME -> {
+                                    if (!hasRecordAudioPermission) {
+                                        requestRecordAudioPermission()
+                                    }
+                                    if (!hasRecordAudioPermission) {
+                                        false
+                                    } else {
+                                        playerViewModel.setVisualizationMode(mode)
+                                        true
+                                    }
+                                }
+                                VisualizationMode.OFF,
+                                VisualizationMode.SIMULATED -> {
+                                    playerViewModel.setVisualizationMode(mode)
+                                    true
+                                }
+                            }
+                        }
+                    )
                 }
 
             }

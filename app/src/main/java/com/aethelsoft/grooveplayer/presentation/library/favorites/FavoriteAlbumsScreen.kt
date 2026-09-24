@@ -27,6 +27,9 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
+import com.aethelsoft.grooveplayer.presentation.common.rememberClearMiniPlayer
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
@@ -56,7 +59,12 @@ fun FavoriteAlbumsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = M_PADDING, vertical = M_PADDING),
+                contentPadding = PaddingValues(
+                    start = M_PADDING,
+                    end = M_PADDING,
+                    top = topBarContentInset() + M_PADDING,
+                    bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
+                ),
                 verticalArrangement = Arrangement.spacedBy(XS_PADDING),
             ) {
                 items(

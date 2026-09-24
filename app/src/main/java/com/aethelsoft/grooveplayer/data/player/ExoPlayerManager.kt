@@ -5,8 +5,11 @@ import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.media.audiofx.Visualizer
 import android.net.Uri
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -20,12 +23,14 @@ import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.services.MusicPlaybackServiceManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.util.Collections.emptyList
 import javax.inject.Inject
@@ -49,6 +54,10 @@ data class AudioVisualizationData(
  * ExoPlayer implementation of PlayerRepository.
  * This is the data layer implementation that should not depend on UseCases.
  * It can depend on other repositories.
+ *
+ * ExoPlayer must be created and touched on the main looper. Hilt may construct
+ * this @Singleton from a background dispatcher on cold start, so construction
+ * and player API calls always hop to Dispatchers.Main.immediate.
  */
 @Singleton
 class ExoPlayerManager @OptIn(UnstableApi::class)
@@ -61,7 +70,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 ) : PlayerRepository {
 
-    private val player: ExoPlayer = ExoPlayer.Builder(ctx).build()
+    private val player: ExoPlayer = createPlayerOnMainThread()
     private val audioManager: AudioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -98,9 +107,99 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     
     // Endless queue feature
     private var isEndlessQueue = false
+
+    /** Queue order from before shuffle was turned on; kept in sync with edits made while shuffled. Null when shuffle is off. */
+    private var preShuffleOrder: MutableList<Song>? = null
     private var allAvailableSongs = listOf<Song>()
 
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /**
+     * ExoPlayer binds to the current thread's looper at construction time.
+     * Always build on the main looper, even if Hilt injects this singleton off-main.
+     */
+    private fun createPlayerOnMainThread(): ExoPlayer {
+        fun build(): ExoPlayer = ExoPlayer.Builder(ctx)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .build(),
+                /* handleAudioFocus = */ true,
+            )
+            // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
+            .setHandleAudioBecomingNoisy(true)
+            .build()
+        return if (Looper.myLooper() == Looper.getMainLooper()) {
+            build()
+        } else {
+            runBlocking(Dispatchers.Main.immediate) { build() }
+        }
+    }
+
+    private inline fun runOnMainThread(crossinline block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+        } else {
+            runBlocking(Dispatchers.Main.immediate) { block() }
+        }
+    }
+
+    private fun attachPlayerListener() {
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                _isPlaying.value = isPlaying
+
+                // Start foreground service when playback begins
+                if (isPlaying) {
+                    serviceManager.startService()
+                    _currentSong.value?.let { song ->
+                        recordPlaybackIfNeeded(song)
+                    }
+
+                    // Ensure visualizer is initialized once we actually have playback.
+                    // On some devices the audioSessionId is 0 at app startup and only
+                    // becomes valid after playback begins, which previously left us
+                    // stuck on the fallback "template" visualization.
+                    initializeVisualizerIfNeeded(reason = "onIsPlayingChanged")
+                }
+            }
+
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // find matching Song in queue by uri
+                val uri = mediaItem?.localConfiguration?.uri?.toString()
+                val song = _queue.value.firstOrNull { it.uri == uri }
+                _currentSong.value = song
+                val mime = mediaItem?.localConfiguration?.mimeType
+                val isM4a = isM4AMimeType(mime) || (song != null && isM4A(song.uri))
+                // M4A + Equalizer causes severe distortion; release Equalizer only. Keep Visualizer for real-time viz.
+                if (isM4a) {
+                    releaseEqualizerOnly()
+                }
+                // Re-init: for M4A we init Visualizer only; for others we init both
+                initializeVisualizerIfNeeded(reason = "media_item_transition")
+                _duration.value = _currentSong.value?.durationMs ?: player.duration.coerceAtLeast(0L)
+
+                // Record playback when song transitions
+                if (song != null && player.isPlaying) {
+                    recordPlaybackIfNeeded(song)
+                }
+
+                // Check if we need to extend the queue for endless playback
+                if (isEndlessQueue && song != null) {
+                    checkAndExtendQueue(song)
+                }
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                _duration.value = player.duration.coerceAtLeast(0L)
+                // When playback ends, update isPlaying state
+                if (state == Player.STATE_ENDED) {
+                    _isPlaying.value = false
+                }
+            }
+        })
+    }
     
     private fun getCurrentVolume(): Float {
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -125,59 +224,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
         }
         
-        player.addListener(object : androidx.media3.common.Player.Listener {
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
-                
-                // Start foreground service when playback begins
-                if (isPlaying) {
-                    serviceManager.startService()
-                    _currentSong.value?.let { song ->
-                        recordPlaybackIfNeeded(song)
-                    }
-                    
-                    // Ensure visualizer is initialized once we actually have playback.
-                    // On some devices the audioSessionId is 0 at app startup and only
-                    // becomes valid after playback begins, which previously left us
-                    // stuck on the fallback "template" visualization.
-                    initializeVisualizerIfNeeded(reason = "onIsPlayingChanged")
-                }
-            }
-
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                // find matching Song in queue by uri
-                val uri = mediaItem?.localConfiguration?.uri?.toString()
-                val song = _queue.value.firstOrNull { it.uri == uri }
-                _currentSong.value = song
-                val mime = mediaItem?.localConfiguration?.mimeType
-                val isM4a = isM4AMimeType(mime) || (song != null && isM4A(song.uri))
-                // M4A + Equalizer causes severe distortion; release Equalizer only. Keep Visualizer for real-time viz.
-                if (isM4a) {
-                    releaseEqualizerOnly()
-                }
-                // Re-init: for M4A we init Visualizer only; for others we init both
-                initializeVisualizerIfNeeded(reason = "media_item_transition")
-                _duration.value = _currentSong.value?.durationMs ?: player.duration.coerceAtLeast(0L)
-                
-                // Record playback when song transitions
-                if (song != null && player.isPlaying) {
-                    recordPlaybackIfNeeded(song)
-                }
-                
-                // Check if we need to extend the queue for endless playback
-                if (isEndlessQueue && song != null) {
-                    checkAndExtendQueue(song)
-                }
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                _duration.value = player.duration.coerceAtLeast(0L)
-                // When playback ends, update isPlaying state
-                if (state == Player.STATE_ENDED) {
-                    _isPlaying.value = false
-                }
-            }
-        })
+        // Listener + player touches must run on the player's application thread (main).
+        runOnMainThread {
+            attachPlayerListener()
+        }
 
         // position ticker
         scope.launch {
@@ -291,7 +341,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         
         // Try to initialize audio visualizer for real waveform data once the player is ready.
         // We also retry later from onIsPlayingChanged when playback actually starts.
-        scope.launch(Dispatchers.Main) {
+        scope.launch(Dispatchers.Main.immediate) {
             delay(1000) // Initial attempt after player construction
             initializeVisualizerIfNeeded(reason = "init_delay")
         }
@@ -349,6 +399,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
      * For other formats: both Equalizer and Visualizer.
      */
     private fun initializeVisualizerIfNeeded(reason: String) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            scope.launch(Dispatchers.Main.immediate) {
+                initializeVisualizerIfNeeded(reason)
+            }
+            return
+        }
         val isM4a = isCurrentTrackM4A()
         if (isM4a) {
             releaseEqualizerOnly()
@@ -657,7 +713,29 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
     }
     
+    /**
+     * Local MediaItem builder.
+     *
+     * R2 cost rule 2 (app/R2_COST_RULES.md): do **not** set signed R2 URLs as the
+     * playback URI. Media3 issues HTTP Range requests by default, which would
+     * Class-B spam GetObject. Download whole-object via BackupRepository first.
+     */
     private fun buildMediaItem(uri: Uri): MediaItem {
+        val scheme = uri.scheme?.lowercase()
+        if (scheme == "http" || scheme == "https") {
+            val host = uri.host.orEmpty().lowercase()
+            val q = uri.query.orEmpty()
+            val looksLikeR2 = "r2.cloudflarestorage" in host ||
+                "X-Amz-Algorithm" in q ||
+                "X-Amz-Signature" in q
+            if (looksLikeR2) {
+                throw IllegalArgumentException(
+                    "R2 cost rule: ExoPlayer must not stream signed R2 URLs " +
+                        "(Range GET spam). Download the whole object locally first.",
+                )
+            }
+        }
+
         val mimeType = if (uri.scheme == "content") {
             try {
                 ctx.contentResolver.getType(uri)
@@ -675,7 +753,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     private suspend fun prepareFromSong(song: Song) {
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.setMediaItem(buildMediaItem(Uri.parse(song.uri)))
             player.prepare()
         }
@@ -684,24 +762,39 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
+        if (_shuffle.value && songs.size > 1) {
+            // Shuffle is on: the chosen song plays first, the rest follow in a shuffled (real) order.
+            val start = startIndex.coerceIn(0, songs.lastIndex)
+            val chosen = songs[start]
+            val rest = songs.filterIndexed { i, _ -> i != start }.shuffled()
+            preShuffleOrder = songs.toMutableList()
+            return setQueueInternal(listOf(chosen) + rest, 0, isEndlessQueue, autoPlay)
+        }
+        preShuffleOrder = if (_shuffle.value) songs.toMutableList() else null
+        setQueueInternal(songs, startIndex, isEndlessQueue, autoPlay)
+    }
+
+    private suspend fun setQueueInternal(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
         this.isEndlessQueue = isEndlessQueue
         this.allAvailableSongs = songs
         
         _queue.value = songs
         
         // All ExoPlayer operations MUST run on Main thread
-        withContext(Dispatchers.Main) {
+        val savedPosition = withContext(Dispatchers.Main.immediate) {
             player.clearMediaItems()
             if (songs.isEmpty()) {
                 player.stop()
                 player.playWhenReady = false
                 serviceManager.stopService()
+                0L
             } else {
                 songs.forEach { s -> player.addMediaItem(buildMediaItem(s.uri.toUri())) }
                 player.prepare()
                 val idx = startIndex.coerceIn(0, songs.lastIndex)
                 player.seekTo(idx, 0)
                 player.playWhenReady = autoPlay
+                player.currentPosition
             }
         }
         
@@ -720,12 +813,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             song?.let { recordPlaybackIfNeeded(it, force = true) }
         }
         
-        // Save player state
+        // Save player state (position already read on main)
         scope.launch(Dispatchers.IO) {
             try {
                 userRepository.updatePlayerState(
                     songId = song?.id,
-                    position = if (songs.isEmpty()) 0L else player.currentPosition,
+                    position = savedPosition,
                     shuffle = _shuffle.value,
                     repeat = _repeat.value.name,
                     queueSongIds = songs.map { it.id },
@@ -734,6 +827,166 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 )
             } catch (e: Exception) {
                 android.util.Log.e("ExoPlayerManager", "Error saving player state: ${e.message}", e)
+            }
+        }
+    }
+
+    override suspend fun skipToQueueIndex(index: Int) {
+        val q = _queue.value
+        if (index !in q.indices) return
+        withContext(Dispatchers.Main.immediate) {
+            if (index >= player.mediaItemCount) return@withContext
+            player.seekTo(index, 0)
+            player.playWhenReady = true
+        }
+        // onMediaItemTransition updates _currentSong; set eagerly so UI reacts instantly.
+        _currentSong.value = q[index]
+        _duration.value = q[index].durationMs
+        _position.value = 0L
+        recordPlaybackIfNeeded(q[index], force = true)
+        persistQueueState()
+    }
+
+    override suspend fun moveQueueItem(from: Int, to: Int) {
+        val q = _queue.value
+        if (from !in q.indices || to !in q.indices || from == to) return
+        val moved = withContext(Dispatchers.Main.immediate) {
+            if (from >= player.mediaItemCount || to >= player.mediaItemCount) return@withContext false
+            player.moveMediaItem(from, to)
+            true
+        }
+        if (!moved) return
+        val newQueue = q.toMutableList().apply { add(to, removeAt(from)) }
+        _queue.value = newQueue
+        preShuffleOrder?.let { orig -> placeAfterPredecessor(orig, newQueue, to) }
+        persistQueueState()
+    }
+
+    override suspend fun removeQueueItem(index: Int): Boolean {
+        val q = _queue.value
+        if (index !in q.indices) return false
+        val removed = withContext(Dispatchers.Main.immediate) {
+            if (index >= player.mediaItemCount || index == player.currentMediaItemIndex) return@withContext false
+            player.removeMediaItem(index)
+            true
+        }
+        if (!removed) return false
+        _queue.value = q.toMutableList().apply { removeAt(index) }
+        preShuffleOrder?.let { orig ->
+            val i = orig.indexOfFirst { it.id == q[index].id }
+            if (i >= 0) orig.removeAt(i)
+        }
+        persistQueueState()
+        return true
+    }
+
+    override suspend fun insertQueueItem(index: Int, song: Song) {
+        val q = _queue.value
+        val at = index.coerceIn(0, q.size)
+        val inserted = withContext(Dispatchers.Main.immediate) {
+            if (at > player.mediaItemCount) return@withContext false
+            player.addMediaItem(at, buildMediaItem(song.uri.toUri()))
+            true
+        }
+        if (!inserted) return
+        val newQueue = q.toMutableList().apply { add(at, song) }
+        _queue.value = newQueue
+        preShuffleOrder?.let { orig -> placeAfterPredecessor(orig, newQueue, at) }
+        persistQueueState()
+    }
+
+
+    override suspend fun playNext(song: Song) {
+        val q = _queue.value
+        val currentIndex = withContext(Dispatchers.Main.immediate) {
+            player.currentMediaItemIndex.coerceAtLeast(0)
+        }
+        // Empty queue: start playback with this song alone.
+        if (q.isEmpty()) {
+            setQueue(listOf(song), startIndex = 0, isEndlessQueue = false, autoPlay = true)
+            return
+        }
+        val insertAt = (currentIndex + 1).coerceIn(0, q.size)
+        // If already next, leave as-is; if elsewhere in queue, move after current.
+        val existing = q.indexOfFirst { it.id == song.id }
+        if (existing == insertAt) return
+        if (existing >= 0) {
+            // Don't move the currently playing item.
+            if (existing == currentIndex) return
+            moveQueueItem(existing, if (existing < insertAt) insertAt - 1 else insertAt)
+            return
+        }
+        insertQueueItem(insertAt, song)
+    }
+
+    /**
+     * Mirrors an edit made while shuffled into [orig]: the song at [queueIndex] in [queue] is placed right after
+     * the song that precedes it in the queue, so reorders carry over when shuffle is turned off.
+     */
+    private fun placeAfterPredecessor(orig: MutableList<Song>, queue: List<Song>, queueIndex: Int) {
+        val song = queue.getOrNull(queueIndex) ?: return
+        val existing = orig.indexOfFirst { it.id == song.id }
+        if (existing >= 0) orig.removeAt(existing)
+        val predecessor = queue.getOrNull(queueIndex - 1)
+        val predIndex = predecessor?.let { p -> orig.indexOfFirst { it.id == p.id } } ?: -1
+        orig.add((predIndex + 1).coerceIn(0, orig.size), song)
+    }
+
+    /** Shuffle only the songs after the current one; the current song keeps playing where it is. */
+    private suspend fun applyShuffleOrder() {
+        val q = _queue.value
+        if (q.isEmpty()) return
+        preShuffleOrder = q.toMutableList()
+        replaceUpcoming { upcoming -> upcoming.shuffled() }
+    }
+
+    /** Put the songs after the current one back in their original order (edits made while shuffled carry over). */
+    private suspend fun restoreUnshuffledOrder() {
+        val orig = preShuffleOrder
+        preShuffleOrder = null
+        if (orig == null || _queue.value.isEmpty()) return
+        val rank = HashMap<String, Int>()
+        orig.forEachIndexed { i, s -> rank.putIfAbsent(s.id, i) }
+        // Stable sort: songs not in the original order (e.g. endless-queue additions) keep their relative order at the end.
+        replaceUpcoming { upcoming -> upcoming.sortedBy { rank[it.id] ?: Int.MAX_VALUE } }
+    }
+
+    /** Swap the items after the current one without interrupting playback. */
+    private suspend fun replaceUpcoming(transform: (List<Song>) -> List<Song>) {
+        val q = _queue.value
+        val newQueue = withContext(Dispatchers.Main.immediate) {
+            val count = player.mediaItemCount
+            val idx = player.currentMediaItemIndex
+            if (count != q.size || idx !in q.indices) return@withContext null
+            val head = q.take(idx + 1)
+            val upcoming = transform(q.drop(idx + 1))
+            if (idx + 1 < count) player.removeMediaItems(idx + 1, count)
+            if (upcoming.isNotEmpty()) {
+                player.addMediaItems(idx + 1, upcoming.map { buildMediaItem(it.uri.toUri()) })
+            }
+            head + upcoming
+        } ?: return
+        _queue.value = newQueue
+        persistQueueState()
+    }
+
+    private fun persistQueueState() {
+        val q = _queue.value
+        val current = _currentSong.value
+        val position = _position.value
+        scope.launch(Dispatchers.IO) {
+            try {
+                userRepository.updatePlayerState(
+                    songId = current?.id,
+                    position = position,
+                    shuffle = _shuffle.value,
+                    repeat = _repeat.value.name,
+                    queueSongIds = q.map { it.id },
+                    queueStartIndex = q.indexOfFirst { it.id == current?.id }.coerceAtLeast(0),
+                    isEndlessQueue = isEndlessQueue
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("ExoPlayerManager", "Error saving queue state: ${e.message}", e)
             }
         }
     }
@@ -779,9 +1032,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         // Add to queue
         val newQueue = currentQueue + randomSongs
         _queue.value = newQueue
+        preShuffleOrder?.addAll(randomSongs)
         
         // Add to ExoPlayer - MUST run on Main thread
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             randomSongs.forEach { song ->
                 player.addMediaItem(buildMediaItem(Uri.parse(song.uri)))
             }
@@ -791,7 +1045,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun play() {
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             // If the song has finished (reached the end), seek to the beginning
             val duration = player.duration
             val currentPosition = player.currentPosition
@@ -804,7 +1058,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun pause() {
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.playWhenReady = false
             player.pause()
         }
@@ -812,7 +1066,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun playSong(song: Song) {
         prepareFromSong(song)
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.playWhenReady = true
             player.play()
         }
@@ -822,7 +1076,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 //        if (fadeTimerSeconds > 0 && _isPlaying.value) {
 //            applyFadeOut()
 //        }
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.seekToNext()
             player.play()
         }
@@ -832,13 +1086,13 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun previous() {
-        val currentPos = withContext(Dispatchers.Main) {
+        val currentPos = withContext(Dispatchers.Main.immediate) {
             player.currentPosition
         }
         
         // if position > 3s, restart; else previous track
         if (currentPos > 3000) {
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main.immediate) {
                 player.seekTo(0)
                 player.play()
             }
@@ -846,7 +1100,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 //            if (fadeTimerSeconds > 0 && _isPlaying.value) {
 //                applyFadeOut()
 //            }
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main.immediate) {
                 player.seekToPrevious()
                 player.play()
             }
@@ -864,7 +1118,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         if (isFading) return // Prevent concurrent fades
         isFading = true
         
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             val originalVolume = player.volume
             val steps = 20 // Number of volume reduction steps
             val delayMs = (fadeTimerSeconds * 1000L) / steps
@@ -887,7 +1141,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         if (isFading) return // Prevent concurrent fades
         isFading = true
         
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             val targetVolume = if (_isPlayerMuted.value) 0f else 1f
             val steps = 20 // Number of volume increase steps
             val delayMs = (fadeTimerSeconds * 1000L) / steps
@@ -903,16 +1157,23 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun seekTo(positionMs: Long) {
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.seekTo(positionMs.coerceAtLeast(0L))
             _position.value = player.currentPosition
         }
     }
 
-    override suspend fun setShuffle(enable: Boolean) {
+    override suspend fun setShuffle(enable: Boolean, reorderQueue: Boolean) {
+        val wasEnabled = _shuffle.value
         _shuffle.value = enable
-        withContext(Dispatchers.Main) {
-            player.shuffleModeEnabled = enable
+        withContext(Dispatchers.Main.immediate) {
+            // The queue itself holds the real playback order; ExoPlayer's hidden shuffle order stays off.
+            player.shuffleModeEnabled = false
+        }
+        if (reorderQueue && enable != wasEnabled) {
+            if (enable) applyShuffleOrder() else restoreUnshuffledOrder()
+        } else if (!reorderQueue) {
+            preShuffleOrder = if (enable) _queue.value.toMutableList() else null
         }
         withContext(Dispatchers.IO) {
             userRepository.updateRepeatAndShuffle(_shuffle.value, _repeat.value.name)
@@ -921,7 +1182,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun setRepeat(mode: RepeatMode) {
         _repeat.value = mode
-        withContext(Dispatchers.Main) {
+        withContext(Dispatchers.Main.immediate) {
             player.repeatMode = when (mode) {
                 RepeatMode.OFF -> ExoPlayer.REPEAT_MODE_OFF
                 RepeatMode.ONE -> ExoPlayer.REPEAT_MODE_ONE
@@ -950,7 +1211,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     override suspend fun setMute(mute: Boolean) {
         _isPlayerMuted.value = mute
         if (!isFading) {  // Don't interfere with fade effects
-            withContext(Dispatchers.Main) {
+            withContext(Dispatchers.Main.immediate) {
                 player.volume = if (mute) 0f else 1f
             }
         }

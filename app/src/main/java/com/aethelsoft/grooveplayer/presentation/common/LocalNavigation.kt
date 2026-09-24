@@ -22,6 +22,7 @@ data class NavigationActions(
     /** Prepares songs and navigates to Share with nearby device. */
     val openShareViaNearbyWithSongs: (List<Song>) -> Unit = {},
     val openUiStyling: () -> Unit = {},
+    val openBackup: () -> Unit = {},
 )
 
 /**

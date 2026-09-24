@@ -21,7 +21,10 @@ import androidx.paging.compose.itemKey
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
+import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
+import com.aethelsoft.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
@@ -47,7 +50,12 @@ fun ArtistDetailScreen(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = M_PADDING, vertical = M_PADDING),
+            contentPadding = PaddingValues(
+                start = M_PADDING,
+                end = M_PADDING,
+                top = topBarContentInset() + M_PADDING,
+                bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
+            ),
             verticalArrangement = Arrangement.spacedBy(XS_PADDING),
         ) {
             items(
@@ -63,7 +71,8 @@ fun ArtistDetailScreen(
                             if (index < list.size) {
                                 playerViewModel.setQueue(list, index)
                             }
-                        }
+                        },
+                        onPlayNext = { playerViewModel.playNext(it) },
                     )
                 }
             }

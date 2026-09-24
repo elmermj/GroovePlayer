@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -17,9 +18,40 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 val ChromeGlassFadeExtension: Dp = 52.dp
 
 /**
- * Top chrome glass: opaque through the bar, then a long fade into content below.
- * Uses [GrooveColors.edgeGradient], not canvas, so the veil stays distinct from the page.
- * Fade is drawn past layout bounds ([clip] = false) so it does not steal touches.
+ * Draw a top-edge veil *over* already-composed page content.
+ * Apply this to the content container (the sibling *behind* [GradientAppBar] /
+ * [XAppBar]), never to the app bar itself — a separate bar node with its own
+ * draw layer composites as a slab and hides whatever is underneath.
+ */
+@Composable
+fun Modifier.grooveOverlayTopScrim(
+    edge: Color = GrooveTheme.colors.edgeGradient,
+    fadeExtension: Dp = ChromeGlassFadeExtension,
+): Modifier {
+    val scrimHeightPx = with(LocalDensity.current) {
+        (statusBarsInset() + GrooveTheme.spacing.appBarHeight + fadeExtension).toPx()
+    }
+    return this.drawWithContent {
+        drawContent()
+        drawRect(
+            brush = Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0.00f to edge.copy(alpha = 0.62f),
+                    0.38f to edge.copy(alpha = 0.32f),
+                    0.70f to edge.copy(alpha = 0.10f),
+                    1.00f to Color.Transparent,
+                ),
+                startY = 0f,
+                endY = scrimHeightPx,
+            ),
+            size = Size(size.width, scrimHeightPx),
+        )
+    }
+}
+
+/**
+ * Top chrome glass for the mini-player when it is top-anchored.
+ * Same veil as [grooveOverlayTopScrim], sized to this node plus [fadeExtension].
  */
 @Composable
 fun Modifier.grooveTopChromeGlass(
@@ -27,28 +59,22 @@ fun Modifier.grooveTopChromeGlass(
     fadeExtension: Dp = ChromeGlassFadeExtension,
 ): Modifier {
     val fadePx = with(LocalDensity.current) { fadeExtension.toPx() }
-    return this
-        .graphicsLayer { clip = false }
-        .drawWithCache {
-            val totalH = size.height + fadePx
-            val barEnd = (size.height / totalH).coerceIn(0f, 1f)
-            val brush = Brush.verticalGradient(
+    return this.drawWithContent {
+        drawContent()
+        val totalH = size.height + fadePx
+        drawRect(
+            brush = Brush.verticalGradient(
                 colorStops = arrayOf(
-                    0.00f to edge.copy(alpha = 0.94f),
-                    0.35f * barEnd to edge.copy(alpha = 0.88f),
-                    0.70f * barEnd to edge.copy(alpha = 0.72f),
-                    barEnd to edge.copy(alpha = 0.42f),
-                    barEnd + (1f - barEnd) * 0.40f to edge.copy(alpha = 0.18f),
-                    barEnd + (1f - barEnd) * 0.72f to edge.copy(alpha = 0.06f),
+                    0.00f to edge.copy(alpha = 0.62f),
+                    0.45f to edge.copy(alpha = 0.28f),
                     1.00f to Color.Transparent,
                 ),
                 startY = 0f,
                 endY = totalH,
-            )
-            onDrawBehind {
-                drawRect(brush = brush, size = Size(size.width, totalH))
-            }
-        }
+            ),
+            size = Size(size.width, totalH),
+        )
+    }
 }
 
 /**

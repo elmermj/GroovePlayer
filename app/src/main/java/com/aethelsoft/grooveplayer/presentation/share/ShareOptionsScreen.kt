@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSectionTitle
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.presentation.transfer.DeviceCapabilityCard
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -52,7 +54,8 @@ fun ShareOptionsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(top = topBarContentInset()),
             verticalArrangement = Arrangement.spacedBy(M_PADDING),
         ) {
             ShareRequirementsBanner(status = shareRequirements)

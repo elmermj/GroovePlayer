@@ -31,12 +31,12 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
  * Dark Groove page chrome: canvas + [GradientAppBar] overlay + content inset.
  * Colors / radii / spacing come from [GrooveTheme] (user-configurable).
  *
- * Default padding clears the navigation/gesture bar and, when a song is active,
- * the floating mini player. Pass [contentPadding] to override.
+ * The content column is full-bleed under [GradientAppBar]. Default padding is
+ * horizontal + bottom only — never a top inset on the viewport, or lists cannot
+ * draw underneath the glass.
  *
- * For scrollable lists, prefer [contentPadding] = [PaddingValues.Zero] and put
- * horizontal/vertical padding on the LazyColumn contentPadding instead
- * (include [grooveBottomContentInset] in that contentPadding).
+ * Scrollables should put [topBarContentInset] in *their* contentPadding / first
+ * spacer (inside the scroll) so rows rest below the title, then slide under it.
  */
 @Composable
 fun GrooveScreen(
@@ -60,13 +60,18 @@ fun GrooveScreen(
             .fillMaxSize()
             .background(colors.canvas)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = topBarContentInset())
-                .padding(resolvedPadding),
-            content = content,
-        )
+                .grooveOverlayTopScrim(),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(resolvedPadding),
+                content = content,
+            )
+        }
         GradientAppBar(
             title = title,
             deviceType = deviceType,
@@ -74,6 +79,12 @@ fun GrooveScreen(
             actions = actions,
         )
     }
+}
+
+/** First child of a GrooveScreen Column so titles rest below the overlay app bar. */
+@Composable
+fun GrooveBelowAppBarSpacer() {
+    Spacer(modifier = Modifier.height(topBarContentInset()))
 }
 
 /**

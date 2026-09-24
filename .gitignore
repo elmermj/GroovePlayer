@@ -22,3 +22,8 @@ local.properties
 keystore/
 *.jks
 *.keystore
+keystore/firebase-service-account.json
+
+# Local layout QA screenshots (not for remote)
+grooveplayer-layout-qa/
+grooveplayer-tablet-shots/

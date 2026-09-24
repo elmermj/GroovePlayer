@@ -37,6 +37,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
+import com.aethelsoft.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.helpers.logShareNearbyP2PTag
@@ -116,6 +117,7 @@ fun DeviceDiscoveryScreen(
         title = if (isSender) "Share with nearby" else "Receive from nearby",
         onBackClick = onNavigateBack,
     ) {
+        GrooveBelowAppBarSpacer()
         DeviceCapabilityCard(capability = deviceCapability)
 
         Spacer(modifier = Modifier.height(M_PADDING))

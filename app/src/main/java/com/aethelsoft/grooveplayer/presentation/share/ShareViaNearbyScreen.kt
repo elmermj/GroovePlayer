@@ -27,6 +27,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveCardTitle
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
+import com.aethelsoft.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.getLocalIpAddress
@@ -66,6 +67,7 @@ fun ShareViaNearbyScreen(
         title = "Share with nearby",
         onBackClick = onNavigateBack,
     ) {
+        GrooveBelowAppBarSpacer()
         if (isSender) {
             WaitingState(
                 title = "Waiting for receiver…",

@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +43,8 @@ import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import com.aethelsoft.grooveplayer.utils.theme.animations.AudioWaveAnimation
 
 @Composable
@@ -49,6 +53,8 @@ fun PlayerQueueComponent(
     queue: List<Song>,
     onItemClick: (Song) -> Unit,
     maxHeight: Dp,
+    onRemove: ((index: Int) -> Unit)? = null,
+    onMove: ((from: Int, to: Int) -> Unit)? = null,
 ){
     val scrollableState = rememberScrollableState { delta -> delta }
     val lazyListState = rememberLazyListState()
@@ -76,6 +82,7 @@ fun PlayerQueueComponent(
 
             Box(
                 modifier = Modifier
+                    .animateItem() // animates reordering, e.g. when shuffle is toggled
                     .fillMaxWidth()
                     .width(360.dp)
             ) {
@@ -83,7 +90,8 @@ fun PlayerQueueComponent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onItemClick(song) }
+                        .clickable { onItemClick(song) },
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(
                         modifier = Modifier.weight(1f)
@@ -127,23 +135,35 @@ fun PlayerQueueComponent(
                         )
                         Spacer(modifier = Modifier.height(S_PADDING))
                     }
+                    if (onRemove != null && !isPlaying) {
+                        IconButton(
+                            onClick = { onRemove(index) },
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                        ) {
+                            Icon(
+                                XClose,
+                                contentDescription = "Remove from queue",
+                                tint = SoftWhite.copy(alpha = 0.7f),
+                            )
+                        }
+                    }
                 }
                 if (isPlaying) {
                     Box(
                         modifier = Modifier
                             .matchParentSize()
                             .background(
-                            brush = Brush.horizontalGradient(
-                                colors = listOf(
-                                    Color.Black.copy(alpha = 0.85f), // left edge
-                                    Color.Black.copy(alpha = 0.55f), // inner fade
-                                    Color.Black.copy(alpha = 0.35f), // center
-                                    Color.Black.copy(alpha = 0.55f), // inner fade
-                                    Color.Black.copy(alpha = 0.85f)  // right edge
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.Black.copy(alpha = 0.85f), // left edge
+                                        Color.Black.copy(alpha = 0.55f), // inner fade
+                                        Color.Black.copy(alpha = 0.35f), // center
+                                        Color.Black.copy(alpha = 0.55f), // inner fade
+                                        Color.Black.copy(alpha = 0.85f)  // right edge
+                                    )
                                 )
-                            )
-                        ),
-                        contentAlignment = Alignment.Center
+                            ),
+                            contentAlignment = Alignment.Center
                     ) {
                         AudioWaveAnimation(
                             waveHeight = 24.dp,

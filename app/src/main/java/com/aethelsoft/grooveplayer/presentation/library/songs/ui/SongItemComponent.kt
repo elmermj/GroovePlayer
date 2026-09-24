@@ -44,6 +44,7 @@ fun SongItemComponent(
     song: Song,
     onClick: () -> Unit,
     onMoreClick: () -> Unit = {},
+    onPlayNext: (() -> Unit)? = null,
     padding: Dp = DefaultSPadding
 ) {
     var showOptionsMenu by remember { mutableStateOf(false) }
@@ -109,6 +110,15 @@ fun SongItemComponent(
                         expanded = showOptionsMenu,
                         onDismissRequest = { showOptionsMenu = false }
                     ) {
+                        if (onPlayNext != null) {
+                            DropdownMenuItem(
+                                text = { Text("Play next") },
+                                onClick = {
+                                    showOptionsMenu = false
+                                    onPlayNext()
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Edit song metadata") },
                             onClick = {

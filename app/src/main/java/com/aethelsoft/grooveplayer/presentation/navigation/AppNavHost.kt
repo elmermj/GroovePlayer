@@ -23,7 +23,8 @@ import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyP
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
-import com.aethelsoft.grooveplayer.presentation.profile.UiStylingScreen
+import com.aethelsoft.grooveplayer.presentation.ui_customisation.UiCustomisationScreen
+import com.aethelsoft.grooveplayer.presentation.backup.BackupScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 import com.aethelsoft.grooveplayer.presentation.share.ReceiveApprovalScreen
 import com.aethelsoft.grooveplayer.presentation.transfer.DeviceDiscoveryScreen
@@ -109,6 +110,12 @@ fun AppNavHost(
                 onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) },
                 onNavigateToSearch = { query ->
                     navController.navigate(AppRoutes.searchRoute(query))
+                },
+                onNavigateToAlbum = { albumId ->
+                    navController.navigate(AppRoutes.albumDetailRoute(albumId))
+                },
+                onNavigateToArtist = { artistId ->
+                    navController.navigate(AppRoutes.artistDetailRoute(artistId))
                 },
             )
         }
@@ -383,7 +390,13 @@ fun AppNavHost(
             val query = backStackEntry.arguments?.getString("query") ?: ""
             SearchScreen(
                 query = query,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAlbum = { albumId ->
+                    navController.navigate(AppRoutes.albumDetailRoute(albumId))
+                },
+                onNavigateToArtist = { artistId ->
+                    navController.navigate(AppRoutes.artistDetailRoute(artistId))
+                },
             )
         }
         composable(
@@ -461,13 +474,21 @@ fun AppNavHost(
                 onNavigateToShare = {
                     navController.navigate(AppRoutes.SHARE_OPTIONS)
                 },
-                onNavigateToUiStyling = {
-                    navController.navigate(AppRoutes.UI_STYLING)
+                onNavigateToUiCustomisation = {
+                    navController.navigate(AppRoutes.UI_CUSTOMISATION)
+                },
+                onNavigateToBackup = {
+                    navController.navigate(AppRoutes.BACKUP)
                 },
             )
         }
-        composable(route = AppRoutes.UI_STYLING) {
-            UiStylingScreen(
+        composable(route = AppRoutes.UI_CUSTOMISATION) {
+            UiCustomisationScreen(
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(route = AppRoutes.BACKUP) {
+            BackupScreen(
                 onNavigateBack = { navController.popBackStack() },
             )
         }

@@ -10,7 +10,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,10 +38,13 @@ fun PlayerControls(
     playerViewModel: PlayerViewModel,
     modifier: Modifier = Modifier
 ) {
+    // Do not force fillMaxWidth here: LargeTablet/Tablet nest this in a Box with
+    // side actions (volume / eq / queue). Stretching under those siblings caused
+    // Visualization/transport collisions (BUG-001). Phone Column still centers wrap content.
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
-        modifier = if (!isMiniPlayer) modifier.fillMaxWidth() else modifier
+        modifier = modifier
     ) {
 
         // Shuffle

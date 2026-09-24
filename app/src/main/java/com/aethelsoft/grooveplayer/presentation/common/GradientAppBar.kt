@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -102,16 +102,17 @@ fun topBarContentInset(): Dp =
 @Composable
 fun Modifier.grooveTopBarContainer(deviceType: DeviceType): Modifier {
     val barHeight = GrooveTheme.spacing.appBarHeight
-    // Status bars ∪ display cutout for notched / landscape devices.
-    val topChromeInsets = WindowInsets.statusBars
-        .union(WindowInsets.displayCutout)
-        .only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)
+    val statusInset = statusBarsInset()
+    // Horizontal cutout only — status inset is part of [height] so the glass
+    // paints across the real chrome (status + title), not just the 72dp row.
+    val cutoutHorizontal = WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)
     return this
         .fillMaxWidth()
         .grooveTopChromeGlass()
-        .windowInsetsPadding(topChromeInsets)
-        .height(barHeight)
-        .padding(end = topBarHorizontalPadding(deviceType))
+        .windowInsetsPadding(cutoutHorizontal)
+        .zIndex(1f)
+        .height(statusInset + barHeight)
+        .padding(top = statusInset, end = topBarHorizontalPadding(deviceType))
 }
 
 @Composable

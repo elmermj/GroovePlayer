@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
@@ -51,6 +50,7 @@ import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAlbum
 import com.aethelsoft.grooveplayer.utils.theme.icons.XAudioLines
@@ -460,9 +460,9 @@ private fun MetadataDetailRow(
 @Composable
 private fun playerArtworkSize(): Dp {
     val deviceType = rememberDeviceType()
-    val containerSize = LocalWindowInfo.current.containerSize
-    val screenHeight = containerSize.height.dp
-    val screenWidth = containerSize.width.dp
+    val windowInfo = rememberAdaptiveWindowInfo()
+    val screenHeight = windowInfo.heightDp.dp
+    val screenWidth = windowInfo.widthDp.dp
     val maxArtworkHeight = when (deviceType) {
         DeviceType.PHONE -> minOf(screenHeight * 0.6f, screenWidth * 0.8f)
         DeviceType.TABLET,

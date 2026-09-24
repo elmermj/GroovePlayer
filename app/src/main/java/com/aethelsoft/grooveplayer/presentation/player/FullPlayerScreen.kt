@@ -12,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
-import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.topAnchoredMiniPlayerInset
 import com.aethelsoft.grooveplayer.presentation.player.layouts.LargeTabletPlayerLayout
 import com.aethelsoft.grooveplayer.presentation.player.layouts.PhonePlayerLayout
@@ -25,7 +25,7 @@ import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 
 @Composable
 fun FullPlayerScreen(
-    playerViewModel: PlayerViewModel = hiltViewModel(),
+    playerViewModel: PlayerViewModel = rememberPlayerViewModel(),
     onClose: () -> Unit = {},
     onOpen: () -> Unit = {}
 ) {

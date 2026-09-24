@@ -42,6 +42,13 @@ fun CustomSlider(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     height: Dp = 4.dp,
     dynamicSizeEnabled: Boolean = true,
+    /** When set, overrides the default 2× active track height. */
+    activeHeight: Dp? = null,
+    showThumb: Boolean = false,
+    thumbSizeRest: Dp = 8.dp,
+    thumbSizeActive: Dp = 12.dp,
+    /** Snap size changes (reduced-motion); colours still update. */
+    reduceMotion: Boolean = false,
     activeColor: Color = MaterialTheme.colorScheme.primary,
     inactiveColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
     onValueChangeFinished: (() -> Unit)? = null,
@@ -50,14 +57,10 @@ fun CustomSlider(
     val density = LocalDensity.current
     val isDragged by interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
-    
-    // Channel to communicate tap events from pointerInput to composable
+
     val tapChannel = remember { Channel<Boolean>(Channel.UNLIMITED) }
-    
-    // Track if slider is being tapped (separate from drag)
     var isTapped by remember { mutableStateOf(false) }
-    
-    // Listen to tap events from pointerInput
+
     LaunchedEffect(Unit) {
         for (tapped in tapChannel) {
             isTapped = tapped
@@ -67,50 +70,66 @@ fun CustomSlider(
             }
         }
     }
-    
-    // Combined interaction state: either dragged or tapped
+
     val isInteracting = isDragged || isTapped
-    
-    // Maximum height: 2x if dynamic size enabled, otherwise same as height
-    val maxHeight = if (dynamicSizeEnabled) height * 2.0f else height
-    
-    // Animate height: 100% larger when interacting (2x) if dynamic size is enabled
+
+    val defaultActiveHeight = if (dynamicSizeEnabled) height * 2.0f else height
+    val targetTrackHeight =
+        if (dynamicSizeEnabled && isInteracting) (activeHeight ?: defaultActiveHeight) else height
+
+    val animSpec = if (reduceMotion) tween<Dp>(0) else tween<Dp>(150)
     val animatedHeight by animateDpAsState(
-        targetValue = if (dynamicSizeEnabled && isInteracting) maxHeight else height,
-        animationSpec = tween(durationMillis = 150),
+        targetValue = targetTrackHeight,
+        animationSpec = animSpec,
         label = "sliderHeight"
     )
     val heightPx = with(density) { animatedHeight.toPx() }
-    
+
+    val targetThumb = when {
+        !showThumb -> 0.dp
+        isInteracting -> thumbSizeActive
+        else -> thumbSizeRest
+    }
+    val animatedThumb by animateDpAsState(
+        targetValue = targetThumb,
+        animationSpec = animSpec,
+        label = "thumbSize"
+    )
+    val thumbPx = with(density) { animatedThumb.toPx() }
+
+    // Reserve space for the larger of active track or active thumb so layout does not jump.
+    val reservedHeight = maxOf(
+        activeHeight ?: defaultActiveHeight,
+        if (showThumb) thumbSizeActive else 0.dp,
+        height
+    )
+
     var currentValue by remember { mutableFloatStateOf(value) }
-    
-    // Update currentValue when value changes externally (but not during drag)
+
     if (!isDragged && currentValue != value) {
         currentValue = value
     }
-    
+
     val normalizedValue = ((currentValue - valueRange.start) / (valueRange.endInclusive - valueRange.start))
         .coerceIn(0f, 1f)
 
-    // Reserve space for maximum height to prevent layout shifts
     Box(
         modifier = modifier
-            .height(maxHeight)
+            .height(reservedHeight)
             .pointerInput(enabled, valueRange, tapChannel) {
                 if (!enabled) return@pointerInput
-                
+
                 awaitPointerEventScope {
                     while (true) {
                         val down = awaitFirstDown(requireUnconsumed = false)
                         tapChannel.trySend(true)
                         val up = waitForUpOrCancellation()
                         if (up != null) {
-                            // Tap completed
-                            val width = size.width.toFloat()
-                            val newValue = ((down.position.x / width).coerceIn(0f, 1f) * 
+                            val width = size.width.toFloat().coerceAtLeast(1f)
+                            val newValue = ((down.position.x / width).coerceIn(0f, 1f) *
                                 (valueRange.endInclusive - valueRange.start) + valueRange.start)
                                 .coerceIn(valueRange.start, valueRange.endInclusive)
-                            
+
                             currentValue = newValue
                             onValueChange(newValue)
                             onValueChangeFinished?.invoke()
@@ -120,31 +139,31 @@ fun CustomSlider(
             }
             .pointerInput(enabled, valueRange) {
                 if (!enabled) return@pointerInput
-                
+
                 var dragStartInteraction: DragInteraction.Start? = null
-                
+
                 detectDragGestures(
                     onDragStart = { offset ->
                         dragStartInteraction = DragInteraction.Start()
                         scope.launch {
                             dragStartInteraction?.let { interactionSource.emit(it) }
                         }
-                        
-                        val width = size.width.toFloat()
-                        val initialValue = ((offset.x / width).coerceIn(0f, 1f) * 
+
+                        val width = size.width.toFloat().coerceAtLeast(1f)
+                        val initialValue = ((offset.x / width).coerceIn(0f, 1f) *
                             (valueRange.endInclusive - valueRange.start) + valueRange.start)
                             .coerceIn(valueRange.start, valueRange.endInclusive)
-                        
+
                         currentValue = initialValue
                         onValueChange(initialValue)
                     },
                     onDrag = { change, _ ->
-                        val width = size.width.toFloat()
+                        val width = size.width.toFloat().coerceAtLeast(1f)
                         val newX = change.position.x.toFloat().coerceIn(0f, width)
-                        val newValue = ((newX / width).coerceIn(0f, 1f) * 
+                        val newValue = ((newX / width).coerceIn(0f, 1f) *
                             (valueRange.endInclusive - valueRange.start) + valueRange.start)
                             .coerceIn(valueRange.start, valueRange.endInclusive)
-                        
+
                         currentValue = newValue
                         onValueChange(newValue)
                     },
@@ -164,28 +183,37 @@ fun CustomSlider(
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(animatedHeight)
+                .height(reservedHeight)
                 .align(Alignment.Center),
         ) {
             val width = size.width
+            val trackTop = (size.height - heightPx) / 2f
             val filledWidth = width * normalizedValue
-            val cornerRadius = heightPx / 2
-            
-            // Draw inactive track
+            val cornerRadius = heightPx / 2f
+
             drawRoundRect(
                 color = inactiveColor,
-                topLeft = Offset.Zero,
+                topLeft = Offset(0f, trackTop),
                 size = Size(width, heightPx),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
             )
-            
-            // Draw active track
-            if (filledWidth > 0) {
+
+            if (filledWidth > 0f) {
                 drawRoundRect(
                     color = activeColor,
-                    topLeft = Offset.Zero,
+                    topLeft = Offset(0f, trackTop),
                     size = Size(filledWidth, heightPx),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                )
+            }
+
+            if (showThumb && thumbPx > 0f) {
+                val cx = (normalizedValue * width).coerceIn(thumbPx / 2f, width - thumbPx / 2f)
+                val cy = size.height / 2f
+                drawCircle(
+                    color = activeColor,
+                    radius = thumbPx / 2f,
+                    center = Offset(cx, cy)
                 )
             }
         }

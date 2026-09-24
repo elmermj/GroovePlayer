@@ -35,6 +35,7 @@ fun ProfileDrawer(
     onClose: () -> Unit,
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiStyling: () -> Unit = {},
+    onNavigateToBackup: () -> Unit = {},
     deviceType: DeviceType,
 ) {
     val canvas = GrooveTheme.colors.canvas
@@ -93,6 +94,7 @@ fun ProfileDrawer(
                         deviceType = deviceType,
                         onNavigateToShare = onNavigateToShare,
                         onNavigateToUiStyling = onNavigateToUiStyling,
+                        onNavigateToBackup = onNavigateToBackup,
                         onClose = onClose
                     )
                 }

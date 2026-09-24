@@ -351,11 +351,18 @@ GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The
 - Gradle 8.13.2+
 
 ### Building
-```bash
-./gradlew :app:assembleDevDebug
-```
+Product flavors: **`dev`** (default, LAN/test ads) and **`prod`** (release-oriented). See `app/FLAVORS.md`.
 
-`dev` and `prod` are product flavors with the same application id. Use `dev` for day-to-day and test-track builds. `assembleDebug` still builds every debug variant.
+```bash
+# Preferred day-to-day
+./gradlew :app:assembleDevDebug
+
+# Production-shaped release APK (debug-signed until a Play keystore is configured)
+./gradlew :app:assembleProdRelease
+
+# assembleDebug still works — builds both devDebug and prodDebug
+./gradlew :app:assembleDebug
+```
 
 ### Running
 ```bash

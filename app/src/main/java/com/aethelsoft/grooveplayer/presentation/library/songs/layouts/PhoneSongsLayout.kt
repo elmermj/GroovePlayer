@@ -21,6 +21,7 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelsoft.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -45,7 +46,8 @@ fun PhoneSongsLayout(
         contentPadding = PaddingValues(
             start = horizontalPadding,
             end = horizontalPadding,
-            top = 16.dp,
+            // Below the translucent app bar at rest; items scroll underneath it.
+            top = topBarContentInset() + 16.dp,
             bottom = 16.dp + bottomPaddingForSelectionBar
         ),
         verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
@@ -64,6 +66,7 @@ fun PhoneSongsLayout(
                             playerViewModel.setQueue(list, index)
                         }
                     },
+                    onPlayNext = { playerViewModel.playNext(it) },
                     onEditMetadata = { onEditSong(it) },
                     onLongPress = onLongPress,
                     padding = 0.dp,

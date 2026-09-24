@@ -23,6 +23,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveActionRow
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
+import com.aethelsoft.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
@@ -39,6 +40,7 @@ fun ReceiveApprovalScreen(
         title = "Receive Music",
         onBackClick = onNavigateBack,
     ) {
+        GrooveBelowAppBarSpacer()
         GrooveMutedText(
             text = "Select songs to receive",
             style = MaterialTheme.typography.bodyMedium,

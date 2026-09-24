@@ -10,6 +10,14 @@ import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.TransferRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.AuthRepositoryImpl
+import com.aethelsoft.grooveplayer.data.billing.BillingRepositoryImpl
+import com.aethelsoft.grooveplayer.data.backup.BackupRepositoryImpl
+import com.aethelsoft.grooveplayer.data.ads.StartupAdQuotaStore
+import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
+import com.aethelsoft.grooveplayer.domain.repository.BillingRepository
+import com.aethelsoft.grooveplayer.domain.repository.BackupRepository
+import com.aethelsoft.grooveplayer.domain.repository.StartupAdQuotaRepository
 import com.aethelsoft.grooveplayer.domain.repository.AudioTagRepository
 import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
@@ -68,6 +76,26 @@ abstract class RepositoryModule {
     abstract fun bindUserRepository(
         impl: UserRepositoryImpl
     ): UserRepository
+
+    @Binds
+    abstract fun bindAuthRepository(
+        impl: AuthRepositoryImpl
+    ): AuthRepository
+
+    @Binds
+    abstract fun bindBillingRepository(
+        impl: BillingRepositoryImpl
+    ): BillingRepository
+
+    @Binds
+    abstract fun bindBackupRepository(
+        impl: BackupRepositoryImpl
+    ): BackupRepository
+
+    @Binds
+    abstract fun bindStartupAdQuotaRepository(
+        impl: StartupAdQuotaStore
+    ): StartupAdQuotaRepository
     
     @Binds
     abstract fun bindEqualizerRepository(

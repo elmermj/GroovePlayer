@@ -51,6 +51,7 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.topBarContentInset
 import com.aethelsoft.grooveplayer.utils.L_PADDING
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -89,7 +90,10 @@ fun ShareConfirmationScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(XS_PADDING),
-                contentPadding = PaddingValues(vertical = M_PADDING),
+                contentPadding = PaddingValues(
+                    top = topBarContentInset() + M_PADDING,
+                    bottom = M_PADDING,
+                ),
             ) {
                 items(songs) { song ->
                     ShareConfirmationSongItem(song = song)

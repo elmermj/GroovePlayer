@@ -12,12 +12,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.utils.S_PADDING
+import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
@@ -34,6 +34,7 @@ fun LastPlayedSectionComponent(
     val playerViewModel = LocalPlayerViewModel.current
     val isPlaying = playerViewModel?.isPlaying?.collectAsState()?.value
     val navigation = LocalNavigation.current
+    val windowInfo = rememberAdaptiveWindowInfo()
     
     // Get the latest queue for playback (not the captured parameter)
     val latestQueue = remember(lastPlayedSongs) { lastPlayedSongs }
@@ -53,7 +54,7 @@ fun LastPlayedSectionComponent(
             rows = GridCells.Fixed(1),
             modifier = Modifier.height(
                 // screen width
-                (LocalWindowInfo.current.containerSize.width.dp - (S_PADDING * 8 )) /8
+                (windowInfo.widthDp.dp - (S_PADDING * 8)) / 8
             ),
             horizontalArrangement = Arrangement.spacedBy(S_PADDING),
         ) {

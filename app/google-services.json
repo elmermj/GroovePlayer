@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "922639144158",
+    "project_id": "grooveplayer-69482",
+    "storage_bucket": "grooveplayer-69482.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922639144158:android:b80b9574abcce0de265e4f",
+        "android_client_info": {
+          "package_name": "com.aethelsoft.grooveplayer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGoe9XvTv-r_uufUu4tJ8o2w5cylHGM80"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
