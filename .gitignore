@@ -28,7 +28,9 @@ keystore/firebase-service-account.json
 grooveplayer-layout-qa/
 grooveplayer-tablet-shots/
 
-# Setup guides stay on disk. Only README.md may be committed.
+# Setup guides stay on disk. Only README.md may be committed,
+# plus the GitHub pull request template.
 *.md
 !README.md
 !**/README.md
+!.github/pull_request_template.md

@@ -1,0 +1,136 @@
+# Surface the first SCRUM-NN key from a branch, PR title, or PR body.
+# Missing keys warn only; this workflow does not fail the check.
+
+name: Jira link
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+  push:
+    branches:
+      - "feature/**"
+      - "fix/**"
+      - "enhancement/**"
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  link:
+    runs-on: ubuntu-latest
+    outputs:
+      jira_key: ${{ steps.extract.outputs.jira_key }}
+      jira_url: ${{ steps.extract.outputs.jira_url }}
+    steps:
+      - name: Extract Jira key and comment
+        id: extract
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = "<!-- grooveplayer-jira-link -->";
+            const jiraBase = "https://aethelsoft.atlassian.net/browse";
+            const keyRe = /SCRUM-\d+/;
+
+            function firstKey(text) {
+              if (!text) return "";
+              const match = String(text).match(keyRe);
+              return match ? match[0] : "";
+            }
+
+            const isPullRequest = context.eventName === "pull_request";
+            const branch = isPullRequest
+              ? (context.payload.pull_request.head.ref || "")
+              : String(context.ref || "").replace(/^refs\/heads\//, "");
+
+            let title = "";
+            let body = "";
+            let prNumber = 0;
+
+            if (isPullRequest) {
+              title = context.payload.pull_request.title || "";
+              body = context.payload.pull_request.body || "";
+              prNumber = context.payload.pull_request.number;
+            } else {
+              const listed = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head: context.repo.owner + ":" + branch,
+                state: "open",
+                per_page: 10,
+              });
+              if (listed.data.length > 0) {
+                const pr = listed.data[0];
+                title = pr.title || "";
+                body = pr.body || "";
+                prNumber = pr.number;
+              }
+            }
+
+            const key = firstKey(branch) || firstKey(title) || firstKey(body);
+            const url = key ? jiraBase + "/" + key : "";
+            core.setOutput("jira_key", key);
+            core.setOutput("jira_url", url);
+
+            async function upsertComment(commentBody) {
+              if (!prNumber) return;
+              const listed = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                per_page: 100,
+              });
+              const existing = listed.data.find(function (comment) {
+                return comment.body && comment.body.indexOf(marker) !== -1;
+              });
+              if (existing) {
+                if (existing.body.trim() === commentBody.trim()) {
+                  core.info("Jira comment already up to date on PR #" + prNumber + ".");
+                  return;
+                }
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: commentBody,
+                });
+                core.info("Updated Jira comment on PR #" + prNumber + ".");
+                return;
+              }
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: commentBody,
+              });
+              core.info("Posted Jira comment on PR #" + prNumber + ".");
+            }
+
+            if (key) {
+              core.notice("Linked " + key + ": " + url);
+              await upsertComment(
+                [
+                  marker,
+                  "**Jira:** [" + key + "](" + url + ")",
+                  "",
+                  "Matched the first `SCRUM-NN` key in the branch name, then the PR title, then the PR body.",
+                ].join("\n")
+              );
+              if (!prNumber) {
+                core.info("Found " + key + " on " + branch + "; no open pull request to comment on.");
+              }
+            } else if (prNumber) {
+              const warning = "No SCRUM-NN key found in the branch name, PR title, or PR body.";
+              core.warning(warning);
+              await upsertComment(
+                [
+                  marker,
+                  "**Warning:** " + warning,
+                  "",
+                  "Add a key such as `SCRUM-60` and the browse link " + jiraBase + "/SCRUM-NN.",
+                  "This check does not fail the build.",
+                ].join("\n")
+              );
+            } else {
+              core.warning("No SCRUM-NN key found on branch " + branch + ", and there is no open pull request.");
+            }

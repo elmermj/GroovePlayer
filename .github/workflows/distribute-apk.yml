@@ -183,10 +183,12 @@ jobs:
           DISPATCH_GROUPS: ${{ github.event.inputs.groups }}
           VAR_TESTERS: ${{ vars.FIREBASE_TESTERS }}
           VERSION_NAME: ${{ env.VERSION_NAME }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           python3 - << 'PY'
           import os
+          import re
           import subprocess
           from pathlib import Path
 
@@ -231,20 +233,57 @@ jobs:
           if ref:
               header += f" on {ref}"
 
-          dispatch_notes = os.environ.get("DISPATCH_NOTES", "").strip()
-          if event == "workflow_dispatch" and dispatch_notes:
-              body = dispatch_notes
-          else:
+          scrum_key = re.compile(r"SCRUM-\d+")
+
+          def git_text(args: list[str]) -> str:
               try:
-                  body = subprocess.check_output(
-                      ["git", "log", "-15", "--no-merges", "--pretty=format:- %s"],
+                  return subprocess.check_output(
+                      ["git", "log", *args],
                       text=True,
                       stderr=subprocess.DEVNULL,
                   ).strip()
               except (subprocess.CalledProcessError, FileNotFoundError):
-                  body = ""
+                  return ""
+
+          def unique_scrum_keys(text: str) -> list[str]:
+              seen: set[str] = set()
+              keys: list[str] = []
+              for key in scrum_key.findall(text or ""):
+                  if key in seen:
+                      continue
+                  seen.add(key)
+                  keys.append(key)
+              return keys
+
+          # Prefer commits on this push. Fall back to the recent log when the
+          # previous SHA is missing (manual dispatch) or not in the checkout.
+          before = os.environ.get("PUSH_BEFORE", "").strip()
+          log_messages = ""
+          if before and set(before) != {"0"} and len(before) >= 7:
+              log_messages = git_text(
+                  [f"{before}..HEAD", "--no-merges", "--pretty=format:%s%n%b"]
+              )
+          if not log_messages:
+              log_messages = git_text(
+                  ["-15", "--no-merges", "--pretty=format:%s%n%b"]
+              )
+
+          dispatch_notes = os.environ.get("DISPATCH_NOTES", "").strip()
+          if event == "workflow_dispatch" and dispatch_notes:
+              body = dispatch_notes
+          else:
+              body = git_text(["-15", "--no-merges", "--pretty=format:- %s"])
               if not body:
                   body = f"- {sha or 'build'}"
+
+          jira_keys = unique_scrum_keys(log_messages)
+          if jira_keys:
+              jira_lines = "\n".join(
+                  f"- {key} https://aethelsoft.atlassian.net/browse/{key}"
+                  for key in jira_keys
+              )
+              jira_block = f"Jira:\n{jira_lines}"
+              body = f"{body}\n\n{jira_block}" if body else jira_block
 
           text = cap(header, body)
           Path("release-notes.txt").write_text(text, encoding="utf-8")
