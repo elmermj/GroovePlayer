@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.aethelsoft.grooveplayer.data.local.db.dao.AlbumDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.PlaylistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SearchHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.TransferDao
@@ -17,6 +18,8 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.PlaylistEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.PlaylistTrackEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SearchHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.TransferEntity
@@ -42,9 +45,11 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         UserSettingsEntity::class,
         SearchHistoryEntity::class,
         TransferEntity::class,
-        TransferFileEntity::class
+        TransferFileEntity::class,
+        PlaylistEntity::class,
+        PlaylistTrackEntity::class,
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,7 +58,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
         /** Room SQLite file name under Context.getDatabasePath. */
         const val DATABASE_NAME = "grooveplayer_database"
         /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
-        const val SCHEMA_VERSION = 15
+        const val SCHEMA_VERSION = 16
     }
 
     abstract fun playbackHistoryDao(): PlaybackHistoryDao
@@ -67,5 +72,6 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
     abstract fun searchHistoryDao(): SearchHistoryDao
     abstract fun transferDao(): TransferDao
     abstract fun transferFileDao(): TransferFileDao
+    abstract fun playlistDao(): PlaylistDao
 }
 

@@ -8,6 +8,7 @@ import com.aethelsoft.grooveplayer.data.repository.EqualizerRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.TransferRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.PlaylistRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.AuthRepositoryImpl
@@ -23,6 +24,7 @@ import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
@@ -116,4 +118,9 @@ abstract class RepositoryModule {
     abstract fun bindTransferRepository(
         impl: TransferRepositoryImpl
     ): TransferRepository
+
+    @Binds
+    abstract fun bindPlaylistRepository(
+        impl: PlaylistRepositoryImpl
+    ): PlaylistRepository
 }

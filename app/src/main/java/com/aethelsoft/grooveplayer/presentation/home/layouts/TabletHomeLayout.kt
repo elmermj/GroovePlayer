@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.domain.model.playlistCountLabel
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
@@ -31,7 +32,8 @@ fun TabletHomeLayout(
     onNavigateToMostPlayed: () -> Unit,
     onNavigateToFavoriteTracks: () -> Unit,
     onNavigateToFavoriteArtists: () -> Unit,
-    onNavigateToFavoriteAlbums: () -> Unit
+    onNavigateToFavoriteAlbums: () -> Unit,
+    onNavigateToPlaylists: () -> Unit,
 ) {
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val mostPlayed by viewModel.mostPlayed.collectAsState()
@@ -39,6 +41,7 @@ fun TabletHomeLayout(
     val favoriteTracks by viewModel.favoriteTracks.collectAsState()
     val favoriteArtists by viewModel.favoriteArtists.collectAsState()
     val favoriteAlbums by viewModel.favoriteAlbums.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
     val lastPlayedSongs by viewModel.lastPlayedSongs.collectAsState()
 
     TemplateVeritcalGridPage(columns = 3) {
@@ -79,6 +82,15 @@ fun TabletHomeLayout(
                 },
                 emptyNoticeText = "No songs found",
                 onClick = onNavigateToSongs
+            )
+        }
+        item {
+            LibraryCardComponent(
+                title = "Playlists",
+                subtitle = if (playlists.isNotEmpty()) playlistCountLabel(playlists.size) else "Create or import",
+                artworks = playlists.flatMap { it.artworkUrls },
+                emptyNoticeText = "No playlists yet",
+                onClick = onNavigateToPlaylists,
             )
         }
         item {

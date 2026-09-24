@@ -188,7 +188,8 @@ class MediaStoreRepository @Inject constructor(
                         genre = genre,
                         durationMs = duration,
                         artworkUrl = artworkUri,
-                        album = album
+                        album = album,
+                        filePath = dataPath.takeIf { it.isNotBlank() },
                     )
                 )
                 index++

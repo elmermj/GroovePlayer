@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.di
 import android.content.Context
 import androidx.room.Room
 import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
+import com.aethelsoft.grooveplayer.data.local.db.MIGRATION_15_16
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,6 +30,7 @@ object AppModule {
             GroovePlayerDatabase::class.java,
             GroovePlayerDatabase.DATABASE_NAME
         )
+        .addMigrations(MIGRATION_15_16)
         .fallbackToDestructiveMigration()  // Allow destructive migration during development
         .build()
     }
@@ -65,4 +67,7 @@ object AppModule {
 
     @Provides
     fun provideTransferFileDao(database: GroovePlayerDatabase) = database.transferFileDao()
+
+    @Provides
+    fun providePlaylistDao(database: GroovePlayerDatabase) = database.playlistDao()
 }

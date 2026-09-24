@@ -19,6 +19,7 @@ fun HomeScreen(
     onNavigateToFavoriteTracks: () -> Unit,
     onNavigateToFavoriteArtists: () -> Unit,
     onNavigateToFavoriteAlbums: () -> Unit,
+    onNavigateToPlaylists: () -> Unit,
     onNavigateToSearch: (String) -> Unit,
     onNavigateToAlbum: (String) -> Unit = {},
     onNavigateToArtist: (String) -> Unit = {},
@@ -35,6 +36,7 @@ fun HomeScreen(
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
                 onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums,
+                onNavigateToPlaylists = onNavigateToPlaylists,
             )
         },
         tabletLayout = {
@@ -46,7 +48,8 @@ fun HomeScreen(
                 onNavigateToMostPlayed = onNavigateToMostPlayed,
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
-                onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums
+                onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums,
+                onNavigateToPlaylists = onNavigateToPlaylists,
             )
         },
         largeTabletLayout = {
@@ -58,7 +61,8 @@ fun HomeScreen(
                 onNavigateToMostPlayed = onNavigateToMostPlayed,
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
-                onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums
+                onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums,
+                onNavigateToPlaylists = onNavigateToPlaylists,
             )
         },
         onNavigateToSearch = onNavigateToSearch,

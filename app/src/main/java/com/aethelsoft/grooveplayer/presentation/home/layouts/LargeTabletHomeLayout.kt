@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.domain.model.playlistCountLabel
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
@@ -46,7 +47,8 @@ fun LargeTabletHomeLayout(
     onNavigateToMostPlayed: () -> Unit,
     onNavigateToFavoriteTracks: () -> Unit,
     onNavigateToFavoriteArtists: () -> Unit,
-    onNavigateToFavoriteAlbums: () -> Unit
+    onNavigateToFavoriteAlbums: () -> Unit,
+    onNavigateToPlaylists: () -> Unit,
 ) {
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val mostPlayed by viewModel.mostPlayed.collectAsState()
@@ -54,6 +56,7 @@ fun LargeTabletHomeLayout(
     val favoriteTracks by viewModel.favoriteTracks.collectAsState()
     val favoriteArtists by viewModel.favoriteArtists.collectAsState()
     val favoriteAlbums by viewModel.favoriteAlbums.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
     val lastPlayedSongs by viewModel.lastPlayedSongs.collectAsState()
 
     val xContentWindowInsets = contentWindowInsets
@@ -105,6 +108,15 @@ fun LargeTabletHomeLayout(
                 },
                 emptyNoticeText = "No songs found",
                 onClick = onNavigateToSongs
+            )
+        }
+        item(span = { GridItemSpan(2) }) {
+            LibraryCardComponent(
+                title = "Playlists",
+                subtitle = if (playlists.isNotEmpty()) playlistCountLabel(playlists.size) else "Create or import",
+                artworks = playlists.flatMap { it.artworkUrls },
+                emptyNoticeText = "No playlists yet",
+                onClick = onNavigateToPlaylists,
             )
         }
         item(span = { GridItemSpan(2) }) {

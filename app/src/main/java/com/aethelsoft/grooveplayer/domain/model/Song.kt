@@ -12,5 +12,7 @@ data class Song (
     val useAlbumYear: Boolean = false,
     val genres: List<Genre> = emptyList(),
     val artists: List<Artist> = emptyList(),
-    val year: Int? = null
+    val year: Int? = null,
+    /** Absolute MediaStore path used by M3U import and export. */
+    val filePath: String? = null,
 ) : Library

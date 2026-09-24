@@ -21,6 +21,9 @@ import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteArtist
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteTracksScreen
 import com.aethelsoft.grooveplayer.presentation.library.genres.GenreTracksScreen
 import com.aethelsoft.grooveplayer.presentation.library.genres.GenresScreen
+import com.aethelsoft.grooveplayer.presentation.library.playlists.AddPlaylistTracksScreen
+import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistDetailScreen
+import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistsScreen
 import com.aethelsoft.grooveplayer.presentation.library.mostplayed.MostPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
@@ -113,6 +116,7 @@ fun AppNavHost(
                 onNavigateToFavoriteTracks = { navController.navigate(AppRoutes.FAVORITE_TRACKS) },
                 onNavigateToFavoriteArtists = { navController.navigate(AppRoutes.FAVORITE_ARTISTS) },
                 onNavigateToFavoriteAlbums = { navController.navigate(AppRoutes.FAVORITE_ALBUMS) },
+                onNavigateToPlaylists = { navController.navigate(AppRoutes.PLAYLISTS) },
                 onNavigateToSearch = { query ->
                     navController.navigate(AppRoutes.searchRoute(query))
                 },
@@ -193,6 +197,38 @@ fun AppNavHost(
         composable(route = AppRoutes.MOST_PLAYED) {
             MostPlayedScreen(
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(route = AppRoutes.PLAYLISTS) {
+            PlaylistsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onOpenPlaylist = { playlistId ->
+                    navController.navigate(AppRoutes.playlistDetailRoute(playlistId))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.PLAYLIST_DETAIL,
+            arguments = listOf(
+                navArgument("playlistId") { type = NavType.LongType },
+            ),
+        ) { entry ->
+            val playlistId = entry.arguments?.getLong("playlistId") ?: 0L
+            PlaylistDetailScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onAddTracks = {
+                    navController.navigate(AppRoutes.playlistAddTracksRoute(playlistId))
+                },
+            )
+        }
+        composable(
+            route = AppRoutes.PLAYLIST_ADD_TRACKS,
+            arguments = listOf(
+                navArgument("playlistId") { type = NavType.LongType },
+            ),
+        ) {
+            AddPlaylistTracksScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(route = AppRoutes.GENRES) {
