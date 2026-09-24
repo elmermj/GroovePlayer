@@ -202,7 +202,16 @@ fun EditSongMetadataDialog(
     }
 
     Dialog(
-        onDismissRequest = { requestDismiss() },
+        onDismissRequest = {
+            if (uiState.isSaving) return@Dialog
+            // One window handles back. While the confirm card is up, back means No
+            // so it cannot also dismiss the editor underneath.
+            if (confirmDiscard) {
+                confirmDiscard = false
+            } else {
+                requestDismiss()
+            }
+        },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
@@ -214,6 +223,7 @@ fun EditSongMetadataDialog(
         SideEffect {
             (view.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
         }
+        Box(modifier = Modifier.fillMaxSize()) {
         EditSongMetadataSheet(
             song = song,
             uiState = uiState,
@@ -241,16 +251,16 @@ fun EditSongMetadataDialog(
                 }
             },
         )
-    }
-
-    if (confirmDiscard) {
-        DiscardConfirmDialog(
-            onNo = { confirmDiscard = false },
-            onYes = {
-                confirmDiscard = false
-                onDismiss()
-            },
-        )
+        if (confirmDiscard) {
+            DiscardConfirmOverlay(
+                onNo = { confirmDiscard = false },
+                onYes = {
+                    confirmDiscard = false
+                    onDismiss()
+                },
+            )
+        }
+        }
     }
 }
 
@@ -1070,7 +1080,19 @@ private fun NumberGlassField(
     imeAction: ImeAction = ImeAction.Done,
     onNext: (() -> Unit)? = null,
 ) {
-    var text by remember { mutableStateOf(value?.toString().orEmpty()) }
+    val canonical = value?.toString().orEmpty()
+    var text by remember { mutableStateOf(canonical) }
+    // Tags arrive after the first composition. Follow the loaded value unless the
+    // text already represents it, so a draft like "01" is not rewritten mid-typing.
+    LaunchedEffect(canonical) {
+        val parsed = text.toIntOrNull()
+        val alreadyShowing = if (value == null) {
+            parsed == null && text.isEmpty()
+        } else {
+            parsed == value
+        }
+        if (!alreadyShowing) text = canonical
+    }
     GlassTextField(
         label = label,
         value = text,
@@ -1207,6 +1229,13 @@ private fun AlbumMenuField(
 ) {
     var text by remember { mutableStateOf(album.orEmpty()) }
     var menuOpen by remember { mutableStateOf(false) }
+    LaunchedEffect(album) {
+        val next = album.orEmpty()
+        if (text != next) {
+            text = next
+            menuOpen = false
+        }
+    }
     val available = suggestions
         .filter { it.isNotBlank() && !it.equals(text, ignoreCase = true) }
         .distinct()
@@ -1433,40 +1462,36 @@ private fun SaveErrorLine(message: String?) {
 }
 
 @Composable
-private fun DiscardConfirmDialog(
+private fun DiscardConfirmOverlay(
     onNo: () -> Unit,
     onYes: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onNo,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.45f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onNo,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
+                .padding(horizontal = 32.dp)
+                .widthIn(max = 340.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
-                    onClick = onNo,
-                ),
-            contentAlignment = Alignment.Center,
+                    onClick = {},
+                )
+                .shadow(4.dp, RoundedCornerShape(RadiusCard))
+                .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusCard))
+                .clip(RoundedCornerShape(RadiusCard))
+                .background(TokenSurface.copy(alpha = 0.92f))
+                .padding(20.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(horizontal = 32.dp)
-                    .widthIn(max = 340.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {},
-                    )
-                    .shadow(4.dp, RoundedCornerShape(RadiusCard))
-                    .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusCard))
-                    .clip(RoundedCornerShape(RadiusCard))
-                    .background(TokenSurface.copy(alpha = 0.92f))
-                    .padding(20.dp),
-            ) {
                 Text(
                     text = "Discard changes?",
                     fontFamily = PoppinsFontFamily,
@@ -1515,7 +1540,6 @@ private fun DiscardConfirmDialog(
                         )
                     }
                 }
-            }
         }
     }
 }
