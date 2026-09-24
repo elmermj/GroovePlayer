@@ -59,7 +59,56 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools cmdline-tools;latest platforms;android-36 build-tools;36.0.0
+          # Empty skips this action's default `tools` package (unpublished; it breaks the job)
+          # and skips a separate sdkmanager call per package. Packages are installed below.
+          packages: ''
+
+      - name: Cache Android SDK packages
+        id: android-sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_SDK_ROOT }}/platforms/android-36
+            ${{ env.ANDROID_SDK_ROOT }}/build-tools/36.0.0
+          key: ${{ runner.os }}-android-sdk-platform-36-build-tools-36.0.0-v1
+
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "ANDROID_SDK_ROOT is not set."
+            exit 1
+          fi
+          missing=0
+          for rel in platforms/android-36 build-tools/36.0.0; do
+            if [ ! -d "${ANDROID_SDK_ROOT}/${rel}" ]; then
+              echo "Missing ${ANDROID_SDK_ROOT}/${rel}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 0 ]; then
+            echo "Android SDK packages already present (cache hit: ${{ steps.android-sdk-cache.outputs.cache-hit }}). Skipping sdkmanager."
+            exit 0
+          fi
+          echo "Installing platform-tools, cmdline-tools;latest, platforms;android-36, build-tools;36.0.0"
+          # Licenses are already accepted by setup-android. Feed y so a prompt cannot hang the job.
+          python3 - << 'PY'
+          import subprocess
+          import sys
+
+          completed = subprocess.run(
+              [
+                  "sdkmanager",
+                  "--install",
+                  "platform-tools",
+                  "cmdline-tools;latest",
+                  "platforms;android-36",
+                  "build-tools;36.0.0",
+              ],
+              input=b"y\n" * 10,
+          )
+          sys.exit(completed.returncode)
+          PY
 
       - name: Decode keystore
         env:
@@ -128,6 +177,35 @@ jobs:
           echo "VERSION_CODE=${{ github.run_number }}"
           echo "VERSION_NAME=1.0.${{ github.run_number }}"
 
+      - name: Apply CI Gradle performance overrides
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+
+          path = Path("gradle.properties")
+          text = path.read_text(encoding="utf-8")
+          # Local Mac keeps the conservative values in git. Replace them on the runner only.
+          replacements = [
+              ("org.gradle.parallel=false", "org.gradle.parallel=true"),
+              ("org.gradle.workers.max=1", "org.gradle.workers.max=4"),
+              ("-Xmx2048m", "-Xmx4g"),
+              ("android.incremental=false", "android.incremental=true"),
+              (
+                  "android.useFullClasspathForDexingTransform=true",
+                  "android.useFullClasspathForDexingTransform=false",
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"gradle.properties is missing expected setting: {old}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+          print("Applied CI Gradle overrides.")
+          print("parallel=true workers.max=4 heap=4g incremental=true fullClasspathDexing=false")
+          print("Kept daemon=true, vfs.watch=false, enableResourceOptimizations=false, enableAsmInstrumentation=false")
+          PY
+
       - name: Build dev release APK
         env:
           VERSION_CODE: ${{ github.run_number }}
@@ -135,7 +213,11 @@ jobs:
         run: |
           echo "VERSION_CODE=${VERSION_CODE}"
           echo "VERSION_NAME=${VERSION_NAME}"
-          ./gradlew :app:assembleDevRelease --stacktrace \
+          # Configuration cache works for a fixed version, but versionCode/versionName are
+          # read while configuring defaultConfig and change every run, so the entry would miss.
+          ./gradlew :app:assembleDevRelease --stacktrace --parallel --max-workers=4 \
+            -Pandroid.incremental=true \
+            -Pandroid.useFullClasspathForDexingTransform=false \
             -PversionCode="${VERSION_CODE}" \
             -PversionName="${VERSION_NAME}"
 
