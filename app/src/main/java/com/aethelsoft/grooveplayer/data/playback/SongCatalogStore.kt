@@ -8,6 +8,7 @@ import com.aethelsoft.grooveplayer.data.local.db.dao.GenreDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SearchHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.SongLikeDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserSettingsDao
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
@@ -16,7 +17,7 @@ import javax.inject.Singleton
 
 /**
  * Removes a song from the device catalog and every derived row that would
- * leave a ghost: library links, playback history, search hits, and the saved queue.
+ * leave a ghost: library links, likes, playback history, search hits, and the saved queue.
  * There is no playlist table; album/artist/genre rows that no longer have songs go too.
  */
 @Singleton
@@ -24,6 +25,7 @@ class SongCatalogStore @Inject constructor(
     private val database: GroovePlayerDatabase,
     private val songDao: SongDao,
     private val songMetadataDao: SongMetadataDao,
+    private val songLikeDao: SongLikeDao,
     private val playbackHistoryDao: PlaybackHistoryDao,
     private val searchHistoryDao: SearchHistoryDao,
     private val albumDao: AlbumDao,
@@ -41,6 +43,7 @@ class SongCatalogStore @Inject constructor(
         if (ids.isEmpty()) return
         val idSet = ids.toSet()
         database.withTransaction {
+            songLikeDao.deleteBySongIds(ids)
             playbackHistoryDao.deleteBySongIds(ids)
             searchHistoryDao.deleteSongEntries(ids)
             songMetadataDao.deleteBySongIds(ids)

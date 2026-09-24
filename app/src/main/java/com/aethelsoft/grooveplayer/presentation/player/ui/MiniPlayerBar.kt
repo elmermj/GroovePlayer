@@ -39,6 +39,7 @@ import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.common.SongLikeButton
 import com.aethelsoft.grooveplayer.presentation.common.grooveBottomChromeGlass
 import com.aethelsoft.grooveplayer.presentation.common.grooveTopChromeGlass
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
@@ -204,7 +205,8 @@ private fun PhoneMiniPlayerBarContent(
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f).height(24.dp))
-                        
+
+                        SongLikeButton(song = song, iconSize = 20.dp)
                         // Play/Pause button only for phone
                         ToggledIconButton(
                             state = isPlaying,
@@ -303,7 +305,8 @@ private fun TabletMiniPlayerBarContent(
                             SongDetails(song = song, isMiniPlayer = true)
                         }
                         Spacer(modifier = Modifier.weight(1f).height(24.dp))
-                        
+
+                        SongLikeButton(song = song, iconSize = 20.dp)
                         // All controls for tablet
                         PlayerControls(
                             isMiniPlayer = true,

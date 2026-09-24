@@ -41,7 +41,7 @@ fun FavoriteTracksScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("No favorite tracks yet")
+                GrooveMutedText("Like a song to see it here")
             }
         } else {
             LazyColumn(

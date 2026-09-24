@@ -59,4 +59,7 @@ object AppModule {
 
     @Provides
     fun provideTransferFileDao(database: GroovePlayerDatabase) = database.transferFileDao()
+
+    @Provides
+    fun provideSongLikeDao(database: GroovePlayerDatabase) = database.songLikeDao()
 }

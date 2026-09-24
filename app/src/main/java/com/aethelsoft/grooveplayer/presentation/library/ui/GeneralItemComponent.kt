@@ -53,6 +53,7 @@ import com.aethelsoft.grooveplayer.domain.model.Artist
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge
+import com.aethelsoft.grooveplayer.presentation.common.SongLikeButton
 import com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.rememberNavigationActions
@@ -397,8 +398,16 @@ fun SongItemComponent(
         selectionConfig = selectionConfig,
         onLongClick = { onLongPress(song) },
         secondaryContent = secondaryContent,
-        beforeMeta = availability?.let { mark ->
-            { SongAvailabilityBadge(mark = mark, iconSize = 16.dp) }
+        beforeMeta = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SongLikeButton(song = song, iconSize = 20.dp)
+                if (availability != null) {
+                    SongAvailabilityBadge(mark = availability, iconSize = 16.dp)
+                }
+            }
         },
     )
 }

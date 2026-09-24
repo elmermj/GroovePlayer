@@ -5,14 +5,17 @@ import androidx.room.withTransaction
 import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongDao
+import com.aethelsoft.grooveplayer.data.local.db.dao.SongLikeDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongMetadataDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.UserSettingsDao
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongLikeEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
 import com.aethelsoft.grooveplayer.data.mapper.UserMapper
 import com.aethelsoft.grooveplayer.domain.backup.restoredMetadata
 import com.aethelsoft.grooveplayer.domain.backup.restoredPlayback
 import com.aethelsoft.grooveplayer.domain.backup.restoredSettings
+import com.aethelsoft.grooveplayer.domain.backup.restoredSongLike
 import com.aethelsoft.grooveplayer.domain.backup.restoredSourcePath
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import java.io.File
@@ -22,6 +25,9 @@ import javax.inject.Singleton
 /**
  * Row copy used before atomic file swap. Restore no longer calls this: the staged
  * snapshot replaces the live database file, then the process restarts onto it.
+ * Likes travel inside that file. If this row copy runs, a snapshot without song_likes
+ * leaves local likes in place, and a snapshot that has the table replaces them,
+ * including an empty table.
  */
 @Singleton
 class LibrarySnapshotApplier @Inject constructor(
@@ -29,6 +35,7 @@ class LibrarySnapshotApplier @Inject constructor(
     private val userSettingsDao: UserSettingsDao,
     private val playbackHistoryDao: PlaybackHistoryDao,
     private val songMetadataDao: SongMetadataDao,
+    private val songLikeDao: SongLikeDao,
     private val songDao: SongDao,
     private val musicRepository: MusicRepository,
 ) {
@@ -81,6 +88,24 @@ class LibrarySnapshotApplier @Inject constructor(
                     songDao.updateSourcePath(songId, path)
                 }
             }
+            tables.likes?.let { likes ->
+                songLikeDao.deleteAll()
+                likes.forEach { row ->
+                    songLikeDao.insert(
+                        SongLikeEntity(
+                            songId = row.songId,
+                            title = row.title,
+                            artist = row.artist,
+                            album = row.album,
+                            genre = row.genre,
+                            uri = row.uri,
+                            artworkUrl = row.artworkUrl,
+                            durationMs = row.durationMs,
+                            likedAt = row.likedAt,
+                        ),
+                    )
+                }
+            }
         }
         musicRepository.bumpCatalogGeneration()
     }
@@ -96,7 +121,8 @@ class LibrarySnapshotApplier @Inject constructor(
             val history = readRows(sqlite, "playback_history")?.mapNotNull(::restoredPlayback)
             val metadata = readRows(sqlite, "song_metadata")?.mapNotNull(::restoredMetadata)
             val sourcePaths = readRows(sqlite, "songs").orEmpty().mapNotNull(::restoredSourcePath)
-            SnapshotTables(settings, history, metadata, sourcePaths)
+            val likes = readRows(sqlite, "song_likes")?.mapNotNull(::restoredSongLike)
+            SnapshotTables(settings, history, metadata, sourcePaths, likes)
         }
     }
 
@@ -132,5 +158,6 @@ class LibrarySnapshotApplier @Inject constructor(
         val history: List<com.aethelsoft.grooveplayer.domain.backup.RestoredPlayback>?,
         val metadata: List<com.aethelsoft.grooveplayer.domain.backup.RestoredMetadata>?,
         val sourcePaths: List<Pair<String, String>>,
+        val likes: List<com.aethelsoft.grooveplayer.domain.backup.RestoredSongLike>?,
     )
 }

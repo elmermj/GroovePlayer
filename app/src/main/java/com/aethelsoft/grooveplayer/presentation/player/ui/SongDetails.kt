@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.common.FullPlayerSongLike
 import com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge
 import com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
@@ -74,6 +75,10 @@ fun SongDetails(
                 style = typography.playerSongArtist.toTextStyle(),
                 color = colors.muted,
             )
+            if (song != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                FullPlayerSongLike(song)
+            }
             if (availability != null) {
                 Spacer(modifier = Modifier.height(6.dp))
                 SongAvailabilityBadge(mark = availability, iconSize = 18.dp)

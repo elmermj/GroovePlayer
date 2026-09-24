@@ -9,8 +9,6 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.dao.FavoriteTrackResult
 import com.aethelsoft.grooveplayer.domain.model.Album
-import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
-import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
 import com.aethelsoft.grooveplayer.domain.model.MostPlayedTrack
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.model.makeAlbumId
@@ -102,13 +100,6 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
         }
     }
     
-    override fun getFavoriteTracks(sinceTimestamp: Long, limit: Int): Flow<List<Song>> {
-        return dao.getFavoriteTracks(sinceTimestamp, limit).map { results ->
-            android.util.Log.d("PlaybackHistoryRepo", "getFavoriteTracks: Found ${results.size} entries (timestamp=$sinceTimestamp)")
-            results.map { it.toSong() }
-        }
-    }
-
     override fun getMostPlayed(limit: Int): Flow<List<MostPlayedTrack>> {
         return dao.getMostPlayed(limit).map { results ->
             results.map { result ->
@@ -120,31 +111,6 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
         }
     }
     
-    override fun getFavoriteArtists(sinceTimestamp: Long, limit: Int): Flow<List<FavoriteArtist>> {
-        return dao.getFavoriteArtists(sinceTimestamp, limit).map { results ->
-            results.map { result ->
-                FavoriteArtist(
-                    artist = result.artist,
-                    playCount = result.playCount
-                )
-            }
-        }
-    }
-    
-    override fun getFavoriteAlbums(sinceTimestamp: Long, limit: Int): Flow<List<FavoriteAlbum>> {
-        return dao.getFavoriteAlbums(sinceTimestamp, limit).map { results ->
-            results.map { result ->
-                val primaryArtist = ArtistParser.parseArtists(result.artist).firstOrNull() ?: result.artist
-                FavoriteAlbum(
-                    album = result.album,
-                    artist = primaryArtist,
-                    playCount = result.playCount,
-                    artworkUrl = result.artworkUrl
-                )
-            }
-        }
-    }
-
     override fun getLastPlayedSongs(sinceTimestamp: Long, limit: Int): Flow<List<Song>> {
         return dao.getLastPlayedSongs(sinceTimestamp, limit).map { entities ->
             android.util.Log.d("PlaybackHistoryRepo", "getLastPlayedSongs: Found ${entities.size} entries (timestamp=$sinceTimestamp)")

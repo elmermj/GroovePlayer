@@ -139,7 +139,9 @@ public fun PhoneHomeLayout(
             LibraryCardComponent(
                 title = "Favorite Albums",
                 subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
-                artworks = emptyList(),
+                artworks = favoriteAlbums.map { item ->
+                    if (item.artworkUrl.isNullOrEmpty()) "Unknown" else item.artworkUrl
+                },
                 emptyNoticeText = "No favorites yet",
                 onClick = onNavigateToFavoriteAlbums
             )

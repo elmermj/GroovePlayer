@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.presentation.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.domain.library.SongLikeIndex
 import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
 import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
 import com.aethelsoft.grooveplayer.domain.model.LibraryGenre
@@ -59,13 +60,13 @@ class HomeViewModel @Inject constructor(
     private val _genres = MutableStateFlow<List<LibraryGenre>?>(null)
     val genres: StateFlow<List<LibraryGenre>?> = _genres.asStateFlow()
     
-    val favoriteTracks: StateFlow<List<Song>> = getFavoriteTracksUseCase(allTimeTimestamp, 20)
+    val favoriteTracks: StateFlow<List<Song>> = getFavoriteTracksUseCase(allTimeTimestamp, SongLikeIndex.ALL)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
     
-    val favoriteArtists: StateFlow<List<FavoriteArtist>> = getFavoriteArtistsUseCase(allTimeTimestamp, 20)
+    val favoriteArtists: StateFlow<List<FavoriteArtist>> = getFavoriteArtistsUseCase(allTimeTimestamp, SongLikeIndex.ALL)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
     
-    val favoriteAlbums: StateFlow<List<FavoriteAlbum>> = getFavoriteAlbumsUseCase(allTimeTimestamp, 20)
+    val favoriteAlbums: StateFlow<List<FavoriteAlbum>> = getFavoriteAlbumsUseCase(allTimeTimestamp, SongLikeIndex.ALL)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     val lastPlayedSongs: StateFlow<List<Song>> = getLastPlayedSongsUseCase(allTimeTimestamp, 8)

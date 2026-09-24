@@ -68,6 +68,7 @@ object LibraryDatabaseOpener {
             GroovePlayerDatabase::class.java,
             GroovePlayerDatabase.DATABASE_NAME,
         )
+            .addMigrations(GroovePlayerMigrations.MIGRATION_16_17)
             .fallbackToDestructiveMigration()
             .fallbackToDestructiveMigrationOnDowngrade()
             .build()
