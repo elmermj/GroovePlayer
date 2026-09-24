@@ -6,12 +6,22 @@ package com.aethelsoft.grooveplayer.domain.model
 enum class CloudBackupPhase {
     IDLE,
     PREPARING,
+    /** Copying included-folder audio into Groove Downloads and updating Room paths. */
+    CONSOLIDATING,
     UPLOADING,
     SUCCESS,
     ERROR,
     BLOCKED_QUOTA,
     BLOCKED_GRACE,
     BLOCKED_NOT_PREMIUM,
+}
+
+/** Ordered backup stages. Song upload and the catalog start only after consolidate finishes. */
+enum class BackupJobStep {
+    PREPARING,
+    CONSOLIDATING,
+    UPLOADING_FILES,
+    UPLOADING_CATALOG,
 }
 
 data class CloudBackupState(
@@ -21,6 +31,13 @@ data class CloudBackupState(
     val bytesUploaded: Long = 0L,
     val filesTotal: Int = 0,
     val filesCompleted: Int = 0,
+    /** Songs copied into Groove Downloads with Room paths updated. */
+    val consolidateCompleted: Int = 0,
+    val consolidateTotal: Int = 0,
+    /** Song files finished (uploaded or hash-skipped). Catalog upload is separate. */
+    val uploadCompleted: Int = 0,
+    val uploadTotal: Int = 0,
+    val jobStep: BackupJobStep = BackupJobStep.PREPARING,
     val filesDeduped: Int = 0,
     /** Songs skipped client-side: cloud already has the same SHA-256 and size. */
     val filesSkipped: Int = 0,

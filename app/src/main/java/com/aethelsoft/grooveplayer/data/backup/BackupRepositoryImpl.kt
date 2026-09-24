@@ -13,6 +13,7 @@ import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupUploadUrlRequestDto
 import com.aethelsoft.grooveplayer.di.NetworkModule
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
 import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
 import com.aethelsoft.grooveplayer.domain.backup.CloudHashDedup
 import com.aethelsoft.grooveplayer.domain.backup.ContentHash
@@ -22,6 +23,7 @@ import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
 import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
+import com.aethelsoft.grooveplayer.domain.model.BackupJobStep
 import com.aethelsoft.grooveplayer.domain.model.BackupKinds
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
@@ -92,12 +94,7 @@ class BackupRepositoryImpl @Inject constructor(
     @Volatile
     private var gateEntitlement: StorageEntitlement? = null
 
-    private val _state = MutableStateFlow(
-        CloudBackupState(
-            lastBackupAtEpochMs = prefs.getLong(KEY_LAST_BACKUP, 0L).takeIf { it > 0L },
-            lastError = prefs.getString(KEY_LAST_ERROR, null),
-        )
-    )
+    private val _state = MutableStateFlow(restoredBackupState())
 
     override fun observeBackupState() = _state.asStateFlow()
 
@@ -108,6 +105,19 @@ class BackupRepositoryImpl @Inject constructor(
                 includedFolders = folders,
                 lastBackupAtEpochMs = prefs.getLong(KEY_LAST_BACKUP, 0L).takeIf { t -> t > 0L },
                 lastError = prefs.getString(KEY_LAST_ERROR, null),
+                canRetry = prefs.getBoolean(KEY_CAN_RETRY, false),
+                phase = if (prefs.getBoolean(KEY_CAN_RETRY, false) &&
+                    it.phase !in ACTIVE_BACKUP_PHASES
+                ) {
+                    CloudBackupPhase.ERROR
+                } else {
+                    it.phase
+                },
+                message = if (prefs.getBoolean(KEY_CAN_RETRY, false)) {
+                    prefs.getString(KEY_LAST_ERROR, null)
+                } else {
+                    it.message
+                },
             )
         }
     }
@@ -176,17 +186,25 @@ class BackupRepositoryImpl @Inject constructor(
                     progressPercent = 0,
                     bytesPrepared = 0L,
                     bytesUploaded = 0L,
+                    jobStep = BackupJobStep.PREPARING,
                     filesTotal = 0,
                     filesCompleted = 0,
+                    consolidateCompleted = 0,
+                    consolidateTotal = 0,
+                    uploadCompleted = 0,
+                    uploadTotal = 0,
                     filesDeduped = 0,
                     filesSkipped = 0,
                     includedFolders = folders,
                     lastError = null,
                     lastRunDryRun = false,
                     canRetry = false,
-                    message = "Preparing included folders…",
+                    message = BackupProgressLabel.status(
+                        BackupJobStep.PREPARING, 0, 0, 0, 0,
+                    ),
                 )
             }
+            prefs.edit().putBoolean(KEY_CAN_RETRY, false).remove(KEY_LAST_ERROR).apply()
 
             var prepared = 0L
             val files = mutableListOf<File>()
@@ -215,18 +233,12 @@ class BackupRepositoryImpl @Inject constructor(
                 if (ent.quotaBytes > 0) (ent.quotaBytes - ent.usedBytes).coerceAtLeast(0L)
                 else Long.MAX_VALUE
 
-            _state.update {
-                it.copy(
-                    phase = CloudBackupPhase.UPLOADING,
-                    progressPercent = 15,
-                    filesTotal = files.size,
-                    message = "Copying approved songs into Groove Downloads…",
-                )
-            }
-
-            // Paths in Room change before the snapshot, and only after that copy exists.
+            // Paths in Room change before any upload. Progress is per file, and a failure
+            // here never reaches the song or catalog upload.
             val uploadFiles = canonicalizeApprovedSongs(files)
             prepared = uploadFiles.sumOf { it.length() }
+            val consolidateCompleted = _state.value.consolidateCompleted
+            val consolidateTotal = _state.value.consolidateTotal
 
             // Skip only when cloud already has the same SHA-256 and size. A name match is not identity.
             var skippedCount = 0
@@ -248,17 +260,14 @@ class BackupRepositoryImpl @Inject constructor(
             }
             Log.i(TAG, "cloud hash identities=${cloudIdentities.size}")
 
-            _state.update {
-                it.copy(
-                    filesTotal = uploadFiles.size,
-                    message = if (uploadFiles.isEmpty()) {
-                        "No audio in included folders — uploading library snapshot…"
-                    } else {
-                        "Uploading 0/${uploadFiles.size}…"
-                    },
-                    filesSkipped = 0,
-                )
-            }
+            publishStep(
+                step = BackupJobStep.UPLOADING_FILES,
+                phase = CloudBackupPhase.UPLOADING,
+                consolidateCompleted = consolidateCompleted,
+                consolidateTotal = consolidateTotal,
+                uploadCompleted = 0,
+                uploadTotal = uploadFiles.size,
+            )
 
             for (file in uploadFiles) {
                 val size = file.length()
@@ -275,24 +284,17 @@ class BackupRepositoryImpl @Inject constructor(
                     completed++
                     cloudIdentities.add(hash.lowercase() to size)
                     Log.i(TAG, "skip $reason hash=$hash size=$size")
-                    val uploadPct = 20 + ((completed * 75) / uploadFiles.size.coerceAtLeast(1))
-                    _state.update {
-                        it.copy(
-                            progressPercent = uploadPct.coerceIn(0, 94),
-                            bytesPrepared = prepared,
-                            bytesUploaded = uploadedBytes,
-                            filesCompleted = completed,
-                            filesDeduped = dedupedCount,
-                            filesSkipped = skippedCount,
-                            lastRunDryRun = anyDryRun,
-                            message = buildString {
-                                append("Uploading $completed/${uploadFiles.size}")
-                                if (skippedCount > 0) append(" · $skippedCount skipped")
-                                if (dedupedCount > 0) append(" · $dedupedCount deduped")
-                                if (anyDryRun) append(" · dry-run (R2 keys pending)")
-                            },
-                        )
-                    }
+                    publishUploadProgress(
+                        consolidateCompleted = consolidateCompleted,
+                        consolidateTotal = consolidateTotal,
+                        uploadCompleted = completed,
+                        uploadTotal = uploadFiles.size,
+                        prepared = prepared,
+                        uploadedBytes = uploadedBytes,
+                        dedupedCount = dedupedCount,
+                        skippedCount = skippedCount,
+                        anyDryRun = anyDryRun,
+                    )
                 }
 
                 if (CloudHashDedup.alreadyStored(cloudIdentities, hash, size)) {
@@ -414,32 +416,27 @@ class BackupRepositoryImpl @Inject constructor(
                 }
 
                 completed++
-                val uploadPct = 20 + ((completed * 75) / uploadFiles.size.coerceAtLeast(1))
-                _state.update {
-                    it.copy(
-                        progressPercent = uploadPct.coerceIn(0, 94),
-                        bytesPrepared = prepared,
-                        bytesUploaded = uploadedBytes,
-                        filesCompleted = completed,
-                        filesDeduped = dedupedCount,
-                        filesSkipped = skippedCount,
-                        lastRunDryRun = anyDryRun,
-                        message = buildString {
-                            append("Uploading $completed/${uploadFiles.size}")
-                            if (skippedCount > 0) append(" · $skippedCount skipped")
-                            if (dedupedCount > 0) append(" · $dedupedCount deduped")
-                            if (anyDryRun) append(" · dry-run (R2 keys pending)")
-                        },
-                    )
-                }
-            }
-
-            _state.update {
-                it.copy(
-                    progressPercent = 95,
-                    message = "Uploading library snapshot…",
+                publishUploadProgress(
+                    consolidateCompleted = consolidateCompleted,
+                    consolidateTotal = consolidateTotal,
+                    uploadCompleted = completed,
+                    uploadTotal = uploadFiles.size,
+                    prepared = prepared,
+                    uploadedBytes = uploadedBytes,
+                    dedupedCount = dedupedCount,
+                    skippedCount = skippedCount,
+                    anyDryRun = anyDryRun,
                 )
             }
+
+            publishStep(
+                step = BackupJobStep.UPLOADING_CATALOG,
+                phase = CloudBackupPhase.UPLOADING,
+                consolidateCompleted = consolidateCompleted,
+                consolidateTotal = consolidateTotal,
+                uploadCompleted = completed,
+                uploadTotal = uploadFiles.size,
+            )
             val roomResult = uploadRoomDbSnapshot(remainingQuotaHeadroom)
             anyDryRun = anyDryRun || roomResult.anyDryRun
             dedupedCount += if (roomResult.deduped) 1 else 0
@@ -452,6 +449,7 @@ class BackupRepositoryImpl @Inject constructor(
             prefs.edit()
                 .putLong(KEY_LAST_BACKUP, now)
                 .remove(KEY_LAST_ERROR)
+                .putBoolean(KEY_CAN_RETRY, false)
                 .apply()
 
             // Refresh /v1/me storage after batch (complete may already have applied).
@@ -460,10 +458,15 @@ class BackupRepositoryImpl @Inject constructor(
             _state.update {
                 it.copy(
                     phase = CloudBackupPhase.SUCCESS,
+                    jobStep = BackupJobStep.UPLOADING_CATALOG,
                     progressPercent = 100,
                     bytesPrepared = prepared,
                     bytesUploaded = uploadedBytes,
                     filesCompleted = completed,
+                    consolidateCompleted = consolidateCompleted,
+                    consolidateTotal = consolidateTotal,
+                    uploadCompleted = completed,
+                    uploadTotal = uploadFiles.size,
                     filesDeduped = dedupedCount,
                     filesSkipped = skippedCount,
                     lastBackupAtEpochMs = now,
@@ -497,15 +500,25 @@ class BackupRepositoryImpl @Inject constructor(
                     CloudBackupPhase.BLOCKED_QUOTA,
                 )
             ) {
-                val incomplete = e is CloudUploadIncompleteException
-                val msg = e.message ?: "Backup failed"
-                prefs.edit().putString(KEY_LAST_ERROR, msg).apply()
+                val current = _state.value
+                val msg = BackupProgressLabel.failure(
+                    step = current.jobStep,
+                    consolidateCompleted = current.consolidateCompleted,
+                    consolidateTotal = current.consolidateTotal,
+                    uploadCompleted = current.uploadCompleted,
+                    uploadTotal = current.uploadTotal,
+                    detail = e.message,
+                )
+                prefs.edit()
+                    .putString(KEY_LAST_ERROR, msg)
+                    .putBoolean(KEY_CAN_RETRY, true)
+                    .apply()
                 _state.update {
                     it.copy(
                         phase = CloudBackupPhase.ERROR,
                         lastError = msg,
                         message = msg,
-                        canRetry = incomplete || it.canRetry,
+                        canRetry = true,
                     )
                 }
             }
@@ -819,6 +832,89 @@ class BackupRepositoryImpl @Inject constructor(
         return after.substring(q1 + 1, q2).trim()
     }
 
+    private fun restoredBackupState(): CloudBackupState {
+        val retry = prefs.getBoolean(KEY_CAN_RETRY, false)
+        val error = prefs.getString(KEY_LAST_ERROR, null)
+        return CloudBackupState(
+            phase = if (retry) CloudBackupPhase.ERROR else CloudBackupPhase.IDLE,
+            lastBackupAtEpochMs = prefs.getLong(KEY_LAST_BACKUP, 0L).takeIf { it > 0L },
+            lastError = error,
+            message = if (retry) error else null,
+            canRetry = retry,
+        )
+    }
+
+    private fun publishStep(
+        step: BackupJobStep,
+        phase: CloudBackupPhase,
+        consolidateCompleted: Int,
+        consolidateTotal: Int,
+        uploadCompleted: Int,
+        uploadTotal: Int,
+    ) {
+        val completed = when (step) {
+            BackupJobStep.UPLOADING_FILES -> uploadCompleted
+            BackupJobStep.CONSOLIDATING -> consolidateCompleted
+            else -> 0
+        }
+        val total = when (step) {
+            BackupJobStep.UPLOADING_FILES -> uploadTotal
+            BackupJobStep.CONSOLIDATING -> consolidateTotal
+            else -> 0
+        }
+        _state.update {
+            it.copy(
+                phase = phase,
+                jobStep = step,
+                progressPercent = BackupProgressLabel.percent(step, completed, total),
+                filesCompleted = completed,
+                filesTotal = total,
+                consolidateCompleted = consolidateCompleted,
+                consolidateTotal = consolidateTotal,
+                uploadCompleted = uploadCompleted,
+                uploadTotal = uploadTotal,
+                message = BackupProgressLabel.status(
+                    step,
+                    consolidateCompleted,
+                    consolidateTotal,
+                    uploadCompleted,
+                    uploadTotal,
+                ),
+                canRetry = false,
+            )
+        }
+    }
+
+    private fun publishUploadProgress(
+        consolidateCompleted: Int,
+        consolidateTotal: Int,
+        uploadCompleted: Int,
+        uploadTotal: Int,
+        prepared: Long,
+        uploadedBytes: Long,
+        dedupedCount: Int,
+        skippedCount: Int,
+        anyDryRun: Boolean,
+    ) {
+        publishStep(
+            step = BackupJobStep.UPLOADING_FILES,
+            phase = CloudBackupPhase.UPLOADING,
+            consolidateCompleted = consolidateCompleted,
+            consolidateTotal = consolidateTotal,
+            uploadCompleted = uploadCompleted,
+            uploadTotal = uploadTotal,
+        )
+        _state.update {
+            it.copy(
+                bytesPrepared = prepared,
+                bytesUploaded = uploadedBytes,
+                filesDeduped = dedupedCount,
+                filesSkipped = skippedCount,
+                lastRunDryRun = anyDryRun,
+            )
+        }
+    }
+
     private fun setPhase(phase: CloudBackupPhase, message: String) {
         _state.update {
             it.copy(phase = phase, message = message, lastError = message, progressPercent = 0)
@@ -980,12 +1076,20 @@ class BackupRepositoryImpl @Inject constructor(
      * the original only when the path update changed a row. Upload uses the canonical file.
      */
     private suspend fun canonicalizeApprovedSongs(sources: List<File>): List<File> {
-        if (sources.isEmpty()) return emptyList()
+        val pending = sources.filter { it.isFile && it.length() > 0L }
+        publishStep(
+            step = BackupJobStep.CONSOLIDATING,
+            phase = CloudBackupPhase.CONSOLIDATING,
+            consolidateCompleted = 0,
+            consolidateTotal = pending.size,
+            uploadCompleted = 0,
+            uploadTotal = 0,
+        )
+        if (pending.isEmpty()) return emptyList()
         val downloadsDir = grooveDownloads.directory()
         val existing = indexDownloads(downloadsDir).toMutableList()
         val canonical = LinkedHashMap<String, File>()
-        for (source in sources) {
-            if (!source.isFile || source.length() <= 0L) continue
+        pending.forEachIndexed { index, source ->
             val hash = sha256Hex(source)
             val size = source.length()
             val placement = GrooveDownloadPlacement.place(
@@ -1024,6 +1128,14 @@ class BackupRepositoryImpl @Inject constructor(
                 Log.i(TAG, "No Room row for ${source.absolutePath}; original left in place")
             }
             canonical[dest.absolutePath] = dest
+            publishStep(
+                step = BackupJobStep.CONSOLIDATING,
+                phase = CloudBackupPhase.CONSOLIDATING,
+                consolidateCompleted = index + 1,
+                consolidateTotal = pending.size,
+                uploadCompleted = 0,
+                uploadTotal = 0,
+            )
         }
         return canonical.values.toList()
     }
@@ -1327,6 +1439,12 @@ class BackupRepositoryImpl @Inject constructor(
         private const val PREFS = LibraryRestoreSession.PREFS
         private const val KEY_LAST_BACKUP = "last_backup_at"
         private const val KEY_LAST_ERROR = LibraryRestoreSession.KEY_LAST_ERROR
+        private const val KEY_CAN_RETRY = "backup_can_retry"
+        private val ACTIVE_BACKUP_PHASES = setOf(
+            CloudBackupPhase.PREPARING,
+            CloudBackupPhase.CONSOLIDATING,
+            CloudBackupPhase.UPLOADING,
+        )
         private const val KEY_LAST_ROOM_HASH = "last_room_db_hash"
         private const val KEY_LAST_ROOM_SIZE = "last_room_db_size"
         private const val LOGICAL_PATH_ROOM_DB = "library/room.db.gz"

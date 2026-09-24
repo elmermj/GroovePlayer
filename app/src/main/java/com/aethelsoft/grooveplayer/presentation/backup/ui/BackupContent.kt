@@ -54,6 +54,8 @@ import com.aethelsoft.grooveplayer.utils.StorageFormatUtils
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingsButton
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressTone
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupPhase
@@ -744,7 +746,10 @@ private fun BackupNowSection(
     onStartBackup: () -> Unit,
 ) {
     val phase = backupState.phase
-    val busy = phase == CloudBackupPhase.PREPARING || phase == CloudBackupPhase.UPLOADING
+    val busy = phase == CloudBackupPhase.PREPARING ||
+        phase == CloudBackupPhase.CONSOLIDATING ||
+        phase == CloudBackupPhase.UPLOADING
+    val showSteps = busy || phase == CloudBackupPhase.SUCCESS || phase == CloudBackupPhase.ERROR
     val readOnlyGrace = storage?.readOnly == true && storage.overQuota != true
     val blockedQuota = storage?.overQuota == true || storage?.hardStop == true
     val canStart = tier == PrivilegeTier.PREMIUM &&
@@ -826,13 +831,42 @@ private fun BackupNowSection(
     ProfileSettingsButton(
         onClick = { if (buttonEnabled) onStartBackup() },
         title = when {
-            busy -> "Backing up… ${backupState.progressPercent}%"
-            backupState.canRetry -> "Retry upload"
+            busy -> BackupProgressLabel.status(
+                backupState.jobStep,
+                backupState.consolidateCompleted,
+                backupState.consolidateTotal,
+                backupState.uploadCompleted,
+                backupState.uploadTotal,
+            )
+            backupState.canRetry -> "Retry backup"
             else -> "Back up now"
         },
         isActive = buttonEnabled,
         modifier = Modifier.fillMaxWidth(),
     )
+
+    if (showSteps) {
+        Spacer(Modifier.height(8.dp))
+        BackupProgressLabel.lines(
+            phase = phase,
+            step = backupState.jobStep,
+            consolidateCompleted = backupState.consolidateCompleted,
+            consolidateTotal = backupState.consolidateTotal,
+            uploadCompleted = backupState.uploadCompleted,
+            uploadTotal = backupState.uploadTotal,
+        ).forEach { line ->
+            Text(
+                text = line.text,
+                style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
+                color = when (line.tone) {
+                    BackupProgressTone.FAILED -> Color(0xFFFF8A80)
+                    BackupProgressTone.ACTIVE -> GrooveTheme.colors.onSurface
+                    BackupProgressTone.DONE -> SoftWhite.copy(alpha = 0.85f)
+                    BackupProgressTone.PENDING -> SoftWhite.copy(alpha = 0.45f)
+                },
+            )
+        }
+    }
 
     if (busy) {
         Spacer(Modifier.height(8.dp))
@@ -848,7 +882,14 @@ private fun BackupNowSection(
     }
 
     val status = backupState.message ?: backupState.lastError
-    if (!status.isNullOrBlank()) {
+    val activeLabel = BackupProgressLabel.status(
+        backupState.jobStep,
+        backupState.consolidateCompleted,
+        backupState.consolidateTotal,
+        backupState.uploadCompleted,
+        backupState.uploadTotal,
+    )
+    if (!status.isNullOrBlank() && !(busy && status == activeLabel)) {
         Spacer(Modifier.height(6.dp))
         val color = when (phase) {
             CloudBackupPhase.SUCCESS -> SoftWhite
