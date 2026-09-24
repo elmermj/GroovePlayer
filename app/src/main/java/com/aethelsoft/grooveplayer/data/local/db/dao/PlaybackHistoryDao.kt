@@ -102,6 +102,23 @@ interface PlaybackHistoryDao {
     @Query("DELETE FROM playback_history WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
     
+    @Query("""
+        SELECT 
+            songId, 
+            songTitle, 
+            artist, 
+            album, 
+            genre, 
+            uri, 
+            artworkUrl, 
+            COUNT(*) as playCount
+        FROM playback_history
+        GROUP BY songId
+        ORDER BY playCount DESC, songTitle COLLATE NOCASE ASC
+        LIMIT :limit
+    """)
+    fun getMostPlayed(limit: Int = 50): Flow<List<FavoriteTrackResult>>
+
     @Query("SELECT COUNT(*) FROM playback_history")
     suspend fun getTotalPlaybackCount(): Int
     

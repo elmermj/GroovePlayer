@@ -13,7 +13,9 @@ import com.aethelsoft.grooveplayer.presentation.common.BasePageTemplate
 @Composable
 fun HomeScreen(
     onNavigateToSongs: () -> Unit,
+    onNavigateToGenres: () -> Unit,
     onNavigateToRecentlyPlayed: () -> Unit,
+    onNavigateToMostPlayed: () -> Unit,
     onNavigateToFavoriteTracks: () -> Unit,
     onNavigateToFavoriteArtists: () -> Unit,
     onNavigateToFavoriteAlbums: () -> Unit,
@@ -27,7 +29,9 @@ fun HomeScreen(
             PhoneHomeLayout(
                 viewModel = viewModel,
                 onNavigateToSongs = onNavigateToSongs,
+                onNavigateToGenres = onNavigateToGenres,
                 onNavigateToRecentlyPlayed = onNavigateToRecentlyPlayed,
+                onNavigateToMostPlayed = onNavigateToMostPlayed,
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
                 onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums,
@@ -37,7 +41,9 @@ fun HomeScreen(
             TabletHomeLayout(
                 viewModel = viewModel,
                 onNavigateToSongs = onNavigateToSongs,
+                onNavigateToGenres = onNavigateToGenres,
                 onNavigateToRecentlyPlayed = onNavigateToRecentlyPlayed,
+                onNavigateToMostPlayed = onNavigateToMostPlayed,
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
                 onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums
@@ -47,7 +53,9 @@ fun HomeScreen(
             LargeTabletHomeLayout(
                 viewModel = viewModel,
                 onNavigateToSongs = onNavigateToSongs,
+                onNavigateToGenres = onNavigateToGenres,
                 onNavigateToRecentlyPlayed = onNavigateToRecentlyPlayed,
+                onNavigateToMostPlayed = onNavigateToMostPlayed,
                 onNavigateToFavoriteTracks = onNavigateToFavoriteTracks,
                 onNavigateToFavoriteArtists = onNavigateToFavoriteArtists,
                 onNavigateToFavoriteAlbums = onNavigateToFavoriteAlbums

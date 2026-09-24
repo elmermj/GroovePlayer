@@ -5,12 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
 import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
+import com.aethelsoft.grooveplayer.domain.model.LibraryGenre
+import com.aethelsoft.grooveplayer.domain.model.MostPlayedTrack
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteAlbumsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteArtistsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteTracksUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetLastPlayedSongsUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetMostPlayedUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetRecentlyPlayedUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.library_category.GetLibraryGenresUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.InitializeLibraryIndexUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
@@ -33,6 +37,8 @@ class HomeViewModel @Inject constructor(
     application: Application,
     private val getSongsUseCase: GetSongsUseCase,
     private val getRecentlyPlayedUseCase: GetRecentlyPlayedUseCase,
+    private val getMostPlayedUseCase: GetMostPlayedUseCase,
+    private val getLibraryGenresUseCase: GetLibraryGenresUseCase,
     private val getFavoriteTracksUseCase: GetFavoriteTracksUseCase,
     private val getFavoriteArtistsUseCase: GetFavoriteArtistsUseCase,
     private val getFavoriteAlbumsUseCase: GetFavoriteAlbumsUseCase,
@@ -46,6 +52,12 @@ class HomeViewModel @Inject constructor(
     
     val recentlyPlayed: StateFlow<List<Song>> = getRecentlyPlayedUseCase(20)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val mostPlayed: StateFlow<List<MostPlayedTrack>> = getMostPlayedUseCase(20)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _genres = MutableStateFlow<List<LibraryGenre>?>(null)
+    val genres: StateFlow<List<LibraryGenre>?> = _genres.asStateFlow()
     
     val favoriteTracks: StateFlow<List<Song>> = getFavoriteTracksUseCase(allTimeTimestamp, 20)
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
@@ -106,6 +118,14 @@ class HomeViewModel @Inject constructor(
                 setSuccess(songs)
             } catch (e: Exception) {
                 setError(e.message ?: "Failed to load songs")
+            }
+            try {
+                _genres.value = getLibraryGenresUseCase()
+            } catch (e: Exception) {
+                android.util.Log.e("HomeViewModel", "Failed to load genres", e)
+                if (_genres.value == null) {
+                    _genres.value = emptyList()
+                }
             }
         }
     }
