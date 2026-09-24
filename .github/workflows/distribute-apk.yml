@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       notes:
-        description: Release notes shown to testers
+        description: Release notes shown to testers. Leave empty to use recent commits.
         required: false
         type: string
         default: ""
@@ -17,6 +17,11 @@ on:
         required: false
         type: string
         default: testers
+      testers:
+        description: Extra tester emails (comma-separated). matt.elmer24@gmail.com is always included.
+        required: false
+        type: string
+        default: ""
   push:
     branches:
       - test
@@ -40,6 +45,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Enough history for the release-notes commit list.
+          fetch-depth: 50
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
@@ -161,20 +169,119 @@ jobs:
           echo "Firebase App Distribution secrets are present."
 
       - name: Write release notes
+        id: notes
         env:
-          NOTES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.notes || '' }}
+          DISPATCH_NOTES: ${{ github.event.inputs.notes }}
+          DISPATCH_TESTERS: ${{ github.event.inputs.testers }}
+          DISPATCH_GROUPS: ${{ github.event.inputs.groups }}
+          VAR_TESTERS: ${{ vars.FIREBASE_TESTERS }}
+          VERSION_NAME: ${{ env.VERSION_NAME }}
         run: |
           set -euo pipefail
-          printf '%s\n' "Commit: $GITHUB_SHA" > release-notes.txt
-          if [ -n "${NOTES:-}" ]; then
-            printf '%s\n' "$NOTES" >> release-notes.txt
-          fi
+          python3 - << 'PY'
+          import os
+          import subprocess
+          from pathlib import Path
+
+          # Firebase allows much longer notes. Keep App Tester text under ~2KB.
+          MAX_BYTES = 1800
+          DEFAULT_TESTER = "matt.elmer24@gmail.com"
+
+          def one_line_list(value: str) -> list[str]:
+              items = []
+              for chunk in value.replace("\n", ",").replace("\r", ",").split(","):
+                  item = " ".join(chunk.split())
+                  if item:
+                      items.append(item)
+              return items
+
+          def cap(header: str, body: str) -> str:
+              suffix = "\n...\n"
+              full = f"{header}\n\n{body.strip()}\n"
+              if len(full.encode("utf-8")) <= MAX_BYTES:
+                  return full
+              kept = []
+              for line in body.strip().splitlines():
+                  candidate_body = "\n".join(kept + [line])
+                  candidate = f"{header}\n\n{candidate_body}{suffix}"
+                  if len(candidate.encode("utf-8")) > MAX_BYTES:
+                      break
+                  kept.append(line)
+              if kept:
+                  return f"{header}\n\n" + "\n".join(kept) + suffix
+              base = f"{header}{suffix}"
+              raw = base.encode("utf-8")
+              if len(raw) <= MAX_BYTES:
+                  return base
+              return raw[:MAX_BYTES].decode("utf-8", errors="ignore")
+
+          event = os.environ.get("GITHUB_EVENT_NAME", "")
+          version = os.environ.get("VERSION_NAME") or f"1.0.{os.environ.get('GITHUB_RUN_NUMBER', '0')}"
+          sha = os.environ.get("GITHUB_SHA", "")
+          short = sha[:7] if sha else "unknown"
+          ref = os.environ.get("GITHUB_REF_NAME", "")
+          header = f"GroovePlayer {version} ({short})"
+          if ref:
+              header += f" on {ref}"
+
+          dispatch_notes = os.environ.get("DISPATCH_NOTES", "").strip()
+          if event == "workflow_dispatch" and dispatch_notes:
+              body = dispatch_notes
+          else:
+              try:
+                  body = subprocess.check_output(
+                      ["git", "log", "-15", "--no-merges", "--pretty=format:- %s"],
+                      text=True,
+                      stderr=subprocess.DEVNULL,
+                  ).strip()
+              except (subprocess.CalledProcessError, FileNotFoundError):
+                  body = ""
+              if not body:
+                  body = f"- {sha or 'build'}"
+
+          text = cap(header, body)
+          Path("release-notes.txt").write_text(text, encoding="utf-8")
+          size = len(text.encode("utf-8"))
+          print(f"Wrote release-notes.txt ({size} bytes).")
+          print(text)
+
+          if event == "workflow_dispatch" and os.environ.get("DISPATCH_GROUPS", "").strip():
+              groups = ",".join(one_line_list(os.environ.get("DISPATCH_GROUPS", ""))) or "testers"
+          else:
+              groups = "testers"
+
+          if event == "workflow_dispatch" and os.environ.get("DISPATCH_TESTERS", "").strip():
+              emails = one_line_list(os.environ.get("DISPATCH_TESTERS", ""))
+          elif os.environ.get("VAR_TESTERS", "").strip():
+              emails = one_line_list(os.environ.get("VAR_TESTERS", ""))
+          else:
+              emails = []
+          emails.append(DEFAULT_TESTER)
+          unique = []
+          seen = set()
+          for email in emails:
+              key = email.lower()
+              if key in seen:
+                  continue
+              seen.add(key)
+              unique.append(email)
+          testers = ",".join(unique)
+
+          output_path = os.environ.get("GITHUB_OUTPUT")
+          if output_path:
+              with open(output_path, "a", encoding="utf-8") as handle:
+                  handle.write(f"testers={testers}\n")
+                  handle.write(f"groups={groups}\n")
+          print(f"Groups: {groups}")
+          print(f"Testers: {testers}")
+          PY
 
       - name: Upload to Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.groups || 'testers' }}
+          groups: ${{ steps.notes.outputs.groups }}
+          testers: ${{ steps.notes.outputs.testers }}
           file: ${{ steps.apk.outputs.path }}
           releaseNotesFile: release-notes.txt

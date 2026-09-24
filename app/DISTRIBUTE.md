@@ -29,12 +29,18 @@ The App ID is the `mobilesdk_app_id` field in `google-services.json`. It looks l
 
 In the Firebase console, open **App Distribution** and enable it for the GroovePlayer Android app if it is not already on.
 
-## 3. Tester group
+## 3. Testers
+
+Every upload invites **`matt.elmer24@gmail.com`**. The workflow passes that address as `testers` on the Firebase upload, and it still sends the group alias `testers`. Elmer gets the release even when that group is empty or does not list his address. You do not add that inbox in the Firebase console for CI to deliver a build.
+
+Creating the `testers` group is an optional backup for extra people. If a run fails because that alias does not exist, create it once. Elmer’s email does not have to be a member.
 
 1. In App Distribution, open **Testers & Groups**.
-2. Create a group whose **alias** is `testers`. The workflow sends that alias. The display name can be anything.
-3. Add Elmer’s email. Placeholder: `matt.elmer24@gmail.com`. Change it if you want a different inbox.
-4. Save. Firebase emails an invite. Accept it on the phone (step 7).
+2. Create a group whose **alias** is `testers`. The display name can be anything.
+3. Add anyone else who should receive builds through the group.
+4. Save. Firebase emails an invite. Accept it on the phone (step 6).
+
+To invite more addresses without editing the workflow, set the repository **variable** `FIREBASE_TESTERS` (Settings → Secrets and variables → Actions → Variables) to a comma-separated email list. CI still appends `matt.elmer24@gmail.com` if that list omits it. A manual **Run workflow** can set `testers` the same way. Leave both empty and the only invited address is Elmer’s.
 
 ## 4. Service account
 
@@ -83,7 +89,7 @@ Back up the `.jks` and the three release passwords somewhere private (for exampl
 ## 6. Phone
 
 1. Install **Firebase App Tester** from the Play Store.
-2. Open the invite email from step 3 on that phone and accept it.
+2. After the first successful **Distribute APK** run, open the invite email sent to `matt.elmer24@gmail.com` and accept it on that phone. An invite from the optional `testers` group is the same kind of acceptance.
 3. When Android asks, allow App Tester to install unknown apps.
 
 ## 7. Run the workflow
@@ -94,15 +100,20 @@ Back up the `.jks` and the three release passwords somewhere private (for exampl
 
 Mobi and anyone else landing WIP or test builds should put those commits on `test`, not `main`.
 
-You can also run it by hand: GitHub → **Actions → Distribute APK → Run workflow**. Manual runs are unchanged; pick the branch that should be built.
+You can also run it by hand: GitHub → **Actions → Distribute APK → Run workflow**. Pick the branch that should be built.
 
 - Branch: `test`
-- `notes`: optional text for testers
+- `notes`: optional. Leave this empty to publish the automatic changelog. If you type notes, that text is what testers see (the version and short SHA are still included).
 - `groups`: leave as `testers` unless you created another alias
+- `testers`: optional extra emails, comma-separated. `matt.elmer24@gmail.com` is always included.
 
 When it finishes, open App Tester on the phone and install or update GroovePlayer. The run also keeps a copy of the APK under Actions artifacts, named `grooveplayer-dev-release`.
 
-Release notes on the Firebase release include the commit SHA and any `notes` you typed.
+### Release notes
+
+On a push to `test`, and on a manual run when `notes` is empty, the workflow writes `release-notes.txt` from the last 15 non-merge commits on the branch being built. Each subject is a bullet. The file starts with the version name (`1.0.<run number>`) and a short commit SHA. Notes are capped under about 2KB so App Tester stays readable.
+
+On **Run workflow**, a non-empty `notes` value replaces that commit list. Version and SHA stay at the top.
 
 ## 8. First install vs later updates
 
