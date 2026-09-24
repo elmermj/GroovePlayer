@@ -106,11 +106,16 @@ jobs:
                       out.append(ch)
               return "".join(out)
 
+          # App Tester installs on physical devices. Bake the Fly API (not 10.0.2.2).
+          # Web client ID must match backend verify; defaults match app/build.gradle.kts.
           lines = [
               "RELEASE_STORE_FILE=keystore/grooveplayer-upload.jks",
               f"RELEASE_STORE_PASSWORD={prop(os.environ['RELEASE_STORE_PASSWORD'])}",
               f"RELEASE_KEY_ALIAS={prop(os.environ['RELEASE_KEY_ALIAS'])}",
               f"RELEASE_KEY_PASSWORD={prop(os.environ['RELEASE_KEY_PASSWORD'])}",
+              "API_BASE_URL=https://grooveplayer-backend.fly.dev",
+              "GOOGLE_WEB_CLIENT_ID=356328665268-h7p2ct3o1k8358itiecp3h6o4r1tjjgo.apps.googleusercontent.com",
+              "GOOGLE_ANDROID_CLIENT_ID=356328665268-1t80fc2j091cei383co7tncernl4p00c.apps.googleusercontent.com",
           ]
           Path("local.properties").write_text("\n".join(lines) + "\n", encoding="ascii")
           print("Wrote local.properties (values not shown).")
