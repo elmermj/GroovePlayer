@@ -2,9 +2,12 @@ package com.aethelsoft.grooveplayer.presentation.home.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.material3.Text
@@ -12,10 +15,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
+import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
@@ -50,47 +55,76 @@ fun LastPlayedSectionComponent(
             )
         }
 
-        LazyHorizontalGrid(
-            rows = GridCells.Fixed(1),
-            modifier = Modifier.height(
-                // screen width
-                (windowInfo.widthDp.dp - (S_PADDING * 8)) / 8
-            ),
-            horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-        ) {
-            items(maxEightSongsList.size){ index ->
-                val song = maxEightSongsList[index]
-                val singleArtworkUrl: List<String> = listOf(song.artworkUrl ?: "")
-                LibraryCardComponent(
-                    title = song.title,
-                    subtitle = song.artist,
-                    artworks = singleArtworkUrl,
-                    onClick = {
-                        // Scenario 1: No song is currently playing
-                        if(currentSong == null){
-                            playerViewModel?.setQueueFromLastPlayedSongs(
-                                songs = allLibrarySongs,  // Use all songs for endless queue
-                                startSongId = song.id,
-                            )
-                        } else if(song.id == currentSong.id) {
-                            // Scenario 2 & 3: The clicked song is the same as the current one
-                            if (isPlaying == true) {
-                                // Scenario 3: If playing, open the full player screen
-                                navigation.openFullPlayer()
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            // Same inner width as the library grid. Four tiles plus the gaps between
+            // them fill that width (~¼ of the content, about four across).
+            val contentWidthDp = if (constraints.hasBoundedWidth) {
+                maxWidth.value
+            } else {
+                windowInfo.widthDp - (M_PADDING.value * 2f)
+            }
+            val tileWidth = continueTileWidthDp(
+                contentWidthDp = contentWidthDp,
+                gapDp = S_PADDING.value,
+            ).dp
+            val typography = GrooveTheme.typography
+            val density = LocalDensity.current
+            val tileHeight = continueTileHeightDp(
+                tileWidthDp = tileWidth.value,
+                overlayPaddingDp = LibraryCardOverlayPadding.value,
+                titleLineHeightDp = with(density) {
+                    typography.cardTitle.toTextStyle().lineHeight.toDp().value
+                },
+                subtitleLineHeightDp = with(density) {
+                    typography.cardSubtitle.toTextStyle().lineHeight.toDp().value
+                },
+            ).dp
+
+            LazyHorizontalGrid(
+                rows = GridCells.Fixed(1),
+                modifier = Modifier.height(tileHeight),
+                horizontalArrangement = Arrangement.spacedBy(S_PADDING),
+            ) {
+                items(maxEightSongsList.size) { index ->
+                    val song = maxEightSongsList[index]
+                    val singleArtworkUrl: List<String> = listOf(song.artworkUrl ?: "")
+                    LibraryCardComponent(
+                        modifier = Modifier
+                            .width(tileWidth)
+                            .height(tileHeight),
+                        square = false,
+                        titleMaxLines = CONTINUE_TITLE_MAX_LINES,
+                        subtitleMaxLines = CONTINUE_SUBTITLE_MAX_LINES,
+                        title = song.title,
+                        subtitle = song.artist,
+                        artworks = singleArtworkUrl,
+                        onClick = {
+                            // Scenario 1: No song is currently playing
+                            if(currentSong == null){
+                                playerViewModel?.setQueueFromLastPlayedSongs(
+                                    songs = allLibrarySongs,  // Use all songs for endless queue
+                                    startSongId = song.id,
+                                )
+                            } else if(song.id == currentSong.id) {
+                                // Scenario 2 & 3: The clicked song is the same as the current one
+                                if (isPlaying == true) {
+                                    // Scenario 3: If playing, open the full player screen
+                                    navigation.openFullPlayer()
+                                } else {
+                                    // Scenario 2: If paused, resume playback
+                                    playerViewModel?.playPauseToggle()
+                                }
                             } else {
-                                // Scenario 2: If paused, resume playback
-                                playerViewModel?.playPauseToggle()
+                                // Bonus Scenario: A different song is playing
+                                playerViewModel?.setQueueFromLastPlayedSongs(
+                                    songs = allLibrarySongs,
+                                    startSongId = song.id,
+                                )
                             }
-                        } else {
-                            // Bonus Scenario: A different song is playing
-                            playerViewModel?.setQueueFromLastPlayedSongs(
-                                songs = allLibrarySongs,
-                                startSongId = song.id,
-                            )
-                        }
-                    },
-                    emptyNoticeText = "Artwork not available"
-                )
+                        },
+                        emptyNoticeText = "Artwork not available"
+                    )
+                }
             }
         }
     }
