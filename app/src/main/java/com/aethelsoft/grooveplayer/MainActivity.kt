@@ -47,6 +47,8 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
+import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptDialog
+import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptViewModel
 import com.aethelsoft.grooveplayer.presentation.backup.RestoreLaunchViewModel
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
@@ -373,6 +375,8 @@ fun GroovePlayerAppMain() {
                     )
             ) {
                 val restoreLaunch: RestoreLaunchViewModel = hiltViewModel()
+                val loginRestorePrompt: LoginRestorePromptViewModel = hiltViewModel()
+                val showLoginRestorePrompt by loginRestorePrompt.visible.collectAsState()
                 AppNavHost(
                     navController = navController,
                     startDestination = if (restoreLaunch.startOnApplyScreen) {
@@ -380,7 +384,23 @@ fun GroovePlayerAppMain() {
                     } else {
                         AppRoutes.HOME
                     },
+                    onBackupRestoreVisible = loginRestorePrompt::onBackupRestoreVisible,
+                    onManualRestoreOpened = loginRestorePrompt::onManualRestoreOpened,
                 )
+                if (showLoginRestorePrompt) {
+                    LoginRestorePromptDialog(
+                        onKeepCurrent = loginRestorePrompt::keepCurrentData,
+                        onRestore = {
+                            if (loginRestorePrompt.confirmRestore()) {
+                                navController.navigate(
+                                    AppRoutes.restoreApplyRoute(startDownload = true),
+                                ) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        },
+                    )
+                }
                 val bottomBarState = BottomBarState.resolve(
                     currentRoute = currentRoute,
                     hasSecondaryContent = secondaryBottomContent.value != null,

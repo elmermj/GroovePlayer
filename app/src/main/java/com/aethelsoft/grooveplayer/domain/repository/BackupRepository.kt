@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.domain.repository
 
+import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
@@ -11,6 +12,9 @@ import java.io.File
 
 interface BackupRepository {
     fun observeBackupState(): Flow<CloudBackupState>
+
+    /** Persisted library-restore phase. [RestorePhase.IDLE] when nothing is in progress. */
+    fun restorePhase(): RestorePhase
 
     /** Folders that would be included in a backup (music folders minus exclusions). */
     suspend fun resolveIncludedFolders(): List<String>
