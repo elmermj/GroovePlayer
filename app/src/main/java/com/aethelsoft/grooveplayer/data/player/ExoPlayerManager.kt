@@ -842,15 +842,54 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         replaceUpcoming { upcoming -> upcoming.shuffled() }
     }
 
-    /** Put the songs after the current one back in their original order (edits made while shuffled carry over). */
+    /**
+     * Restore [preShuffleOrder] (removals and moves already applied) and keep the current song playing.
+     * When the songs before the current one are still in their original order, only the upcoming tracks are
+     * rewritten so playback is not interrupted. Otherwise the whole queue is replaced and playback seeks
+     * back to the current song in that restored order.
+     */
     private suspend fun restoreUnshuffledOrder() {
-        val orig = preShuffleOrder
+        val orig = preShuffleOrder?.toList()
         preShuffleOrder = null
-        if (orig == null || _queue.value.isEmpty()) return
-        val rank = HashMap<String, Int>()
-        orig.forEachIndexed { i, s -> rank.putIfAbsent(s.id, i) }
-        // Stable sort: songs not in the original order (e.g. endless-queue additions) keep their relative order at the end.
-        replaceUpcoming { upcoming -> upcoming.sortedBy { rank[it.id] ?: Int.MAX_VALUE } }
+        val q = _queue.value
+        if (orig.isNullOrEmpty() || q.isEmpty()) return
+        val currentId = _currentSong.value?.id ?: return
+        val origIndex = orig.indexOfFirst { it.id == currentId }
+        if (origIndex < 0) return
+        if (q.map { it.id } == orig.map { it.id }) return
+
+        val queueIndex = q.indexOfFirst { it.id == currentId }
+        val headMatches = queueIndex == origIndex &&
+            q.take(queueIndex).map { it.id } == orig.take(origIndex).map { it.id }
+        if (headMatches) {
+            val desiredIds = orig.drop(origIndex + 1).map { it.id }
+            val desiredSet = desiredIds.toSet()
+            replaceUpcoming { upcoming ->
+                val byId = upcoming.associateBy { it.id }
+                val ordered = desiredIds.mapNotNull { byId[it] }
+                val extras = upcoming.filter { it.id !in desiredSet }
+                ordered + extras
+            }
+            return
+        }
+
+        val position = _position.value
+        val playing = _isPlaying.value
+        _queue.value = orig
+        withContext(Dispatchers.Main.immediate) {
+            player.setMediaItems(
+                orig.map { buildMediaItem(it.uri.toUri()) },
+                origIndex,
+                position.coerceAtLeast(0L),
+            )
+            player.prepare()
+            player.playWhenReady = playing
+        }
+        _queue.value = orig
+        _currentSong.value = orig[origIndex]
+        _position.value = position
+        _duration.value = orig[origIndex].durationMs
+        persistQueueState()
     }
 
     /** Swap the items after the current one without interrupting playback. */

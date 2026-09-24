@@ -33,6 +33,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
@@ -53,9 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -68,12 +71,26 @@ import com.aethelsoft.grooveplayer.utils.theme.animations.AudioWaveAnimation
 import com.aethelsoft.grooveplayer.utils.theme.icons.XChevronUp
 import com.aethelsoft.grooveplayer.utils.theme.icons.XGripVertical
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
-import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import kotlinx.coroutines.launch
 
-/** Same subtle scrim the Phone FullPlayer overlays already use. */
-private val PhoneSheetScrim = Color.Black.copy(alpha = 0.5f)
-private val PhoneSheetContainer = Color(0xFF121212)
+/**
+ * Subtle dark gradient drawn behind the phone queue and EQ sheets.
+ * The sheets themselves use a transparent scrim so this gradient shows through the dialog window.
+ */
+@Composable
+fun PlayerSheetGradientScrim(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.42f to Color.Black.copy(alpha = 0.22f),
+                    1f to Color.Black.copy(alpha = 0.55f),
+                )
+            )
+    )
+}
 
 /**
  * "Up next" peek row under the transport controls. Shows what plays next; tapping opens the queue sheet.
@@ -89,8 +106,8 @@ fun PhoneUpNextPeekRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.08f))
+            .clip(RoundedCornerShape(GrooveTheme.radii.card))
+            .background(GrooveTheme.colors.surface)
             .clickable(onClickLabel = "Open queue", onClick = onClick)
             .padding(horizontal = S_PADDING, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -107,7 +124,7 @@ fun PhoneUpNextPeekRow(
             Text(
                 text = "Up next",
                 style = MaterialTheme.typography.labelSmall,
-                color = SoftWhite,
+                color = GrooveTheme.colors.muted,
             )
             // Animate when the next song changes (skip, reorder, shuffle toggle).
             AnimatedContent(
@@ -127,12 +144,12 @@ fun PhoneUpNextPeekRow(
                 )
             }
         }
-        Icon(XChevronUp, contentDescription = null, tint = SoftWhite)
+        Icon(XChevronUp, contentDescription = "Open queue", tint = GrooveTheme.colors.muted)
     }
 }
 
 /**
- * Phone queue bottom sheet. Opens partially expanded and drags up to full screen.
+ * Phone queue bottom sheet. Standard Material3 sheet: rests half-open and can drag to full.
  * "Now playing" stays pinned; "Up next" supports tap-to-jump, drag-handle reorder and swipe-to-remove with Undo.
  * Indices passed to callbacks are absolute positions in [queue].
  */
@@ -171,21 +188,37 @@ fun PhoneQueueSheet(
     val latestUpNextStart by rememberUpdatedState(upNextStart)
     val latestOnMove by rememberUpdatedState(onMove)
 
+    val sheetColor = GrooveTheme.colors.edgeGradient
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        scrimColor = PhoneSheetScrim,
-        containerColor = PhoneSheetContainer,
+        scrimColor = Color.Transparent,
+        containerColor = sheetColor,
         contentColor = Color.White,
+        shape = RoundedCornerShape(topStart = GrooveTheme.radii.card, topEnd = GrooveTheme.radii.card),
     ) {
         Box(modifier = Modifier.fillMaxHeight()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                Text(
-                    text = "Queue",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = M_PADDING, vertical = S_PADDING),
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = M_PADDING, vertical = S_PADDING),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Queue",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                    )
+                    if (queue.isNotEmpty()) {
+                        Text(
+                            text = queue.size.toString(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = GrooveTheme.colors.muted,
+                        )
+                    }
+                }
 
                 if (currentSong != null) {
                     SectionLabel("Now playing")
@@ -194,6 +227,7 @@ fun PhoneQueueSheet(
                         isNowPlaying = true,
                         onClick = null,
                         handle = null,
+                        pinned = true,
                     )
                 }
 
@@ -209,9 +243,11 @@ fun PhoneQueueSheet(
                         val song = entry.song
                         val isDragging = draggingId == entry.key
                         val dismissState = rememberSwipeToDismissBoxState()
+                        var removed by remember { mutableStateOf(false) }
 
                         LaunchedEffect(dismissState.currentValue) {
-                            if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                            if (!removed && dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                                removed = true
                                 val absolute = upNextStart + localIndex
                                 upNext.remove(entry)
                                 onRemove(absolute)
@@ -249,7 +285,7 @@ fun PhoneQueueSheet(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0xFFB3261E))
+                                        .background(GrooveTheme.colors.error)
                                         .padding(horizontal = M_PADDING),
                                     contentAlignment = Alignment.CenterEnd,
                                 ) {
@@ -318,33 +354,45 @@ fun PhoneQueueSheet(
 /**
  * Phone equalizer bottom sheet: fixed ~70% height (does not drag to full screen).
  * Content is the Tablet EQ panel ([EqualizerControlsComponent]) in its Phone-sheet variant, so the logic is shared.
+ * Band drags lock the sheet so the gesture stays on the slider.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneEqualizerSheet(
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sliderDragging = remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true,
+        confirmValueChange = { target ->
+            !sliderDragging.value || target == SheetValue.Expanded
+        },
+    )
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    // Drag handle sits above this content; together they land near 70% and cannot grow to full screen.
+    val contentHeight = (screenHeight * 0.70f - 48.dp).coerceAtLeast(240.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        scrimColor = PhoneSheetScrim,
-        containerColor = PhoneSheetContainer,
+        scrimColor = Color.Transparent,
+        containerColor = GrooveTheme.colors.edgeGradient,
         contentColor = Color.White,
+        shape = RoundedCornerShape(topStart = GrooveTheme.radii.card, topEnd = GrooveTheme.radii.card),
     ) {
         EqualizerControlsComponent(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.7f),
+                .height(contentHeight),
             isPhoneSheet = true,
+            onSliderDragChange = { sliderDragging.value = it },
         )
     }
 }
 
 /** Stable LazyColumn key even if the same song appears twice in the queue. */
-private data class QueueEntry(val key: String, val song: Song)
+internal data class QueueEntry(val key: String, val song: Song)
 
-private fun List<Song>.toQueueEntries(): List<QueueEntry> {
+internal fun List<Song>.toQueueEntries(): List<QueueEntry> {
     val seen = HashMap<String, Int>()
     return map { song ->
         val n = seen.getOrElse(song.id) { 0 }
@@ -358,7 +406,7 @@ private fun SectionLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelMedium,
-        color = SoftWhite,
+        color = GrooveTheme.colors.muted,
         modifier = Modifier.padding(start = M_PADDING, end = M_PADDING, top = S_PADDING, bottom = 4.dp),
     )
 }
@@ -370,11 +418,14 @@ private fun QueueSongRow(
     isNowPlaying: Boolean,
     onClick: (() -> Unit)?,
     handle: Modifier?,
+    pinned: Boolean = false,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isNowPlaying) Color.White.copy(alpha = 0.06f) else PhoneSheetContainer)
+            .padding(horizontal = if (pinned) M_PADDING else 0.dp)
+            .clip(RoundedCornerShape(if (pinned) GrooveTheme.radii.card else 0.dp))
+            .background(if (pinned) GrooveTheme.colors.surface else Color.Transparent)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = M_PADDING, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -411,7 +462,7 @@ private fun QueueSongRow(
             Text(
                 text = song.artist,
                 style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
-                color = SoftWhite,
+                color = GrooveTheme.colors.muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -422,13 +473,13 @@ private fun QueueSongRow(
                     .size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(XGripVertical, contentDescription = "Drag to reorder", tint = SoftWhite)
+                Icon(XGripVertical, contentDescription = "Drag to reorder", tint = GrooveTheme.colors.muted)
             }
         }
     }
 }
 
-private fun Modifier.pointerInputReorder(
+internal fun Modifier.pointerInputReorder(
     key: Any,
     onStart: () -> Unit,
     onDrag: (Float) -> Unit,

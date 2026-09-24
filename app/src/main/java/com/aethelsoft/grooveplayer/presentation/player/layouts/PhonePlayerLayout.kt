@@ -77,6 +77,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneEqualizerSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneQueueSheet
 import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneUpNextPeekRow
+import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerSheetGradientScrim
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
 import com.aethelsoft.grooveplayer.presentation.player.ui.SongDetails
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
@@ -122,6 +123,12 @@ fun PhonePlayerLayout(
     val overlaysBlockingPullUp = showQueue || showBluetoothSheet || showEqualizer
     val bottomSafeInset = navigationBarsInset()
 
+    fun hideSongDetails() {
+        if (playerViewModel.songDetailsSheetState.value != PlayerSongDetailsSheetState.Hidden) {
+            playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Hidden)
+        }
+    }
+
     // Waveform / glow visualization toggle
     val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
     val effectiveVisualization =
@@ -156,15 +163,33 @@ fun PhonePlayerLayout(
     }
 
     // Only one overlay at a time on Phone: queue, equalizer or Bluetooth.
+    // Song Details is closed while any of those is open.
     fun toggleQueue() {
         val open = !showQueue
-        if (open) { showEqualizer = false; showBluetoothSheet = false }
+        if (open) {
+            showEqualizer = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
         showQueue = open
     }
     fun toggleEqualizer() {
         val open = !showEqualizer
-        if (open) { showQueue = false; showBluetoothSheet = false }
+        if (open) {
+            showQueue = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
         showEqualizer = open
+    }
+    fun toggleBluetooth() {
+        val open = !showBluetoothSheet
+        if (open) {
+            showQueue = false
+            showEqualizer = false
+            hideSongDetails()
+        }
+        showBluetoothSheet = open
     }
     val currentQueueIndex = queue.indexOfFirst { it.id == song?.id }
     val nextSong = if (currentQueueIndex >= 0) queue.getOrNull(currentQueueIndex + 1) else null
@@ -247,14 +272,7 @@ fun PhonePlayerLayout(
                     PlayerShareButton(song = song)
                     ToggledIconButton(
                         state = showBluetoothSheet,
-                        onClick = {
-                            if (!showBluetoothSheet) {
-                                // If opening bluetooth, close queue / equalizer sheets first
-                                showQueue = false
-                                showEqualizer = false
-                            }
-                            showBluetoothSheet = !showBluetoothSheet
-                        },
+                        onClick = { toggleBluetooth() },
                         activeBackground = Color.White,
                         inactiveBackground = Color.Transparent,
                     ) {
@@ -273,7 +291,7 @@ fun PhonePlayerLayout(
                 else -> 0f
             }
             val artworkScale by animateFloatAsState(
-                targetValue = if (showBluetoothSheet) 0.85f else 1f,
+                targetValue = if (showQueue || showEqualizer || showBluetoothSheet) 0.85f else 1f,
                 animationSpec = spring(
                     dampingRatio = 0.8f,
                     stiffness = 300f
@@ -484,6 +502,9 @@ fun PhonePlayerLayout(
             }
 
             Spacer(modifier = Modifier.height(S_PADDING + bottomSafeInset))
+        }
+        if (showQueue || showEqualizer) {
+            PlayerSheetGradientScrim()
         }
         if (showQueue) {
             PhoneQueueSheet(
