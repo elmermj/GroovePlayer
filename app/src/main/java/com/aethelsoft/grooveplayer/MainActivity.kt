@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -164,6 +168,19 @@ fun GroovePlayerAppMain() {
     // Access activity-scoped PlayerViewModel from CompositionLocal
     val playerViewModel = LocalPlayerViewModel.current!!
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        playerViewModel.premiumStreamRequired.collect {
+            val result = snackbarHostState.showSnackbar(
+                message = "Cloud streaming is part of Premium.",
+                actionLabel = "Upgrade",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                navController.navigate(AppRoutes.PROFILE)
+            }
+        }
+    }
     val adsViewModel: AdsViewModel = hiltViewModel()
     val activity = LocalActivity.current
     LaunchedEffect(Unit) {
@@ -342,6 +359,7 @@ fun GroovePlayerAppMain() {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = GrooveTheme.colors.canvas,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { innerPadding ->
             Box(
                 modifier = Modifier

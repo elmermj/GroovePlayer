@@ -34,6 +34,10 @@ interface CloudAudioLookup {
 }
 
 interface CloudStreamEntitlement {
-    /** True only for [com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.PREMIUM]. */
+    /**
+     * Entitlement to stream when a cloud object exists.
+     * True only for [com.aethelsoft.grooveplayer.domain.model.PrivilegeTier.PREMIUM].
+     * False does not mean the object is missing and must not purge the catalog.
+     */
     suspend fun canStreamFromCloud(): Boolean
 }

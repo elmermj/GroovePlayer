@@ -9,8 +9,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Cloud streaming and availability badges share this gate: Premium only.
- * Free and Basic never stream and never see a badge.
+ * Premium gate for streaming an object that already exists, and for availability badges.
+ * Free and Basic are not entitled: playback skips and the catalog row stays.
+ * This check is not a purge signal. Purge runs only when the object is confirmed absent.
  */
 @Singleton
 class PremiumCloudEntitlement @Inject constructor(

@@ -1,13 +1,16 @@
 package com.aethelsoft.grooveplayer.domain.playback
 
 /**
- * Elmer playback policy (SCRUM-62).
+ * Elmer playback policy (SCRUM-62). Cloud streaming is Premium-only.
  *
- * 1. Local file (or a whole-object cache of it) always wins. Cloud is not consulted.
- * 2. Otherwise, if the song is still in the device catalog and cloud audio exists,
- *    stream only when [canStreamCloud] (Premium — same gate as availability badges).
- * 3. Otherwise, if it is in the catalog and cloud audio is confirmed missing, purge.
- *    Unknown cloud (offline, auth, route error) does not purge.
+ * 1. Local file (or a whole-object cache of it) always plays, for every tier. Cloud is not consulted.
+ * 2. Local missing + catalog row + cloud object **exists** → stream only when [canStreamCloud]
+ *    (PrivilegeTier.PREMIUM, same check as backup and availability badges).
+ *    Not entitled: skip playback and keep the catalog row. That is not a purge.
+ * 3. Local missing + cloud object **confirmed absent** → purge, for every tier.
+ *    Unknown cloud (offline, auth, route error) is not "absent" and does not purge.
+ *
+ * Purge means the object is gone. The Premium gate only decides whether an existing object may be streamed.
  */
 enum class CloudAudioPresence {
     PRESENT,
@@ -18,8 +21,19 @@ enum class CloudAudioPresence {
 enum class PlaybackDecision {
     PLAY_LOCAL,
     STREAM_CLOUD,
+    /** Cloud object confirmed absent. */
     PURGE,
+    /** Do not play. Catalog stays. Includes "cloud exists, not Premium". */
     SKIP,
+}
+
+enum class PlaybackDropReason {
+    /** Cloud object confirmed absent. Catalog row is deleted. */
+    PURGED,
+    /** Cloud object exists; user is not Premium. Skip and offer upgrade. Catalog stays. */
+    NOT_ENTITLED,
+    /** Not in the catalog, cloud unknown, or the download failed. Catalog stays. */
+    UNAVAILABLE,
 }
 
 fun playbackDecision(
@@ -31,9 +45,12 @@ fun playbackDecision(
     if (localAvailable) return PlaybackDecision.PLAY_LOCAL
     if (!inCatalog) return PlaybackDecision.SKIP
     return when (cloud) {
+        // Object exists. Premium may stream it. Anyone else skips; the row stays.
         CloudAudioPresence.PRESENT ->
             if (canStreamCloud) PlaybackDecision.STREAM_CLOUD else PlaybackDecision.SKIP
+        // Object truly gone. Delete the catalog row for every tier.
         CloudAudioPresence.ABSENT -> PlaybackDecision.PURGE
+        // Not proven absent. Do not purge and do not stream.
         CloudAudioPresence.UNKNOWN -> PlaybackDecision.SKIP
     }
 }

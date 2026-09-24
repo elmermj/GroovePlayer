@@ -18,8 +18,10 @@ import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackDropReason
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedPlayback
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedQueue
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.services.MusicPlaybackServiceManager
@@ -28,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -87,6 +90,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val _isFullScreenPlayerOpen = MutableStateFlow(false)
     private val _isPlayerMuted = MutableStateFlow(false)
     private val _audioVisualization = MutableStateFlow(AudioVisualizationData())
+    private val _premiumStreamRequired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     
     private var lastRecordedSongId: String? = null
     private var lastRecordedTimestamp: Long = 0L
@@ -666,8 +670,22 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _duration.value = song.durationMs
     }
 
+    override fun observePremiumStreamRequired(): Flow<Unit> = _premiumStreamRequired
+
+    private fun notePremiumGate(resolved: ResolvedQueue) {
+        if (resolved.premiumStreamBlocked) _premiumStreamRequired.tryEmit(Unit)
+    }
+
+    private fun notePremiumGate(resolved: ResolvedPlayback) {
+        if (resolved is ResolvedPlayback.Dropped && resolved.reason == PlaybackDropReason.NOT_ENTITLED) {
+            _premiumStreamRequired.tryEmit(Unit)
+        }
+    }
+
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
+        // Resolve before any MediaItem is opened: local, Premium stream, or purge-if-absent.
         val resolved = resolvePlaybackSource.resolveQueue(songs, startIndex)
+        notePremiumGate(resolved)
         val playable = resolved.songs
         val resolvedStart = resolved.startIndex
         if (playable.isEmpty()) {
@@ -795,6 +813,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun insertQueueItem(index: Int, song: Song) {
         val resolved = resolvePlaybackSource.resolveOne(song)
+        notePremiumGate(resolved)
         val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
         val q = _queue.value
         val at = index.coerceIn(0, q.size)
@@ -982,7 +1001,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         
         // Pick 10 random songs
         val randomSongs = songsToPickFrom.shuffled().take(10).mapNotNull { song ->
-            (resolvePlaybackSource.resolveOne(song) as? ResolvedPlayback.Playable)?.song
+            val resolved = resolvePlaybackSource.resolveOne(song)
+            notePremiumGate(resolved)
+            (resolved as? ResolvedPlayback.Playable)?.song
         }
         if (randomSongs.isEmpty()) return
         
@@ -1023,6 +1044,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun playSong(song: Song) {
         val resolved = resolvePlaybackSource.resolveOne(song)
+        notePremiumGate(resolved)
         val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
         prepareFromSong(playable)
         withContext(Dispatchers.Main.immediate) {

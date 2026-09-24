@@ -2,11 +2,13 @@ package com.aethelsoft.grooveplayer.domain.usecase.player_category
 
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioHit
+import com.aethelsoft.grooveplayer.domain.playback.CloudAudioPresence
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
 import com.aethelsoft.grooveplayer.domain.playback.CloudPlaybackCache
 import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
 import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackDecision
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackDropReason
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
 import com.aethelsoft.grooveplayer.domain.playback.adjustedQueueStartIndex
 import com.aethelsoft.grooveplayer.domain.playback.looksLikeSignedObjectUrl
@@ -19,17 +21,27 @@ import javax.inject.Singleton
 
 sealed class ResolvedPlayback {
     data class Playable(val song: Song) : ResolvedPlayback()
-    data class Dropped(val songId: String, val purged: Boolean) : ResolvedPlayback()
+    data class Dropped(val songId: String, val reason: PlaybackDropReason) : ResolvedPlayback() {
+        /** True only when the cloud object is gone and the catalog row was removed. */
+        val purged: Boolean get() = reason == PlaybackDropReason.PURGED
+    }
 }
 
 data class ResolvedQueue(
     val songs: List<Song>,
     val startIndex: Int,
+    /**
+     * At least one song had cloud audio but the user is not Premium.
+     * Those songs were skipped. Their catalog rows were not purged.
+     */
+    val premiumStreamBlocked: Boolean = false,
 )
 
 /**
- * Single resolve path for play and enqueue.
- * Local URI, whole-object cloud file (or a non-R2 stream URL), or catalog purge.
+ * Single resolve path for play and enqueue, before any player URI is opened.
+ *
+ * Local file, Premium whole-object cloud playback, or purge when the object is absent.
+ * A non-Premium user who only has a cloud copy is skipped (upgrade), never deleted.
  */
 @Singleton
 class ResolvePlaybackSourceUseCase @Inject constructor(
@@ -49,6 +61,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             val playable = ArrayList<Song>(songs.size)
             val playableIds = ArrayList<String>(songs.size)
             val purgeIds = ArrayList<String>()
+            var premiumStreamBlocked = false
             for (song in songs) {
                 when (val resolved = resolveOneLocked(song, purgeNow = false)) {
                     is ResolvedPlayback.Playable -> {
@@ -56,7 +69,8 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
                         playableIds += song.id
                     }
                     is ResolvedPlayback.Dropped -> {
-                        if (resolved.purged) purgeIds += song.id
+                        if (resolved.reason == PlaybackDropReason.PURGED) purgeIds += song.id
+                        if (resolved.reason == PlaybackDropReason.NOT_ENTITLED) premiumStreamBlocked = true
                     }
                 }
             }
@@ -70,6 +84,7 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
                     startIndex = startIndex,
                     playableIds = playableIds,
                 ),
+                premiumStreamBlocked = premiumStreamBlocked,
             )
         }
 
@@ -86,14 +101,17 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
         }
         val inCatalog = catalog.contains(song.id)
         if (!inCatalog) {
-            return ResolvedPlayback.Dropped(song.id, purged = false)
+            return ResolvedPlayback.Dropped(song.id, PlaybackDropReason.UNAVAILABLE)
         }
         val cloudHit = cloud.lookup(song, logicalPath)
+        // Entitlement is read only after the object is known to exist or not.
+        // It never decides purge.
+        val canStream = entitlement.canStreamFromCloud()
         val decision = playbackDecision(
             localAvailable = false,
             inCatalog = true,
             cloud = cloudHit.presence,
-            canStreamCloud = entitlement.canStreamFromCloud(),
+            canStreamCloud = canStream,
         )
         return when (decision) {
             PlaybackDecision.PLAY_LOCAL -> ResolvedPlayback.Playable(song)
@@ -101,9 +119,16 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             PlaybackDecision.PURGE -> {
                 cache.delete(song.id)
                 if (purgeNow) purgeQuietly(listOf(song.id))
-                ResolvedPlayback.Dropped(song.id, purged = true)
+                ResolvedPlayback.Dropped(song.id, PlaybackDropReason.PURGED)
             }
-            PlaybackDecision.SKIP -> ResolvedPlayback.Dropped(song.id, purged = false)
+            PlaybackDecision.SKIP -> ResolvedPlayback.Dropped(
+                song.id,
+                if (cloudHit.presence == CloudAudioPresence.PRESENT && !canStream) {
+                    PlaybackDropReason.NOT_ENTITLED
+                } else {
+                    PlaybackDropReason.UNAVAILABLE
+                },
+            )
         }
     }
 
@@ -119,7 +144,8 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
     }
 
     private suspend fun streamOrSkip(song: Song, hit: CloudAudioHit?): ResolvedPlayback {
-        val playUri = materialize(song.id, hit) ?: return ResolvedPlayback.Dropped(song.id, purged = false)
+        val playUri = materialize(song.id, hit)
+            ?: return ResolvedPlayback.Dropped(song.id, PlaybackDropReason.UNAVAILABLE)
         return ResolvedPlayback.Playable(song.copy(uri = playUri))
     }
 

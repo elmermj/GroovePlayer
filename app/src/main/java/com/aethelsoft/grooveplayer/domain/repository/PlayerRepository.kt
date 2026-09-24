@@ -46,4 +46,10 @@ interface PlayerRepository {
     fun observeIsPlayerMuted(): Flow<Boolean>
     fun observeAudioAmplitude(): Flow<Float>
     fun observeAudioVisualization(): Flow<AudioVisualizationData>
+
+    /**
+     * Fired when a play/enqueue skipped a song because cloud audio exists
+     * and the user is not Premium. The catalog row was not purged.
+     */
+    fun observePremiumStreamRequired(): Flow<Unit>
 }

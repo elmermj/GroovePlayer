@@ -175,16 +175,20 @@ class ResolvePlaybackSourceUseCaseTest {
     @Test
     fun nonPremiumKeepsCatalogWhenCloudExists() = runBlocking {
         val catalog = FakeCatalog(setOf("1"))
+        val cache = FakeCache()
         val useCase = useCase(
             local = false,
             cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.PRESENT, downloadUrl = "https://cdn.example/a.mp3")),
             catalog = catalog,
             premium = false,
+            cache = cache,
         )
         val resolved = useCase.resolveOne(song("1"))
         assertTrue(resolved is ResolvedPlayback.Dropped)
-        assertTrue(!(resolved as ResolvedPlayback.Dropped).purged)
+        assertEquals(PlaybackDropReason.NOT_ENTITLED, (resolved as ResolvedPlayback.Dropped).reason)
+        assertTrue(!resolved.purged)
         assertTrue(catalog.purged.isEmpty())
+        assertTrue(cache.stored.isEmpty())
     }
 
     @Test
@@ -228,6 +232,30 @@ class ResolvePlaybackSourceUseCaseTest {
         assertEquals(listOf("a", "c"), queue.songs.map { it.id })
         assertEquals(1, queue.startIndex)
         assertEquals(listOf(listOf("b")), catalog.purged)
+        assertTrue(!queue.premiumStreamBlocked)
+    }
+
+    @Test
+    fun nonPremiumQueueSkipsCloudSongWithoutPurging() = runBlocking {
+        val catalog = FakeCatalog(setOf("a", "b"))
+        val useCase = ResolvePlaybackSourceUseCase(
+            localAudio = object : LocalAudioAvailability {
+                override fun isReadable(uri: String, filePath: String?) = uri.endsWith("/a")
+            },
+            cache = FakeCache(),
+            catalog = catalog,
+            cloud = FakeCloud(
+                CloudAudioHit(CloudAudioPresence.PRESENT, downloadUrl = "https://cdn.example/b.mp3"),
+            ),
+            entitlement = object : CloudStreamEntitlement {
+                override suspend fun canStreamFromCloud() = false
+            },
+        )
+        val queue = useCase.resolveQueue(listOf(song("a"), song("b")), startIndex = 1)
+        assertEquals(listOf("a"), queue.songs.map { it.id })
+        assertEquals(0, queue.startIndex)
+        assertTrue(queue.premiumStreamBlocked)
+        assertTrue(catalog.purged.isEmpty())
     }
 
     private fun useCase(
