@@ -92,7 +92,53 @@ class AppPrivateLibraryTest {
         )
         assertEquals(1, plan.size)
         assertTrue(plan.single().needsBytes)
-        assertEquals("song__3.mp3", plan.single().destination.name)
+        val hashName = GrooveDownloadPlacement.hashedFileName(
+            "song.mp3",
+            ContentHash.sha256(File(legacy, "song.mp3")),
+        )
+        assertEquals(hashName, plan.single().destination.name)
+        assertFalse(plan.single().destination.exists())
+    }
+
+    @Test
+    fun sameNameAndSizeStillCopiesWhenTheBytesDiffer() {
+        val root = tempDir()
+        val legacy = File(root, "Groove Downloads").apply { mkdirs() }
+        val privateRoot = File(root, "groove-library").apply { mkdirs() }
+        val source = File(legacy, "song.mp3").apply { writeBytes(byteArrayOf(1, 2)) }
+        File(privateRoot, "song.mp3").writeBytes(byteArrayOf(9, 9))
+
+        val plan = LegacyLibraryAdoption.plan(
+            listOf(LegacyLibraryDir(legacy, deleteAfterCopy = false)),
+            privateRoot,
+        )
+        assertTrue(plan.single().needsBytes)
+        assertFalse(plan.single().destination.name == "song.mp3")
+        assertEquals(
+            GrooveDownloadPlacement.hashedFileName("song.mp3", ContentHash.sha256(source)),
+            plan.single().destination.name,
+        )
+    }
+
+    @Test
+    fun hashNameCollisionPicksAFreeSuffixInsteadOfOverwriting() {
+        val root = tempDir()
+        val legacy = File(root, "Groove Downloads").apply { mkdirs() }
+        val privateRoot = File(root, "groove-library").apply { mkdirs() }
+        val source = File(legacy, "song.mp3").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        File(privateRoot, "song.mp3").writeBytes(byteArrayOf(9))
+        val hashName = GrooveDownloadPlacement.hashedFileName("song.mp3", ContentHash.sha256(source))
+        val occupied = File(privateRoot, hashName).apply { writeBytes(byteArrayOf(7)) }
+
+        val plan = LegacyLibraryAdoption.plan(
+            listOf(LegacyLibraryDir(legacy, deleteAfterCopy = false)),
+            privateRoot,
+        )
+        val copy = plan.single()
+        assertTrue(copy.needsBytes)
+        assertFalse(copy.destination.absolutePath == occupied.absolutePath)
+        assertFalse(copy.destination.exists())
+        assertTrue(occupied.readBytes().contentEquals(byteArrayOf(7)))
     }
 
     @Test

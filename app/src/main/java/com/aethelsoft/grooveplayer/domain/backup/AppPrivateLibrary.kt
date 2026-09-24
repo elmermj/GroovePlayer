@@ -87,11 +87,11 @@ object LegacyLibraryAdoption {
                 if (AppPrivateLibrary.isScratchFile(source.name)) continue
                 if (!source.canRead()) continue
                 if (!seen.add(source.absolutePath)) continue
-                val dest = destination(privateRoot, source, reserved)
+                val (dest, needsBytes) = destination(privateRoot, source, reserved)
                 planned += LegacyLibraryCopy(
                     source = source,
                     destination = dest,
-                    needsBytes = !dest.isFile || dest.length() != source.length(),
+                    needsBytes = needsBytes,
                     deleteSourceAfterCopy = legacy.deleteAfterCopy,
                 )
             }
@@ -99,25 +99,50 @@ object LegacyLibraryAdoption {
         return planned
     }
 
-    private fun destination(root: File, source: File, reserved: MutableSet<String>): File {
+    /**
+     * Same cosmetic name is reused only when SHA-256 and size both match.
+     * A different file uses the content-hash name from [GrooveDownloadPlacement].
+     * If that name is already a different file, the next free suffix is chosen.
+     * An existing private file is never the copy target.
+     */
+    private fun destination(
+        root: File,
+        source: File,
+        reserved: MutableSet<String>,
+    ): Pair<File, Boolean> {
+        val sourceHash = lazy { ContentHash.sha256(source) }
         val direct = File(root, source.name)
-        if (direct.isFile && direct.length() == source.length()) return direct
+        if (sameBytes(direct, source, sourceHash)) return direct to false
         if (!direct.exists() && source.name !in reserved) {
             reserved += source.name
-            return direct
+            return direct to true
         }
-        val unique = uniqueName(source)
-        reserved += unique
-        return File(root, unique)
+        val hashedName = GrooveDownloadPlacement.hashedFileName(source.name, sourceHash.value)
+        val hashed = File(root, hashedName)
+        if (sameBytes(hashed, source, sourceHash)) return hashed to false
+        val free = freeName(root, hashedName, reserved)
+        reserved += free
+        return File(root, free) to true
     }
 
-    private fun uniqueName(source: File): String {
-        val name = source.name
-        val ext = name.substringAfterLast('.', "")
-        val usableExt = ext.isNotEmpty() && ext != name && ext.length <= 8 &&
+    private fun sameBytes(candidate: File, source: File, sourceHash: Lazy<String>): Boolean {
+        if (!candidate.isFile || candidate.length() != source.length() || candidate.length() <= 0L) {
+            return false
+        }
+        return ContentHash.sha256(candidate).equals(sourceHash.value, ignoreCase = true)
+    }
+
+    private fun freeName(root: File, preferred: String, reserved: MutableSet<String>): String {
+        if (preferred !in reserved && !File(root, preferred).exists()) return preferred
+        val ext = preferred.substringAfterLast('.', "")
+        val usableExt = ext.isNotEmpty() && ext != preferred && ext.length <= 8 &&
             ext.all { it.isLetterOrDigit() }
-        val stem = if (usableExt) name.substringBeforeLast('.') else name
-        val marked = "${stem}__${source.length()}"
-        return if (usableExt) "$marked.$ext" else marked
+        val stem = if (usableExt) preferred.substringBeforeLast('.') else preferred
+        var index = 2
+        while (true) {
+            val name = if (usableExt) "${stem}__$index.$ext" else "${stem}__$index"
+            if (name !in reserved && !File(root, name).exists()) return name
+            index++
+        }
     }
 }

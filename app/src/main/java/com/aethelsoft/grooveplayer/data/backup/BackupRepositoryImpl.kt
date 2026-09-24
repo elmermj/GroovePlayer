@@ -1262,6 +1262,10 @@ class BackupRepositoryImpl @Inject constructor(
         val plan = LegacyLibraryAdoption.plan(grooveDownloads.legacyDirectories(), privateRoot)
         for (item in plan) {
             if (item.needsBytes) {
+                if (item.destination.exists()) {
+                    Log.w(TAG, "Refusing to overwrite ${item.destination.absolutePath}")
+                    continue
+                }
                 try {
                     RoomDbSwapFiles.copyDurable(item.source, item.destination)
                 } catch (e: Exception) {
