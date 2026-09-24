@@ -70,6 +70,20 @@ val ADMOB_TEST_APP_ID = "ca-app-pub-3940256099942544~3347511713"
 val ADMOB_TEST_BANNER_UNIT_ID = "ca-app-pub-3940256099942544/6300978111"
 val ADMOB_TEST_INTERSTITIAL_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
 
+/** Command-line -P, then VERSION_* env, then local defaults. App Tester reads the APK. */
+fun projectProp(name: String): String? =
+    findProperty(name)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+
+val resolvedVersionCode: Int =
+    projectProp("versionCode")?.toIntOrNull()
+        ?: System.getenv("VERSION_CODE")?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+        ?: 1
+
+val resolvedVersionName: String =
+    projectProp("versionName")
+        ?: System.getenv("VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: "1.0"
+
 android {
     namespace = "com.aethelsoft.grooveplayer"
     compileSdk = 36
@@ -78,8 +92,8 @@ android {
         applicationId = "com.aethelsoft.grooveplayer"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = resolvedVersionCode
+        versionName = resolvedVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 

@@ -135,7 +135,9 @@ jobs:
         run: |
           echo "VERSION_CODE=${VERSION_CODE}"
           echo "VERSION_NAME=${VERSION_NAME}"
-          ./gradlew :app:assembleDevRelease --stacktrace
+          ./gradlew :app:assembleDevRelease --stacktrace \
+            -PversionCode="${VERSION_CODE}" \
+            -PversionName="${VERSION_NAME}"
 
       - name: Check signed APK
         id: apk
