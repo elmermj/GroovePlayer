@@ -66,6 +66,14 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${admobAppId}" />
 
+        <!-- play-services-ads-lite and play-services-measurement-api both set
+             android.adservices.AD_SERVICES_CONFIG. GMA's config includes attribution
+             and topics; measurement's only includes attribution. Keep GMA. -->
+        <property
+            android:name="android.adservices.AD_SERVICES_CONFIG"
+            android:resource="@xml/gma_ad_services_config"
+            tools:replace="android:resource" />
+
         <!--  Main Activity  -->
         <activity
             android:name=".MainActivity"
