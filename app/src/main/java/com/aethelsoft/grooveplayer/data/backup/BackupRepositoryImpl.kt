@@ -13,6 +13,7 @@ import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupUploadUrlRequestDto
 import com.aethelsoft.grooveplayer.di.NetworkModule
+import com.aethelsoft.grooveplayer.domain.backup.AppPrivateLibrary
 import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
 import com.aethelsoft.grooveplayer.domain.backup.BackupJobGate
 import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
@@ -23,6 +24,7 @@ import com.aethelsoft.grooveplayer.domain.backup.ContentHash
 import com.aethelsoft.grooveplayer.domain.backup.DbSwapStep
 import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
 import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
+import com.aethelsoft.grooveplayer.domain.backup.LegacyLibraryAdoption
 import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
@@ -66,7 +68,7 @@ import javax.inject.Singleton
 /**
  * Manual cloud backup via Benny R2 API (docs/backup-api.md + docs/backup-library.md).
  *
- * Approved songs are copied into Groove Downloads and Room `sourcePath` is updated
+ * Approved songs are copied into the app-private library and Room `sourcePath` is updated
  * before any upload. Same SHA-256 + size already in the cloud is skipped.
  * Song bytes are confirmed first; the Room snapshot is uploaded only after that.
  *
@@ -1116,11 +1118,13 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Copy each approved song into Groove Downloads, point Room at that path, then delete
+     * Copy each approved song into the app-private library, point Room at that path, then delete
      * the original only when the path update changed a row. Upload uses the canonical file.
      * Hash and copy report bytes so the consolidate bar and N/M move for the whole phase.
      */
     private suspend fun canonicalizeApprovedSongs(sources: List<File>): List<File> {
+        val downloadsDir = grooveDownloads.directory()
+        adoptLegacyLibraryFiles(downloadsDir)
         val pending = sources.filter { it.isFile && it.length() > 0L }
         if (pending.isEmpty()) {
             publishStep(
@@ -1133,7 +1137,6 @@ class BackupRepositoryImpl @Inject constructor(
             )
             return emptyList()
         }
-        val downloadsDir = grooveDownloads.directory()
         val indexFiles = grooveDownloadFiles(downloadsDir)
         val plannedBytes = indexFiles.sumOf { it.length() } + pending.sumOf { it.length() } * 3L
         val progress = ConsolidateByteProgress(pending.size, plannedBytes)
@@ -1178,12 +1181,12 @@ class BackupRepositoryImpl @Inject constructor(
                 }
                 if (!copiedHash.equals(hash, ignoreCase = true) || dest.length() != size) {
                     dest.delete()
-                    error("Copy into Groove Downloads did not match ${source.name}")
+                    error("Copy into the app library did not match ${source.name}")
                 }
                 existing += HashedAudio(dest.absolutePath, hash, dest.length())
             } else {
                 if (placement.reusedExisting) {
-                    Log.i(TAG, "reuse Groove Downloads hash=$hash path=${dest.absolutePath}")
+                    Log.i(TAG, "reuse app library hash=$hash path=${dest.absolutePath}")
                 }
                 progress.credit(size * 2L)
                 publishConsolidate(progress, force = true)
@@ -1250,9 +1253,45 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Copy readable leftovers from shared Music/Groove Downloads (and older app folders)
+     * into the private library and point Room at the new paths. Shared leftovers are left
+     * in place so a MediaProvider EPERM never becomes a user cleanup task.
+     */
+    private suspend fun adoptLegacyLibraryFiles(privateRoot: File) {
+        val plan = LegacyLibraryAdoption.plan(grooveDownloads.legacyDirectories(), privateRoot)
+        for (item in plan) {
+            if (item.needsBytes) {
+                try {
+                    RoomDbSwapFiles.copyDurable(item.source, item.destination)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    Log.w(TAG, "Left leftover library file in place: ${item.source.absolutePath}", e)
+                    continue
+                }
+                if (!item.destination.isFile || item.destination.length() != item.source.length()) {
+                    item.destination.delete()
+                    continue
+                }
+            }
+            val aliases = buildList {
+                add(item.source.absolutePath)
+                runCatching { item.source.canonicalPath }.getOrNull()?.let { add(it) }
+            }.distinct()
+            for (old in aliases) {
+                database.songDao().retargetSourcePath(old, item.destination.absolutePath)
+            }
+            if (item.deleteSourceAfterCopy && !item.source.delete()) {
+                Log.i(TAG, "App-owned leftover kept at ${item.source.absolutePath}")
+            }
+        }
+    }
+
     private fun grooveDownloadFiles(dir: File): List<File> {
         val children = dir.listFiles() ?: return emptyList()
-        return children.filter { it.isFile && it.length() > 0L && !it.name.endsWith(".partial") }
+        return children.filter { file ->
+            file.isFile && file.length() > 0L && !AppPrivateLibrary.isScratchFile(file.name)
+        }
     }
 
     private fun indexDownloads(dir: File): List<HashedAudio> {
@@ -1262,7 +1301,7 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Download cloud songs that are not already in Groove Downloads under the same hash,
+     * Download cloud songs that are not already in the app library under the same hash,
      * rewrite the staged catalog to those paths, and refuse to swap if any required file is missing.
      * Tracks that were never uploaded are not required and their on-disk files are not deleted.
      */
@@ -1277,6 +1316,7 @@ class BackupRepositoryImpl @Inject constructor(
             kind == BackupKinds.SONG && obj.contentHash.isNotBlank()
         }
         val downloadsDir = grooveDownloads.directory()
+        adoptLegacyLibraryFiles(downloadsDir)
         val existing = indexDownloads(downloadsDir).toMutableList()
         val placements = mutableListOf<PlacedCloudSong>()
         for (obj in songs) {
@@ -1309,7 +1349,7 @@ class BackupRepositoryImpl @Inject constructor(
                 partial.delete()
                 existing += HashedAudio(dest.absolutePath, hash, dest.length())
             } else if (size > 0L && dest.length() != size) {
-                error("Groove Downloads already has different bytes for this song")
+                error("The app library already has different bytes for this song")
             }
             placements += PlacedCloudSong(
                 contentHash = hash,
@@ -1325,7 +1365,7 @@ class BackupRepositoryImpl @Inject constructor(
         }
         if (missing.isNotEmpty()) {
             error(
-                "Restore is missing ${missing.size} song file(s) in Groove Downloads. " +
+                "Restore is missing ${missing.size} song file(s) in the app library. " +
                     "The library database was not replaced.",
             )
         }

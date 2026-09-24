@@ -129,7 +129,7 @@ fun BackupContent(
         )
 
         Text(
-            text = "Cloud backup copies approved songs into Groove Downloads, uploads those files, " +
+            text = "Cloud backup copies approved songs into the app library, uploads those files, " +
                 "then uploads the library snapshot (favourites, recents, playlists, settings). " +
                 "A song already in the cloud with the same content hash is skipped. " +
                 "Trim and long-press remove songs only — not the library snapshot.",
@@ -690,7 +690,7 @@ private fun ConfirmBackupDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Approved songs are copied into Groove Downloads and the library paths are updated. " +
+                    text = "Approved songs are copied into the app library and the library paths are updated. " +
                         "Audio uploads first. The Room snapshot uploads only after those files are in the cloud. " +
                         "Songs already on cloud with the same content hash are skipped.",
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
@@ -818,7 +818,7 @@ private fun BackupNowSection(
         }
         else -> {
             Text(
-                text = "Copies included-folder audio into Groove Downloads, uploads those files to Cloudflare R2, " +
+                text = "Copies included-folder audio into the app library, uploads those files to Cloudflare R2, " +
                 "then uploads the Room snapshot (real PUT when backend dry_run is false).",
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite.copy(alpha = 0.85f),
@@ -960,7 +960,7 @@ private fun RestoreLibrarySection(
             val schema = librarySnapshot?.schemaVersion?.toString() ?: "?"
             val size = librarySnapshot?.sizeBytes ?: 0L
             "Cloud Room DB ready · schema $schema · ${StorageFormatUtils.formatBytes(size, size.coerceAtLeast(1L))}. " +
-                "Missing songs download into Groove Downloads, then the app reopens on the restored library. " +
+                "Missing songs download into the app library, then the app reopens on the restored library. " +
                 "Songs that were never backed up stay on this device."
         } else {
             emptyHint

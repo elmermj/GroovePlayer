@@ -4,7 +4,7 @@ import android.database.sqlite.SQLiteDatabase
 import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
 import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
 
-/** Rewrites snapshot `songs.sourcePath` values to local Groove Downloads paths. */
+/** Rewrites snapshot `songs.sourcePath` values to app-private library paths. */
 object StagedCatalogRewriter {
     fun rewrite(databaseFile: java.io.File, placements: List<PlacedCloudSong>) {
         val db = SQLiteDatabase.openDatabase(

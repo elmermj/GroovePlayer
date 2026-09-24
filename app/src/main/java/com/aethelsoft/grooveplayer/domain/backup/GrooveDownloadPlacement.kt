@@ -1,7 +1,7 @@
 package com.aethelsoft.grooveplayer.domain.backup
 
 /**
- * Where a backed-up song lands inside Groove Downloads.
+ * Where a backed-up song lands inside the app-private library.
  * Same SHA-256 and size reuse the existing file. A free cosmetic name is kept.
  * A name already used by different bytes becomes `<sha256>.<ext>`, never `track (1).mp3`.
  */
@@ -17,6 +17,7 @@ data class DownloadPlacement(
 )
 
 object GrooveDownloadPlacement {
+    /** Legacy shared folder name. New copies use [AppPrivateLibrary.FOLDER_NAME]. */
     const val FOLDER_NAME = "Groove Downloads"
 
     fun isInside(path: String, downloadsDir: String): Boolean {

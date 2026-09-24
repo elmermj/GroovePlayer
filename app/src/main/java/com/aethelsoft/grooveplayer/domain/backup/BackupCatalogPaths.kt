@@ -1,7 +1,7 @@
 package com.aethelsoft.grooveplayer.domain.backup
 
 /**
- * A cloud song after its bytes have a single path under Groove Downloads.
+ * A cloud song after its bytes have a single path under the app library.
  * [logicalPath] is the path stored in the backup catalog (cosmetic).
  */
 data class PlacedCloudSong(

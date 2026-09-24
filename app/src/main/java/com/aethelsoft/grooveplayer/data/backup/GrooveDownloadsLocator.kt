@@ -2,34 +2,61 @@ package com.aethelsoft.grooveplayer.data.backup
 
 import android.content.Context
 import android.os.Environment
-import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
+import com.aethelsoft.grooveplayer.domain.backup.AppPrivateLibrary
+import com.aethelsoft.grooveplayer.domain.backup.LegacyLibraryDir
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * One folder for backed-up audio: public `Music/Groove Downloads` when that directory
- * can be created, otherwise the app-specific external-files folder of the same name.
+ * App-private folder for consolidated backup audio.
+ * `getExternalFilesDir(null)/groove-library`, then `filesDir/groove-library`.
+ * Shared `Music/Groove Downloads` is never created or written.
  */
 @Singleton
 class GrooveDownloadsLocator @Inject constructor(
     @ApplicationContext private val context: Context,
-) {
+) : AppLibraryPaths {
+    @Volatile
+    private var cachedRoot: File? = null
+
     fun directory(): File {
-        @Suppress("DEPRECATION")
-        val publicDir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
-            GrooveDownloadPlacement.FOLDER_NAME,
-        )
-        if ((publicDir.isDirectory || publicDir.mkdirs()) && publicDir.canWrite()) {
-            return publicDir
+        cachedRoot?.takeIf { it.isDirectory }?.let { return it }
+        return synchronized(this) {
+            cachedRoot?.takeIf { it.isDirectory } ?: resolve().also { cachedRoot = it }
         }
-        val appDir = File(
-            context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir,
-            GrooveDownloadPlacement.FOLDER_NAME,
+    }
+
+    override fun isInside(path: String): Boolean =
+        AppPrivateLibrary.isInside(path, directory().absolutePath)
+
+    /**
+     * Existing leftover folders only. Does not create shared Music or any legacy path.
+     */
+    fun legacyDirectories(): List<LegacyLibraryDir> {
+        val current = directory().absolutePath
+        @Suppress("DEPRECATION")
+        val publicMusic = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        return AppPrivateLibrary.legacyCandidates(
+            publicMusicDir = publicMusic,
+            externalFilesDir = context.getExternalFilesDir(null),
+            filesDir = context.filesDir,
+        ).filter { spec ->
+            spec.directory.isDirectory && spec.directory.absolutePath != current
+        }
+    }
+
+    private fun resolve(): File {
+        val candidates = AppPrivateLibrary.privateCandidates(
+            externalFilesDir = context.getExternalFilesDir(null),
+            filesDir = context.filesDir,
         )
-        appDir.mkdirs()
-        return appDir
+        val chosen = AppPrivateLibrary.firstCreatable(candidates, GrooveLibraryWriteProbe::canCreateFile)
+        if (chosen != null) return chosen
+        val internal = File(context.filesDir, AppPrivateLibrary.FOLDER_NAME)
+        internal.mkdirs()
+        return internal
     }
 }

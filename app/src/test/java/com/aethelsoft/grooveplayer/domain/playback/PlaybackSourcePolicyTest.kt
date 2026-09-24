@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.domain.playback
 
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
@@ -9,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 class PlaybackSourcePolicyTest {
 
@@ -296,6 +298,7 @@ class ResolvePlaybackSourceUseCaseTest {
             catalog = catalog,
             cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.ABSENT)),
             tickets = FakeTickets(),
+            appLibraryPaths = AppLibraryPaths { false },
         )
         val queue = useCase.resolveQueue(
             songs = listOf(song("a"), song("b"), song("c")),
@@ -326,6 +329,7 @@ class ResolvePlaybackSourceUseCaseTest {
                     error("playback api failed")
             },
             tickets = FakeTickets(),
+            appLibraryPaths = AppLibraryPaths { false },
         )
         val queue = useCase.resolveQueue(
             songs = listOf(
@@ -349,12 +353,39 @@ class ResolvePlaybackSourceUseCaseTest {
             catalog = catalog,
             cloud = FakeCloud(CloudAudioHit(CloudAudioPresence.PRESENT, entitled = false)),
             tickets = FakeTickets(),
+            appLibraryPaths = AppLibraryPaths { false },
         )
         val queue = useCase.resolveQueue(listOf(song("a"), song("b")), startIndex = 1)
         assertEquals(listOf("a"), queue.songs.map { it.id })
         assertEquals(0, queue.startIndex)
         assertTrue(queue.premiumStreamBlocked)
         assertTrue(catalog.purged.isEmpty())
+    }
+
+    @Test
+    fun appLibraryFilePlaysInsteadOfAReadableContentUri() = runBlocking {
+        val dir = File(System.getProperty("java.io.tmpdir"), "groove-lib-${System.nanoTime()}")
+        dir.mkdirs()
+        val songFile = File(dir, "song.mp3")
+        songFile.writeBytes(byteArrayOf(1, 2, 3))
+        val useCase = ResolvePlaybackSourceUseCase(
+            localAudio = object : LocalAudioAvailability {
+                override fun isReadable(uri: String, filePath: String?) = true
+            },
+            cache = FakeCache(),
+            catalog = object : SongCatalog {
+                override suspend fun contains(songId: String) = true
+                override suspend fun sourcePath(songId: String) = songFile.absolutePath
+                override suspend fun purge(songIds: List<String>) = Unit
+            },
+            cloud = FakeCloud(),
+            tickets = FakeTickets(),
+            appLibraryPaths = AppLibraryPaths { path -> path == songFile.absolutePath },
+        )
+        val resolved = useCase.resolveOne(song("1"))
+        assertTrue(resolved is ResolvedPlayback.Playable)
+        assertEquals(songFile.toURI().toString(), (resolved as ResolvedPlayback.Playable).song.uri)
+        dir.deleteRecursively()
     }
 
     private fun useCase(
@@ -371,6 +402,7 @@ class ResolvePlaybackSourceUseCaseTest {
         catalog = catalog,
         cloud = cloud,
         tickets = tickets,
+        appLibraryPaths = AppLibraryPaths { false },
     )
 
     private fun song(id: String) = Song(
