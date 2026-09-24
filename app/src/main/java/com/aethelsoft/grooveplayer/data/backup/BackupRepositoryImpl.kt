@@ -26,6 +26,8 @@ import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
 import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
 import com.aethelsoft.grooveplayer.domain.backup.LegacyLibraryAdoption
 import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
+import com.aethelsoft.grooveplayer.domain.backup.R2GetException
+import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
 import com.aethelsoft.grooveplayer.domain.model.BackupJobStep
@@ -44,8 +46,11 @@ import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.coroutineContext
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -58,6 +63,7 @@ import retrofit2.HttpException
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.zip.GZIPInputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.GZIPOutputStream
@@ -552,17 +558,12 @@ class BackupRepositoryImpl @Inject constructor(
             require(!contentHash.isNullOrBlank() || !r2Key.isNullOrBlank()) {
                 "content_hash or r2_key required"
             }
-            val resolved = resolveDownloadUrl(contentHash = contentHash, r2Key = r2Key)
-            if (resolved.dryRun) {
-                Log.i(TAG, "dry_run skip GET download key=${resolved.r2Key}")
-                // Create empty placeholder so callers can see dry-run path worked.
-                destFile.parentFile?.mkdirs()
-                destFile.writeBytes(ByteArray(0))
-                return@runCatching Unit
-            }
-            val url = resolved.url ?: error("download-url missing download_url")
-            // One whole-object GetObject — no Range (R2 cost rule 2).
-            getFromR2(url, destFile)
+            transferWholeObject(
+                contentHash = contentHash,
+                r2Key = r2Key,
+                destFile = destFile,
+                seededUrl = null,
+            )
         }
     }
 
@@ -660,6 +661,7 @@ class BackupRepositoryImpl @Inject constructor(
     /**
      * Whole-object R2 GET (cost rule 2). Never set Range — one GetObject per song.
      * Body streamed to disk (still a single Class B request).
+     * A dropped socket or rejected signature throws [R2GetException] so the caller can remint.
      */
     private fun getFromR2(downloadUrl: String, destFile: File) {
         val request = Request.Builder()
@@ -670,50 +672,136 @@ class BackupRepositoryImpl @Inject constructor(
         check(request.header("Range") == null) {
             "R2 cost rule violated: Range header on GetObject"
         }
-        r2HttpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                error("R2 GET failed HTTP ${response.code}")
+        try {
+            r2HttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw R2GetException(
+                        httpCode = response.code,
+                        message = "R2 GET failed HTTP ${response.code}",
+                    )
+                }
+                val body = response.body ?: throw R2GetException(
+                    httpCode = null,
+                    message = "R2 GET empty body",
+                )
+                destFile.parentFile?.mkdirs()
+                FileOutputStream(destFile).use { out ->
+                    body.byteStream().use { input -> input.copyTo(out) }
+                }
             }
-            val body = response.body ?: error("R2 GET empty body")
-            destFile.parentFile?.mkdirs()
-            FileOutputStream(destFile).use { out ->
-                body.byteStream().use { input -> input.copyTo(out) }
-            }
+        } catch (e: R2GetException) {
+            destFile.delete()
+            throw e
+        } catch (e: IOException) {
+            destFile.delete()
+            throw R2GetException(
+                httpCode = null,
+                message = e.message?.takeIf { it.isNotBlank() } ?: "connection abort",
+                cause = e,
+            )
         }
     }
 
     /**
+     * Mint (or reuse) a signed URL, then GET the whole object.
+     * A dropped connection or rejected signature retries that one object.
+     * A dead session still stops the restore.
+     */
+    private suspend fun transferWholeObject(
+        contentHash: String?,
+        r2Key: String?,
+        destFile: File,
+        seededUrl: String?,
+    ) {
+        var lastError: Exception? = null
+        for (attempt in 1..RestoreDownloadRetry.MAX_ATTEMPTS) {
+            coroutineContext.ensureActive()
+            try {
+                val url = if (attempt == 1 && !seededUrl.isNullOrBlank()) {
+                    seededUrl
+                } else {
+                    val resolved = resolveDownloadUrl(
+                        contentHash = contentHash,
+                        r2Key = r2Key,
+                        forceRefresh = attempt > 1,
+                    )
+                    if (resolved.dryRun) {
+                        Log.i(TAG, "dry_run skip GET download key=${resolved.r2Key}")
+                        destFile.parentFile?.mkdirs()
+                        destFile.writeBytes(ByteArray(0))
+                        return
+                    }
+                    resolved.url ?: error("download-url missing download_url")
+                }
+                getFromR2(url, destFile)
+                return
+            } catch (e: CancellationException) {
+                destFile.delete()
+                throw e
+            } catch (e: Exception) {
+                destFile.delete()
+                coroutineContext.ensureActive()
+                lastError = e
+                if (RestoreDownloadRetry.isTerminalUnauthorized(e)) throw e
+                val httpCode = (e as? R2GetException)?.httpCode
+                val retry = attempt < RestoreDownloadRetry.MAX_ATTEMPTS &&
+                    when (e) {
+                        is R2GetException -> RestoreDownloadRetry.r2GetShouldRetry(httpCode, e)
+                        is IOException -> RestoreDownloadRetry.isTransientTransferError(e)
+                        else -> false
+                    }
+                if (!retry) throw e
+                Log.w(
+                    TAG,
+                    "restore GET retry $attempt/${RestoreDownloadRetry.MAX_ATTEMPTS} " +
+                        "hash=$contentHash key=$r2Key",
+                    e,
+                )
+                evictDownloadUrl(contentHash, r2Key)
+                delay(RestoreDownloadRetry.backoffMs(attempt))
+            }
+        }
+        throw lastError ?: IllegalStateException("R2 GET failed")
+    }
+
+    /**
      * Resolve a signed download URL with in-session reuse until near expiry
-     * (R2 cost rule 3). Remint only on miss or when TTL < [DOWNLOAD_URL_REMIN_SKEW_MS].
+     * (R2 cost rule 3). Remint only on miss, after a failed GET, or when TTL
+     * is under [DOWNLOAD_URL_REMIN_SKEW_MS].
      */
     private suspend fun resolveDownloadUrl(
         contentHash: String?,
         r2Key: String?,
+        forceRefresh: Boolean = false,
     ): ResolvedDownloadUrl {
         val primaryKey = downloadCacheKey(contentHash, r2Key)
         val now = System.currentTimeMillis()
-        downloadUrlCache[primaryKey]?.let { cached ->
-            if (cached.isReusable(now)) {
-                Log.i(
-                    TAG,
-                    "reuse download-url cacheKey=$primaryKey " +
-                        "ttlMs=${cached.expiresAtEpochMs - now}",
-                )
-                return ResolvedDownloadUrl(
-                    url = cached.url,
-                    r2Key = cached.r2Key,
-                    dryRun = false,
-                    fromCache = true,
-                )
+        if (!forceRefresh) {
+            downloadUrlCache[primaryKey]?.let { cached ->
+                if (cached.isReusable(now)) {
+                    Log.i(
+                        TAG,
+                        "reuse download-url cacheKey=$primaryKey " +
+                            "ttlMs=${cached.expiresAtEpochMs - now}",
+                    )
+                    return ResolvedDownloadUrl(
+                        url = cached.url,
+                        r2Key = cached.r2Key,
+                        dryRun = false,
+                        fromCache = true,
+                    )
+                }
             }
         }
         val resp = try {
-            backupApi.requestDownloadUrl(
-                BackupDownloadUrlRequestDto(
-                    contentHash = contentHash,
-                    r2Key = r2Key,
+            callRestoreApi {
+                backupApi.requestDownloadUrl(
+                    BackupDownloadUrlRequestDto(
+                        contentHash = contentHash,
+                        r2Key = r2Key,
+                    )
                 )
-            )
+            }
         } catch (e: HttpException) {
             throw mapBackupHttp(e)
         }
@@ -754,6 +842,52 @@ class BackupRepositoryImpl @Inject constructor(
         }
         entry.r2Key?.takeIf { it.isNotBlank() }?.let { k ->
             downloadUrlCache["k:$k"] = entry
+        }
+    }
+
+    private fun evictDownloadUrl(contentHash: String?, r2Key: String?) {
+        contentHash?.takeIf { it.isNotBlank() }?.let { downloadUrlCache.remove("h:$it") }
+        r2Key?.takeIf { it.isNotBlank() }?.let { downloadUrlCache.remove("k:$it") }
+    }
+
+    /**
+     * Access tokens expire in 15 minutes. A 401 is `{ "error": "unauthorized" }`.
+     * Refresh once and repeat the call. A failed refresh leaves the 401 in place.
+     * A dropped socket ("connection abort") retries the same small JSON call.
+     */
+    private suspend fun <T> callRestoreApi(block: suspend () -> T): T {
+        var lastError: Exception? = null
+        for (attempt in 1..RestoreDownloadRetry.MAX_ATTEMPTS) {
+            coroutineContext.ensureActive()
+            try {
+                return withFreshAccess(block)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: HttpException) {
+                throw e
+            } catch (e: IOException) {
+                lastError = e
+                if (attempt == RestoreDownloadRetry.MAX_ATTEMPTS ||
+                    !RestoreDownloadRetry.isTransientTransferError(e)
+                ) {
+                    throw e
+                }
+                Log.w(TAG, "restore API retry $attempt/${RestoreDownloadRetry.MAX_ATTEMPTS}", e)
+                delay(RestoreDownloadRetry.backoffMs(attempt))
+            }
+        }
+        throw lastError ?: IllegalStateException("backup API failed")
+    }
+
+    private suspend fun <T> withFreshAccess(block: suspend () -> T): T {
+        try {
+            return block()
+        } catch (e: HttpException) {
+            if (!RestoreDownloadRetry.apiNeedsAccessRefresh(e.code())) throw e
+            Log.w(TAG, "backup API 401 — refreshing access token")
+            val refreshed = authRepository.refreshSession()
+            if (refreshed.isFailure) throw e
+            return block()
         }
     }
 
@@ -824,6 +958,10 @@ class BackupRepositoryImpl @Inject constructor(
                     "Free cloud space or buy a +20 GB pack. Local library is untouched."
                 setPhase(CloudBackupPhase.BLOCKED_QUOTA, m)
                 m
+            }
+            401 -> {
+                val detail = apiError.ifBlank { "unauthorized" }
+                "$detail — session expired. Sign in again, then retry restore."
             }
             422 -> {
                 // Prefer CloudUploadIncompleteException from complete; this is a fallback.
@@ -980,6 +1118,16 @@ class BackupRepositoryImpl @Inject constructor(
         // must still be allowed to continue the persisted SCRUM-67 phase.
         var holdForApply = alreadyHeld
         try {
+            // Same refresh backup does before upload. Without it, a token older than
+            // 15 minutes makes the first library call return "unauthorized".
+            val refreshed = authRepository.refreshSession()
+            if (refreshed.isFailure) {
+                Log.w(
+                    TAG,
+                    "restore access refresh failed; continuing with current token",
+                    refreshed.exceptionOrNull(),
+                )
+            }
             val phaseAtStart = restoreSession.phase()
             if (phaseAtStart == RestorePhase.IDLE || phaseAtStart == RestorePhase.COMMITTED) {
                 // A fresh job only. A kill while DOWNLOADING must not wipe a finished snapshot.
@@ -1065,7 +1213,7 @@ class BackupRepositoryImpl @Inject constructor(
 
     private suspend fun downloadLibrarySnapshot() {
         val resp = try {
-            backupApi.getLibrary()
+            callRestoreApi { backupApi.getLibrary() }
         } catch (e: HttpException) {
             throw mapBackupHttp(e)
         }
@@ -1096,7 +1244,12 @@ class BackupRepositoryImpl @Inject constructor(
         )
         val gz = restoreSession.partialGzip()
         val raw = restoreSession.partialDatabase()
-        getFromR2(url, gz)
+        transferWholeObject(
+            contentHash = lib.contentHash,
+            r2Key = lib.r2Key,
+            destFile = gz,
+            seededUrl = url,
+        )
         gunzipFile(gz, raw)
         val staged = restoreSession.stagingDatabase()
         if (staged.exists()) staged.delete()
@@ -1311,7 +1464,7 @@ class BackupRepositoryImpl @Inject constructor(
      */
     private suspend fun ensureCloudSongs(stagedDb: File) {
         val objects = try {
-            backupApi.listObjects(kind = BackupKinds.SONG).objects
+            callRestoreApi { backupApi.listObjects(kind = BackupKinds.SONG).objects }
         } catch (e: HttpException) {
             throw mapBackupHttp(e)
         }
