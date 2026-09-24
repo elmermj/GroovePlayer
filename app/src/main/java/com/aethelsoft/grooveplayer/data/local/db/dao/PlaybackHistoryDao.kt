@@ -25,6 +25,7 @@ interface PlaybackHistoryDao {
     """)
     fun getRecentlyPlayed(limit: Int = 50): Flow<List<PlaybackHistoryEntity>>
     
+    /** Play-count aggregate. Favorite screens read song_likes instead. */
     @Query("""
         SELECT 
             songId, 

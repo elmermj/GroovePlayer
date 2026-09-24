@@ -6,6 +6,7 @@ import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
 import com.aethelsoft.grooveplayer.data.repository.AudioTagRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.EqualizerRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.SongLikeRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.TransferRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
@@ -35,6 +36,7 @@ import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.repository.SongLikeRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
@@ -68,6 +70,11 @@ abstract class RepositoryModule {
     abstract fun bindPlaybackHistoryRepository(
         impl: PlaybackHistoryRepositoryImpl
     ): PlaybackHistoryRepository
+
+    @Binds
+    abstract fun bindSongLikeRepository(
+        impl: SongLikeRepositoryImpl
+    ): SongLikeRepository
     
     @Binds
     abstract fun bindAudioTagRepository(

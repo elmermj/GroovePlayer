@@ -497,6 +497,7 @@ fun LargeTabletPlayerLayout(
                 color = GrooveTheme.colors.muted,
                 textAlign = TextAlign.Center
             )
+            com.aethelsoft.grooveplayer.presentation.common.FullPlayerSongLike(song)
             com.aethelsoft.grooveplayer.presentation.common.FullPlayerSongAvailability(song)
 
             Spacer(modifier = Modifier.height(L_PADDING))

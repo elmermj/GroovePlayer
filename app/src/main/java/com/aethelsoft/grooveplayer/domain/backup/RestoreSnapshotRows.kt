@@ -96,6 +96,34 @@ fun restoredMetadata(row: Map<String, String?>): RestoredMetadata? {
     )
 }
 
+data class RestoredSongLike(
+    val songId: String,
+    val title: String,
+    val artist: String,
+    val album: String,
+    val genre: String,
+    val uri: String,
+    val artworkUrl: String?,
+    val durationMs: Long,
+    val likedAt: Long,
+)
+
+fun restoredSongLike(row: Map<String, String?>): RestoredSongLike? {
+    val songId = row.string("songId")?.takeIf { it.isNotBlank() } ?: return null
+    val title = row.string("title").orEmpty().ifBlank { "Unknown" }
+    return RestoredSongLike(
+        songId = songId,
+        title = title,
+        artist = row.string("artist").orEmpty().ifBlank { "Unknown Artist" },
+        album = row.string("album").orEmpty().ifBlank { "Single - $title" },
+        genre = row.string("genre").orEmpty(),
+        uri = row.string("uri").orEmpty(),
+        artworkUrl = row.string("artworkUrl")?.takeIf { it.isNotBlank() },
+        durationMs = row.long("durationMs", 0L),
+        likedAt = row.long("likedAt", 0L),
+    )
+}
+
 /** Path update for a song that already exists locally. Does not insert a foreign catalog row. */
 fun restoredSourcePath(row: Map<String, String?>): Pair<String, String>? {
     val songId = row.string("songId")?.takeIf { it.isNotBlank() } ?: return null
