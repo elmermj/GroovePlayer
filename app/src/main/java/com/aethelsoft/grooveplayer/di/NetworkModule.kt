@@ -6,6 +6,7 @@ import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
+import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -14,6 +15,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -75,7 +77,10 @@ object NetworkModule {
 
     /**
      * Plain client for R2 signed PUT/GET — must NOT attach Bearer.
-     * Longer timeouts for large audio uploads.
+     * Read/write timeouts cover stalled sockets. There is no call timeout:
+     * a 10-minute cap aborted long Call/Voice downloads (connection abort)
+     * before restore could reach Applying. HTTP/1.1 avoids HTTP/2 stream resets
+     * on those whole-object bodies.
      *
      * R2 cost rules for backup restore only:
      * - One whole-object GetObject (no Range spam)
@@ -115,11 +120,15 @@ object NetworkModule {
             }
             chain.proceed(next)
         }
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.MINUTES)
             .writeTimeout(5, TimeUnit.MINUTES)
-            .callTimeout(10, TimeUnit.MINUTES)
+            .callTimeout(RestoreDownloadRetry.R2_CALL_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        if (RestoreDownloadRetry.R2_HTTP1_ONLY) {
+            builder.protocols(listOf(Protocol.HTTP_1_1))
+        }
+        return builder
             .addInterceptor(r2CostGuard)
             .addInterceptor(logging)
             .build()
