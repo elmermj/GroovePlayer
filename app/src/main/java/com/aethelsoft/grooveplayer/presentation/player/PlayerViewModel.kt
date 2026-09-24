@@ -105,7 +105,13 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = viewModelScope.launch {
-        queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
+        try {
+            queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "setQueue failed", e)
+        }
     }
 
     fun skipToQueueItem(index: Int) = viewModelScope.launch { editQueueUseCase.skipTo(index) }

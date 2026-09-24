@@ -6,6 +6,7 @@ import javax.inject.Inject
 class RestoreCloudLibraryUseCase @Inject constructor(
     private val backupRepository: BackupRepository,
 ) {
-    suspend operator fun invoke(): Result<Unit> =
-        backupRepository.restoreLibraryFromCloud()
+    suspend fun stage(): Result<Unit> = backupRepository.stageLibraryRestore()
+
+    suspend fun apply(): Result<Unit> = backupRepository.applyStagedLibraryRestore()
 }

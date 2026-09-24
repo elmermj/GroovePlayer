@@ -12,6 +12,7 @@ import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupUploadUrlRequestDto
 import com.aethelsoft.grooveplayer.di.NetworkModule
+import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
 import com.aethelsoft.grooveplayer.domain.model.BackupKinds
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
@@ -25,6 +26,7 @@ import com.aethelsoft.grooveplayer.domain.repository.BackupRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,6 +63,8 @@ import javax.inject.Singleton
 class BackupRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: GroovePlayerDatabase,
+    private val restoreSession: LibraryRestoreSession,
+    private val snapshotApplier: LibrarySnapshotApplier,
     private val musicRepository: MusicRepository,
     private val userRepository: UserRepository,
     private val authRepository: AuthRepository,
@@ -849,8 +853,11 @@ class BackupRepositoryImpl @Inject constructor(
             }
         }
 
-    override suspend fun restoreLibraryFromCloud(): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
+    override suspend fun stageLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
+        // Commit DOWNLOADING before any byte is written so a killed process cannot
+        // treat a partial file as a finished snapshot.
+        restoreSession.beginDownload()
+        try {
             val resp = try {
                 backupApi.getLibrary()
             } catch (e: HttpException) {
@@ -860,12 +867,7 @@ class BackupRepositoryImpl @Inject constructor(
                 ?: error("No cloud library snapshot yet — back up first.")
             val remoteSchema = lib.schemaVersion
                 ?: error("Cloud library missing schema_version")
-            val localSchema = try {
-                database.openHelper.readableDatabase.version
-            } catch (_: Exception) {
-                GroovePlayerDatabase.SCHEMA_VERSION
-            }
-            // Compatible if remote <= local (Room can migrate forward); block if newer.
+            val localSchema = GroovePlayerDatabase.SCHEMA_VERSION
             if (remoteSchema > localSchema) {
                 error(
                     "Cloud library schema $remoteSchema is newer than this app ($localSchema). " +
@@ -877,7 +879,6 @@ class BackupRepositoryImpl @Inject constructor(
                 error("Cloud restore is dry-run only until R2 is live.")
             }
             val url = lib.downloadUrl ?: error("library missing download_url")
-            // Prefer URL from library response; cache for in-session reuse (rule 3).
             val expiresInSec = (lib.expiresInSec ?: DEFAULT_DOWNLOAD_EXPIRES_SEC).coerceAtLeast(1)
             rememberDownloadUrl(
                 CachedSignedDownload(
@@ -887,25 +888,59 @@ class BackupRepositoryImpl @Inject constructor(
                     expiresAtEpochMs = System.currentTimeMillis() + expiresInSec * 1000L,
                 ),
             )
-            val gz = File(context.cacheDir, "restore-room.db.gz")
-            val raw = File(context.cacheDir, "restore-room.db")
+            val gz = restoreSession.partialGzip()
+            val raw = restoreSession.partialDatabase()
             getFromR2(url, gz)
             gunzipFile(gz, raw)
-            // Close Room before replacing files (WAL/SHM must go).
-            database.close()
-            val dbFile = context.getDatabasePath(GroovePlayerDatabase.DATABASE_NAME)
-            File(dbFile.path + "-wal").delete()
-            File(dbFile.path + "-shm").delete()
-            dbFile.parentFile?.mkdirs()
-            raw.copyTo(dbFile, overwrite = true)
+            val staged = restoreSession.stagingDatabase()
+            if (staged.exists()) staged.delete()
+            if (!raw.renameTo(staged)) {
+                raw.copyTo(staged, overwrite = true)
+                raw.delete()
+            }
             gz.delete()
-            raw.delete()
-            prefs.edit().putBoolean(KEY_NEEDS_RESTART_AFTER_RESTORE, true).apply()
-            Log.i(
-                TAG,
-                "library restore wrote ${dbFile.absolutePath} schema=$remoteSchema — restart required",
+            when (val verdict = restoreSession.peekStagingVerdict()) {
+                StagingVerdict.VALID -> Unit
+                StagingVerdict.NEWER_THAN_APP -> error(
+                    "Cloud library schema is newer than this app. Update GroovePlayer before restoring.",
+                )
+                StagingVerdict.TRUNCATED, StagingVerdict.NOT_SQLITE, null -> error(
+                    "Downloaded library file was incomplete. Your music was not changed.",
+                )
+            }
+            restoreSession.markStaged()
+            Log.i(TAG, "library snapshot staged schema=$remoteSchema path=${staged.absolutePath}")
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            restoreSession.discard()
+            throw e
+        } catch (e: Exception) {
+            restoreSession.discard()
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun applyStagedLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
+        val staged = restoreSession.stagingDatabase()
+        if (restoreSession.peekStagingVerdict() != StagingVerdict.VALID) {
+            restoreSession.discard()
+            return@withContext Result.failure(
+                IllegalStateException(
+                    "Restored library file was incomplete. Your music was not changed.",
+                ),
             )
-            Unit
+        }
+        restoreSession.markApplying()
+        try {
+            snapshotApplier.apply(staged)
+            restoreSession.discard()
+            Log.i(TAG, "library snapshot applied into the open database")
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            restoreSession.discard()
+            Result.failure(e)
         }
     }
 
@@ -1136,7 +1171,6 @@ class BackupRepositoryImpl @Inject constructor(
         private const val PREFS = "groove_cloud_backup"
         private const val KEY_LAST_BACKUP = "last_backup_at"
         private const val KEY_LAST_ERROR = "last_error"
-        private const val KEY_NEEDS_RESTART_AFTER_RESTORE = "needs_restart_after_library_restore"
         private const val KEY_LAST_ROOM_HASH = "last_room_db_hash"
         private const val KEY_LAST_ROOM_SIZE = "last_room_db_size"
         private const val LOGICAL_PATH_ROOM_DB = "library/room.db.gz"

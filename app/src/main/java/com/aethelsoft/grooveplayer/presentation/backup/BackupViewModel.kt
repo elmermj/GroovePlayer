@@ -17,7 +17,6 @@ import com.aethelsoft.grooveplayer.domain.usecase.backup_category.FetchCloudLibr
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.GetIncludedBackupFoldersUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ListBackupObjectsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ObserveCloudBackupStateUseCase
-import com.aethelsoft.grooveplayer.domain.usecase.backup_category.RestoreCloudLibraryUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.StartCloudBackupUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.TrimCloudBackupUseCase
 import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
@@ -42,7 +41,6 @@ class BackupViewModel @Inject constructor(
     private val deleteBackupObjectUseCase: DeleteBackupObjectUseCase,
     private val trimCloudBackupUseCase: TrimCloudBackupUseCase,
     private val fetchCloudLibraryUseCase: FetchCloudLibraryUseCase,
-    private val restoreCloudLibraryUseCase: RestoreCloudLibraryUseCase,
     private val authRepository: AuthRepository,
     private val restoreAuthSessionUseCase: RestoreAuthSessionUseCase,
 ) : BaseViewModel(application) {
@@ -205,27 +203,6 @@ class BackupViewModel @Inject constructor(
                 }
         } finally {
             _libraryLoading.value = false
-        }
-    }
-
-    fun restoreLibrary() = viewModelScope.launch {
-        if (_librarySnapshot.value == null) {
-            _restoreMessage.value = "No cloud library snapshot yet — back up first."
-            return@launch
-        }
-        _restoreInFlight.value = true
-        _restoreMessage.value = null
-        try {
-            restoreCloudLibraryUseCase()
-                .onSuccess {
-                    _restoreMessage.value =
-                        "Library restored from cloud. Force-stop and reopen the app to reload Room."
-                }
-                .onFailure {
-                    _restoreMessage.value = it.message ?: "Could not restore library"
-                }
-        } finally {
-            _restoreInFlight.value = false
         }
     }
 

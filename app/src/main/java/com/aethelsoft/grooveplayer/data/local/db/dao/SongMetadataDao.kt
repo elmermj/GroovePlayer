@@ -24,5 +24,8 @@ interface SongMetadataDao {
 
     @Query("DELETE FROM song_metadata WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
+
+    @Query("DELETE FROM song_metadata")
+    suspend fun deleteAll()
 }
 
