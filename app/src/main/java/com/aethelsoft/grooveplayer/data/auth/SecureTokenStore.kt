@@ -45,7 +45,11 @@ class SecureTokenStore @Inject constructor(
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        // commit() so a process kill cannot revive access/refresh after Sign-out.
+        // apply() updates memory immediately but the disk write can be lost.
+        if (!prefs.edit().clear().commit()) {
+            prefs.edit().clear().apply()
+        }
     }
 
     fun hasSession(): Boolean = !getRefreshToken().isNullOrBlank()

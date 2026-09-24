@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.data.auth
 
 import android.app.Activity
 import android.content.Context
+import android.util.Base64
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -16,6 +17,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,7 +29,10 @@ import javax.inject.Singleton
  * matches package + signing SHA-1 registered in Google Cloud / Firebase.
  *
  * Profile "Sign in with Google" uses the explicit Sign-In-With-Google button flow
- * ([GetSignInWithGoogleOption]), not One Tap.
+ * ([GetSignInWithGoogleOption]), not One Tap. Each request uses a fresh nonce and
+ * refuses an immediately-available credential so a prior account is not replayed.
+ * Sign-out calls [clearCredentialSession]; the button path clears again first so
+ * Credential Manager does not prioritize that account when several exist.
  */
 @Singleton
 class GoogleIdTokenProvider @Inject constructor(
@@ -41,8 +46,12 @@ class GoogleIdTokenProvider @Inject constructor(
             "GOOGLE_WEB_CLIENT_ID is missing or invalid. Set it in local.properties / CI."
         }
 
+        // Button path only (user is signed out). Clear again so a failed Sign-out
+        // clear cannot leave the previous account as the prioritized session.
+        clearCredentialSession(activity)
+
         // Explicit button → SIWG first (Google guidance). Fall back to GoogleIdOption
-        // only if SIWG reports no credentials.
+        // only if SIWG reports no credentials. Both paths disable silent auto-select.
         return try {
             requestViaSignInWithGoogle(credentialManager, activity, serverClientId)
         } catch (e: NoCredentialException) {
@@ -64,15 +73,25 @@ class GoogleIdTokenProvider @Inject constructor(
 
     /**
      * Clears Credential Manager / Google sign-in state so the next Sign-In
-     * does not auto-pick the previous account without a clean chooser.
+     * does not auto-pick the previous account when several accounts exist.
+     * Does not revoke the app's Google grants — the chooser can still list them.
      */
-    suspend fun clearCredentialSession() {
+    suspend fun clearCredentialSession(context: Context = appContext) {
         try {
-            CredentialManager.create(appContext)
+            CredentialManager.create(context)
                 .clearCredentialState(ClearCredentialStateRequest())
         } catch (e: Exception) {
             Log.w(TAG, "clearCredentialState failed (continuing local sign-out)", e)
         }
+    }
+
+    private fun freshNonce(): String {
+        val bytes = ByteArray(16)
+        nonceRandom.nextBytes(bytes)
+        return Base64.encodeToString(
+            bytes,
+            Base64.NO_WRAP or Base64.URL_SAFE or Base64.NO_PADDING,
+        )
     }
 
     private suspend fun requestViaGoogleIdOption(
@@ -84,9 +103,11 @@ class GoogleIdTokenProvider @Inject constructor(
             .setFilterByAuthorizedAccounts(false)
             .setServerClientId(serverClientId)
             .setAutoSelectEnabled(false)
+            .setNonce(freshNonce())
             .build()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
+            .setPreferImmediatelyAvailableCredentials(false)
             .build()
         val result = credentialManager.getCredential(activity, request)
         return extractIdToken(result.credential)
@@ -97,9 +118,12 @@ class GoogleIdTokenProvider @Inject constructor(
         activity: Activity,
         serverClientId: String,
     ): String {
-        val option = GetSignInWithGoogleOption.Builder(serverClientId).build()
+        val option = GetSignInWithGoogleOption.Builder(serverClientId)
+            .setNonce(freshNonce())
+            .build()
         val request = GetCredentialRequest.Builder()
             .addCredentialOption(option)
+            .setPreferImmediatelyAvailableCredentials(false)
             .build()
         val result = credentialManager.getCredential(activity, request)
         return extractIdToken(result.credential)
@@ -121,6 +145,7 @@ class GoogleIdTokenProvider @Inject constructor(
 
     companion object {
         private const val TAG = "GoogleIdTokenProvider"
+        private val nonceRandom = SecureRandom()
 
         /**
          * True when the user dismissed the chooser (no config / SHA problem).
