@@ -19,7 +19,7 @@ on:
         default: testers
   push:
     branches:
-      - main
+      - test
     paths:
       - "app/**"
       - "gradle/**"
