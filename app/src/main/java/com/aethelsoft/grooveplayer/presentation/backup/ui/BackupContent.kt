@@ -59,6 +59,7 @@ import com.aethelsoft.grooveplayer.domain.backup.BackupProgressTone
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupPhase
+import com.aethelsoft.grooveplayer.domain.model.isUploadInProgress
 import androidx.compose.material3.LinearProgressIndicator
 
 /**
@@ -197,6 +198,7 @@ fun BackupContent(
             librarySnapshot = librarySnapshot,
             libraryLoading = libraryLoading,
             restoreInFlight = restoreInFlight,
+            backupInProgress = visibleBackupState.phase.isUploadInProgress(),
             restoreMessage = restoreMessage,
             onRestoreLibrary = onRestoreLibrary,
         )
@@ -933,6 +935,7 @@ private fun RestoreLibrarySection(
     librarySnapshot: CloudLibrarySnapshot?,
     libraryLoading: Boolean,
     restoreInFlight: Boolean,
+    backupInProgress: Boolean,
     restoreMessage: String?,
     onRestoreLibrary: () -> Unit,
 ) {
@@ -977,11 +980,16 @@ private fun RestoreLibrarySection(
         )
     }
     Spacer(Modifier.height(8.dp))
-    val enabled = hasSnapshot && !restoreInFlight && !libraryLoading && tier == PrivilegeTier.PREMIUM
+    val enabled = hasSnapshot &&
+        !restoreInFlight &&
+        !backupInProgress &&
+        !libraryLoading &&
+        tier == PrivilegeTier.PREMIUM
     ProfileSettingsButton(
         onClick = { if (enabled) onRestoreLibrary() },
         title = when {
             restoreInFlight -> "Restoring library…"
+            backupInProgress -> "Restore unavailable"
             !hasSnapshot -> "Restore unavailable"
             else -> "Restore library from cloud"
         },

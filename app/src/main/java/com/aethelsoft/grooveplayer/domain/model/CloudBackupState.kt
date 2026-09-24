@@ -24,6 +24,12 @@ enum class BackupJobStep {
     UPLOADING_CATALOG,
 }
 
+/** True while a manual backup is consolidating files or uploading them. */
+fun CloudBackupPhase.isUploadInProgress(): Boolean =
+    this == CloudBackupPhase.PREPARING ||
+        this == CloudBackupPhase.CONSOLIDATING ||
+        this == CloudBackupPhase.UPLOADING
+
 data class CloudBackupState(
     val phase: CloudBackupPhase = CloudBackupPhase.IDLE,
     val progressPercent: Int = 0,

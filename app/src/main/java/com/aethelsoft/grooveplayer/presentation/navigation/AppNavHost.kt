@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -48,6 +49,8 @@ import com.aethelsoft.grooveplayer.presentation.share.ShareViaNearbyScreen
 fun AppNavHost(
     navController: NavHostController,
     startDestination: String = AppRoutes.HOME,
+    onBackupRestoreVisible: (Boolean) -> Unit = {},
+    onManualRestoreOpened: () -> Unit = {},
 ) {
     NavHost(
         navController = navController,
@@ -522,9 +525,14 @@ fun AppNavHost(
             )
         }
         composable(route = AppRoutes.BACKUP) {
+            DisposableEffect(Unit) {
+                onBackupRestoreVisible(true)
+                onDispose { onBackupRestoreVisible(false) }
+            }
             BackupScreen(
                 onNavigateBack = { navController.popBackStack() },
                 onRestoreLibrary = {
+                    onManualRestoreOpened()
                     navController.navigate(AppRoutes.restoreApplyRoute(startDownload = true))
                 },
             )
@@ -538,6 +546,10 @@ fun AppNavHost(
                 },
             ),
         ) { entry ->
+            DisposableEffect(Unit) {
+                onBackupRestoreVisible(true)
+                onDispose { onBackupRestoreVisible(false) }
+            }
             val startDownload = entry.arguments?.getBoolean("start") ?: false
             RestoreApplyScreen(
                 startDownload = startDownload,

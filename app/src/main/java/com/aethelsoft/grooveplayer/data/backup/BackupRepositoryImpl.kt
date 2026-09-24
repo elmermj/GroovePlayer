@@ -13,10 +13,12 @@ import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupUploadUrlRequestDto
 import com.aethelsoft.grooveplayer.di.NetworkModule
-import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
-import com.aethelsoft.grooveplayer.domain.backup.ConsolidateByteProgress
 import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
+import com.aethelsoft.grooveplayer.domain.backup.BackupJobGate
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
+import com.aethelsoft.grooveplayer.domain.backup.BackupTransfer
 import com.aethelsoft.grooveplayer.domain.backup.CloudHashDedup
+import com.aethelsoft.grooveplayer.domain.backup.ConsolidateByteProgress
 import com.aethelsoft.grooveplayer.domain.backup.ContentHash
 import com.aethelsoft.grooveplayer.domain.backup.DbSwapStep
 import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
@@ -30,6 +32,7 @@ import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupPhase
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
+import com.aethelsoft.grooveplayer.domain.model.isUploadInProgress
 import com.aethelsoft.grooveplayer.domain.model.StorageEntitlement
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupRequest
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupResult
@@ -77,6 +80,7 @@ class BackupRepositoryImpl @Inject constructor(
     private val database: GroovePlayerDatabase,
     private val restoreSession: LibraryRestoreSession,
     private val grooveDownloads: GrooveDownloadsLocator,
+    private val jobGate: BackupJobGate,
     private val musicRepository: MusicRepository,
     private val userRepository: UserRepository,
     private val authRepository: AuthRepository,
@@ -99,6 +103,8 @@ class BackupRepositoryImpl @Inject constructor(
     private val _state = MutableStateFlow(restoredBackupState())
 
     override fun observeBackupState() = _state.asStateFlow()
+
+    override fun restorePhase(): RestorePhase = restoreSession.phase()
 
     override suspend fun refreshLocalState() {
         val folders = resolveIncludedFolders()
@@ -180,7 +186,12 @@ class BackupRepositoryImpl @Inject constructor(
                 )
                 error("Quota full.")
             }
-
+            if (restoreSession.phase() != RestorePhase.IDLE ||
+                !jobGate.tryAcquire(BackupTransfer.BACKUP)
+            ) {
+                error(BackupJobGate.BUSY_MESSAGE)
+            }
+            try {
             val folders = resolveIncludedFolders()
             _state.update {
                 it.copy(
@@ -495,6 +506,9 @@ class BackupRepositoryImpl @Inject constructor(
                     "uploadedBytes=$uploadedBytes dryRun=$anyDryRun",
             )
             Unit
+            } finally {
+                jobGate.release(BackupTransfer.BACKUP)
+            }
         }.onFailure { e ->
             if (_state.value.phase !in setOf(
                     CloudBackupPhase.BLOCKED_NOT_PREMIUM,
@@ -953,12 +967,22 @@ class BackupRepositoryImpl @Inject constructor(
         }
 
     override suspend fun stageLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
-        val phaseAtStart = restoreSession.phase()
-        if (phaseAtStart == RestorePhase.IDLE || phaseAtStart == RestorePhase.COMMITTED) {
-            // A fresh job only. A kill while DOWNLOADING must not wipe a finished snapshot.
-            restoreSession.beginDownload()
+        if (_state.value.phase.isUploadInProgress()) {
+            return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
         }
+        val alreadyHeld = jobGate.current() == BackupTransfer.RESTORE
+        if (!alreadyHeld && !jobGate.tryAcquire(BackupTransfer.RESTORE)) {
+            return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
+        }
+        // Hold the gate through apply. A resume after process death has an empty gate and
+        // must still be allowed to continue the persisted SCRUM-67 phase.
+        var holdForApply = alreadyHeld
         try {
+            val phaseAtStart = restoreSession.phase()
+            if (phaseAtStart == RestorePhase.IDLE || phaseAtStart == RestorePhase.COMMITTED) {
+                // A fresh job only. A kill while DOWNLOADING must not wipe a finished snapshot.
+                restoreSession.beginDownload()
+            }
             val reuseSnapshot = phaseAtStart != RestorePhase.IDLE &&
                 phaseAtStart != RestorePhase.DOWNLOADING &&
                 phaseAtStart != RestorePhase.COMMITTED &&
@@ -973,6 +997,7 @@ class BackupRepositoryImpl @Inject constructor(
             ensureCloudSongs(restoreSession.stagingDatabase())
             restoreSession.markFilesReady()
             Log.i(TAG, "restore files ready at ${restoreSession.stagingDatabase().absolutePath}")
+            holdForApply = true
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
@@ -981,10 +1006,19 @@ class BackupRepositoryImpl @Inject constructor(
                 restoreSession.discard()
             }
             Result.failure(e)
+        } finally {
+            if (!holdForApply) jobGate.release(BackupTransfer.RESTORE)
         }
     }
 
     override suspend fun applyStagedLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
+        if (_state.value.phase.isUploadInProgress()) {
+            return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
+        }
+        val alreadyHeld = jobGate.current() == BackupTransfer.RESTORE
+        if (!alreadyHeld && !jobGate.tryAcquire(BackupTransfer.RESTORE)) {
+            return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
+        }
         try {
             val phase = restoreSession.phase()
             if (phase != RestorePhase.FILES_READY && phase != RestorePhase.SWAPPING) {
@@ -1022,6 +1056,8 @@ class BackupRepositoryImpl @Inject constructor(
                 restoreSession.markFilesReady()
             }
             Result.failure(e)
+        } finally {
+            jobGate.release(BackupTransfer.RESTORE)
         }
     }
 
