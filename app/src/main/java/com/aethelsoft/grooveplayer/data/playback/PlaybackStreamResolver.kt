@@ -18,8 +18,8 @@ import javax.inject.Singleton
 /**
  * Exchanges `groove-playback://{songId}` for POST `/v1/playback/stream-url`
  * when ExoPlayer opens the item. That is "about to play" (TTL 3600), not a
- * URL minted for the whole queue. A later open fetches a fresh URL; expiry
- * is not absence.
+ * URL minted for the whole queue. A later open, including after a mid-play
+ * 401/403 on the signed GET, fetches a fresh URL. Expiry is not absence.
  *
  * Range on the signed URL is intentional. This path must not use the backup
  * OkHttp client, which strips Range.
