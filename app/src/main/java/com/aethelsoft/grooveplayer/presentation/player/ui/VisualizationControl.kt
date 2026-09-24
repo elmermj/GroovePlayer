@@ -177,5 +177,5 @@ private fun VisualizationMode.label(): String =
     when (this) {
         VisualizationMode.OFF -> "Off"
         VisualizationMode.SIMULATED -> "Simulated"
-        VisualizationMode.REAL_TIME -> "Real-time"
+        VisualizationMode.REAL_TIME -> "Dynamic"
     }

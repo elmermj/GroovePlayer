@@ -13,7 +13,7 @@ A modern, high-performance music player for Android built with Jetpack Compose, 
 
 ### Audio Features
 - **5-Band Equalizer**: Real-time audio equalization with custom presets (Normal, Pop, Rock, Jazz, Classic, Dance, Electronic, Hip-Hop)
-- **Audio Visualization**: Real-time waveform visualization with multiple modes
+- **Audio Visualization**: Artwork glow with Simulated (time-based) and Dynamic (Visualizer) modes
 - **Beat Detection**: Advanced beat detection algorithm for visual effects
 - **Stereo Balance**: Visual representation of stereo audio balance
 - **Volume Control**: System volume integration with mute support
@@ -314,7 +314,7 @@ app/src/main/java/com/aethelsoft/grooveplayer/
 ### UI Components
 - **Responsive Layouts**: Phone, Tablet, Large Tablet variants
 - **Custom Shaders**: Elliptical gradient effects
-- **Audio Visualization**: Real-time waveform rendering
+- **Audio Visualization**: Artwork glow. Simulated is time-based; Dynamic uses the Visualizer
 - **Custom Sliders**: Volume, seek, equalizer controls
 
 ## 📱 Supported Android Versions

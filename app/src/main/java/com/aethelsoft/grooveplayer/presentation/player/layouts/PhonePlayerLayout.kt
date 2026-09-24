@@ -4,7 +4,6 @@ import android.graphics.BlurMaskFilter
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -82,6 +81,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerShareButton
 import com.aethelsoft.grooveplayer.presentation.player.ui.SongDetails
 import com.aethelsoft.grooveplayer.presentation.player.ui.SwipeableArtwork
 import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelsoft.grooveplayer.presentation.player.ui.rememberArtworkGlowMotion
 import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDetails
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
@@ -303,6 +303,7 @@ fun PhonePlayerLayout(
                 GlowingArtworkContainerPhone(
                     dominantColor = dominantColor,
                     visualization = effectiveVisualization,
+                    config = glowEffectConfig,
                     modifier = Modifier
                         .graphicsLayer {
                             translationX = artworkOffsetXPx
@@ -518,9 +519,9 @@ fun OverlayEffectComponentPhone(
 
 /**
  * Audio-reactive glow container for phone artwork with configurable visual effects.
- * 
+ *
  * @param dominantColor The primary color extracted from artwork for glow tinting
- * @param visualization Real-time audio analysis data (bass, mid, treble, stereo, beat)
+ * @param visualization Audio analysis data (bass, mid, treble, stereo, beat)
  * @param config Glow effect configuration - use presets or customize
  * @param modifier Modifier for the container (must use graphicsLayer { clip = false })
  * @param content The artwork content to wrap with glow effect
@@ -534,37 +535,13 @@ fun GlowingArtworkContainerPhone(
     content: @Composable () -> Unit
 ) {
     val density = LocalDensity.current
-
-    // Balanced animations: responsive but smooth
-    val bassGlow by animateFloatAsState(
-        targetValue = visualization.bass,
-        animationSpec = tween(75),
-        label = "BassGlow"
-    )
-    
-    val midGlow by animateFloatAsState(
-        targetValue = visualization.mid,
-        animationSpec = tween(70),
-        label = "MidGlow"
-    )
-    
-    val trebleGlow by animateFloatAsState(
-        targetValue = visualization.treble,
-        animationSpec = tween(60),
-        label = "TrebleGlow"
-    )
-    
-    val beatPulse by animateFloatAsState(
-        targetValue = visualization.beat,
-        animationSpec = tween(50),
-        label = "BeatPulse"
-    )
-    
-    val stereoBalance by animateFloatAsState(
-        targetValue = visualization.stereoBalance,
-        animationSpec = tween(120),
-        label = "StereoBalance"
-    )
+    val motion = rememberArtworkGlowMotion(visualization, config)
+    val bassGlow = motion.bass
+    val midGlow = motion.mid
+    val trebleGlow = motion.treble
+    val beatPulse = motion.beat
+    val stereoBalance = motion.stereo
+    val glowAlpha = motion.glowAlpha
 
     Box(
         modifier = modifier
@@ -584,10 +561,6 @@ fun GlowingArtworkContainerPhone(
 
                 // Calculate parameters using config
                 val artworkSizePx = with(density) { 320.dp.toPx() }
-                val baseIntensity = (bassGlow * 0.5f + midGlow * 0.3f + trebleGlow * 0.2f)
-                val glowAlpha =
-                    (config.minAlpha + baseIntensity * config.intensityAlphaRange + beatPulse * config.beatAlphaBoost)
-                        .coerceIn(0f, config.maxAlpha)
 
                 val baseBlurRadius = artworkSizePx * config.baseBlurMultiplier
                 val bassExpansion = artworkSizePx * config.bassExpansionMultiplier * bassGlow

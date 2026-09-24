@@ -42,11 +42,11 @@ import kotlin.math.sqrt
  * Audio visualization data containing frequency and stereo information
  */
 data class AudioVisualizationData(
-    val bass: Float = 0f,        // Low frequencies (20-250 Hz)
-    val mid: Float = 0f,         // Mid frequencies / Voice (250-4000 Hz)
-    val treble: Float = 0f,      // High frequencies (4000-20000 Hz)
+    val bass: Float = 0f,        // max(sub 20–60 Hz, bass 60–250 Hz)
+    val mid: Float = 0f,         // 0.4*lowMid (250–1000) + 0.6*presence (1000–3000, voice)
+    val treble: Float = 0f,      // 0.35*highMid (3000–6000) + 0.65*treble (6000–16000)
     val stereoBalance: Float = 0f, // -1.0 (left) to 1.0 (right)
-    val beat: Float = 0f,        // Beat detection intensity
+    val beat: Float = 0f,        // Onset intensity; decays between hits
     val overall: Float = 0f      // Overall amplitude
 )
 
@@ -88,8 +88,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private var lastRecordedSongId: String? = null
     private var lastRecordedTimestamp: Long = 0L
     private var visualizer: Visualizer? = null
-    private var lastBeatEnergy = 0.0
-    private var beatHistory = mutableListOf<Double>()
+    private val bandAnalyzer = AudioBandAnalyzer()
 
     /** Throttle visualization updates to ~15fps on mid-range devices to reduce glow redraw cost. */
     @Volatile
@@ -172,7 +171,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 _currentSong.value = song
                 val mime = mediaItem?.localConfiguration?.mimeType
                 val isM4a = isM4AMimeType(mime) || (song != null && isM4A(song.uri))
-                // M4A + Equalizer causes severe distortion; release Equalizer only. Keep Visualizer for real-time viz.
+                // M4A + Equalizer causes severe distortion; release Equalizer only. Keep Visualizer for Dynamic viz.
                 if (isM4a) {
                     releaseEqualizerOnly()
                 }
@@ -303,10 +302,9 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
         }
         
-        // Start simulation loop for visualization.
-        // This drives the visualization only when:
-        // - Mode is SIMULATED, or
-        // - Mode is REAL_TIME but the Visualizer is not available (fallback).
+        // Time-based template used for SIMULATED, and as a fallback when Dynamic
+        // mode is selected but the Visualizer is not capturing. This loop is not
+        // live FFT analysis and must not be treated as real-time audio.
         scope.launch {
             while (true) {
                 val useSimulation = when (visualizationMode) {
@@ -316,7 +314,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 }
 
                 if (_isPlaying.value && useSimulation) {
-                    // Animated pulsing effect based on time for fallback
+                    bandAnalyzer.reset()
                     val time = System.currentTimeMillis() / 150.0
                     val bassPulse = kotlin.math.sin(time * 0.8) * 0.5 + 0.5
                     val midPulse = kotlin.math.sin(time * 1.2) * 0.5 + 0.5
@@ -333,6 +331,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                         overall = ((bassPulse + midPulse + treblePulse) / 3.0).toFloat().coerceIn(0f, 1f)
                     )
                 } else if (!_isPlaying.value) {
+                    bandAnalyzer.reset()
                     _audioVisualization.value = AudioVisualizationData()
                 }
                 delay(VISUALIZATION_EMIT_INTERVAL_MS)
@@ -383,7 +382,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         return _currentSong.value?.let { isM4A(it.uri) } == true
     }
 
-    /** Release Equalizer only (M4A bypass). Visualizer stays for real-time viz. */
+    /** Release Equalizer only (M4A bypass). Visualizer stays for Dynamic visualization. */
     private fun releaseEqualizerOnly() {
         try {
             equalizerManager.release()
@@ -540,118 +539,33 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                         ) {
                             fft?.let { data ->
                                 // Android FFT format: [DC, Nyquist, real1, imag1, real2, imag2, ...]
-                                // Index 0: DC component, Index 1: Nyquist frequency
-                                // Then alternating real/imaginary pairs
-
                                 val numFrequencies = data.size / 2
+                                if (numFrequencies <= 0) return@let
                                 val magnitudes = FloatArray(numFrequencies)
-
-                                // DC component (index 0)
                                 magnitudes[0] = kotlin.math.abs(data[0].toFloat())
-
-                                // Process real/imaginary pairs (indices 2 onwards)
                                 for (i in 1 until numFrequencies) {
-                                    val real = data[i * 2].toFloat()
-                                    val imag = data[i * 2 + 1].toFloat()
+                                    val realIndex = i * 2
+                                    val imagIndex = realIndex + 1
+                                    if (imagIndex >= data.size) break
+                                    val real = data[realIndex].toFloat()
+                                    val imag = data[imagIndex].toFloat()
                                     magnitudes[i] = sqrt((real * real + imag * imag).toDouble()).toFloat()
                                 }
 
-                                // Frequency bins mapping
-                                // Android's samplingRate parameter is unreliable, use standard audio rate
-                                // Most music is 44.1kHz or 48kHz - using 44100 as safe default
-                                val audioSampleRate = 44100f
-                                val nyquist = audioSampleRate / 2f  // 22050 Hz
-                                val binFreq = nyquist / numFrequencies
-
-                                // Extract frequency bands
-                                var bassSum = 0.0
-                                var bassCount = 0
-                                var midSum = 0.0
-                                var midCount = 0
-                                var trebleSum = 0.0
-                                var trebleCount = 0
-
-                                for (i in magnitudes.indices) {
-                                    val freq = i * binFreq
-                                    val magnitude = magnitudes[i].toDouble()
-
-                                    when {
-                                        freq < 250 -> { // Bass: 20-250 Hz
-                                            bassSum += magnitude
-                                            bassCount++
-                                        }
-                                        freq < 4000 -> { // Mid/Voice: 250-4000 Hz
-                                            midSum += magnitude
-                                            midCount++
-                                        }
-                                        freq < 20000 -> { // Treble: 4000-20000 Hz
-                                            trebleSum += magnitude
-                                            trebleCount++
-                                        }
-                                    }
-                                }
-
-                                // Normalize frequency bands
-                                val bassAvg = if (bassCount > 0) (bassSum / bassCount) / 128.0 else 0.0
-                                val midAvg = if (midCount > 0) (midSum / midCount) / 128.0 else 0.0
-                                val trebleAvg = if (trebleCount > 0) (trebleSum / trebleCount) / 128.0 else 0.0
-
-                                // Apply logarithmic scaling for better visualization
-                                val bassScaled = kotlin.math.log10(1.0 + bassAvg * 9.0) / kotlin.math.log10(10.0)
-                                val midScaled = kotlin.math.log10(1.0 + midAvg * 9.0) / kotlin.math.log10(10.0)
-                                val trebleScaled = kotlin.math.log10(1.0 + trebleAvg * 9.0) / kotlin.math.log10(10.0)
-
-                                // Beat detection: sudden increase in bass energy
-                                val currentEnergy = bassSum / bassCount.coerceAtLeast(1)
-                                beatHistory.add(currentEnergy)
-                                if (beatHistory.size > 30) { // Keep ~0.7 second of history (shorter = more sensitive)
-                                    beatHistory.removeAt(0)
-                                }
-
-                                val avgEnergy = if (beatHistory.isNotEmpty()) {
-                                    beatHistory.average()
-                                } else currentEnergy
-
-                                val energyRatio = if (avgEnergy > 0.01) {
-                                    (currentEnergy / avgEnergy).coerceIn(0.0, 4.0)
-                                } else 0.0
-
-                                // More sensitive beat detection with amplification
-                                val beatIntensity = if (energyRatio > 1.15) { // Lower threshold (was 1.3)
-                                    // Amplified mapping: 1.15->0.0, 2.5->1.0
-                                    val normalized = ((energyRatio - 1.15) / 1.35).coerceIn(0.0, 1.0)
-                                    // Apply power curve for more dramatic beats
-                                    normalized.pow(0.7) // Power < 1 = more sensitive
-                                } else {
-                                    0.0
-                                }
-
-                                // Balanced smoothing: responsive but not jittery
+                                // samplingRate is milliHertz; 0 falls back to 44.1 kHz inside visualizerSampleRateHz.
+                                val sampleRateHz = visualizerSampleRateHz(samplingRate)
+                                val binHz = (sampleRateHz / 2f) / numFrequencies
+                                val analyzed = bandAnalyzer.analyze(
+                                    magnitudes = magnitudes,
+                                    binHz = binHz,
+                                    nowMs = System.currentTimeMillis(),
+                                )
                                 val currentData = pendingVisualization ?: _audioVisualization.value
-
-                                // Bass: smooth but responsive
-                                val smoothedBass = currentData.bass * 0.5f + bassScaled.toFloat() * 0.5f
-
-                                // Mid: balanced for vocals
-                                val smoothedMid = currentData.mid * 0.45f + midScaled.toFloat() * 0.55f
-
-                                // Treble: responsive for highs with slight smoothing
-                                val smoothedTreble = currentData.treble * 0.35f + trebleScaled.toFloat() * 0.65f
-
-                                // Beat: fast rise, moderate fall for punchy but smooth impact
-                                val smoothedBeat = if (beatIntensity.toFloat() > currentData.beat) {
-                                    // Rise fast
-                                    currentData.beat * 0.25f + beatIntensity.toFloat() * 0.75f
-                                } else {
-                                    // Fall moderately
-                                    currentData.beat * 0.6f + beatIntensity.toFloat() * 0.4f
-                                }
-
                                 val next = currentData.copy(
-                                    bass = smoothedBass.coerceIn(0f, 1f),
-                                    mid = smoothedMid.coerceIn(0f, 1f),
-                                    treble = smoothedTreble.coerceIn(0f, 1f),
-                                    beat = smoothedBeat.coerceIn(0f, 1f)
+                                    bass = analyzed.bass,
+                                    mid = analyzed.mid,
+                                    treble = analyzed.treble,
+                                    beat = analyzed.beat,
                                 )
                                 pendingVisualization = next
                                 val now = System.currentTimeMillis()
@@ -660,18 +574,6 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                                     lastVisualizationEmitTime = now
                                     pendingVisualization = null
                                 }
-
-                                // Debug logging with raw and processed values
-                                // if (bassCount > 0 || midCount > 0 || trebleCount > 0) {
-                                //     android.util.Log.v(
-                                //         "ExoPlayerManager",
-                                //         "🎵 Bass: ${"%.2f".format(smoothedBass)} (bins:$bassCount) | Mid: ${"%.2f".format(smoothedMid)} (bins:$midCount) | Treble: ${"%.2f".format(smoothedTreble)} (bins:$trebleCount) | Stereo: ${"%.2f".format(currentData.stereoBalance)} | Beat: ${"%.2f".format(smoothedBeat)}"
-                                //     )
-                                //     android.util.Log.v(
-                                //         "ExoPlayerManager",
-                                //         "   Raw→ BassAvg: ${"%.3f".format(bassAvg)} | MidAvg: ${"%.3f".format(midAvg)} | TrebleAvg: ${"%.3f".format(trebleAvg)} | BinFreq: ${"%.1f".format(binFreq)}Hz | NumBins: $numFrequencies"
-                                //     )
-                                // }
                             }
                         }
                     },
