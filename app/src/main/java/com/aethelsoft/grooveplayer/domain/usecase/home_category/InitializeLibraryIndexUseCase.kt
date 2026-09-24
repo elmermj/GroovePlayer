@@ -13,6 +13,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
 import com.aethelsoft.grooveplayer.domain.library.LibraryGenreIndex
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
+import com.aethelsoft.grooveplayer.domain.repository.SongMetadataRepository
 import com.aethelsoft.grooveplayer.utils.ArtistParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,7 +28,8 @@ class InitializeLibraryIndexUseCase @Inject constructor(
     private val artistDao: ArtistDao,
     private val albumDao: AlbumDao,
     private val genreDao: GenreDao,
-    private val songDao: SongDao
+    private val songDao: SongDao,
+    private val songMetadataRepository: SongMetadataRepository,
 ) {
 
     suspend operator fun invoke() = withContext(Dispatchers.IO) {
@@ -37,6 +39,8 @@ class InitializeLibraryIndexUseCase @Inject constructor(
         val genreIdCache = mutableMapOf<String, Long>()             // lowercase name -> genreId
 
         val songs = musicRepository.getAllSongs()
+        val editedGenresBySongId = songMetadataRepository.getAllMetadata()
+            .associate { it.songId to it.genres }
 
         for (song in songs) {
             val artistNames = ArtistParser.parseArtists(song.artist)
@@ -113,8 +117,9 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 )
             }
 
-            // Link every genre tag on the song. Cross-refs require the song row.
-            for (genreName in LibraryGenreIndex.namesFor(song)) {
+            // Replace links with the same tags genre browse uses, including edits.
+            songDao.deleteSongGenreCrossRefs(song.id)
+            for (genreName in LibraryGenreIndex.namesFor(song, editedGenresBySongId)) {
                 val genreId = ensureGenreId(genreName, genreIdCache) ?: continue
                 songDao.insertSongGenreCrossRef(
                     SongGenreCrossRef(

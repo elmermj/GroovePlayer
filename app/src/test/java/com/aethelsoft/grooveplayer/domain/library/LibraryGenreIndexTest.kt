@@ -56,6 +56,18 @@ class LibraryGenreIndexTest {
     }
 
     @Test
+    fun `namesFor map matches browse when tags were edited or cleared`() {
+        val song = song(id = "1", genre = "Jazz")
+
+        assertEquals(
+            listOf("Soul"),
+            LibraryGenreIndex.namesFor(song, mapOf("1" to listOf("Soul"))),
+        )
+        assertTrue(LibraryGenreIndex.namesFor(song, mapOf("1" to emptyList())).isEmpty())
+        assertEquals(listOf("Jazz"), LibraryGenreIndex.namesFor(song, emptyMap()))
+    }
+
+    @Test
     fun `song genre list is used when metadata was not edited`() {
         val songs = listOf(
             song(id = "1", genre = "Jazz", genres = listOf("Ambient")),

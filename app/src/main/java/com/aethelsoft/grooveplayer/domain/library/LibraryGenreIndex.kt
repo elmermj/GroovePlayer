@@ -24,14 +24,22 @@ object LibraryGenreIndex {
             .distinctBy { it.lowercase() }
     }
 
+    /**
+     * Same resolution browse uses: a map entry replaces MediaStore tags, including
+     * an empty list when the user cleared genres.
+     */
+    fun namesFor(
+        song: Song,
+        editedGenresBySongId: Map<String, List<String>>,
+    ): List<String> = namesFor(song, editedGenres(song.id, editedGenresBySongId))
+
     fun build(
         songs: List<Song>,
         editedGenresBySongId: Map<String, List<String>> = emptyMap(),
     ): List<LibraryGenre> {
         val groups = linkedMapOf<String, GenreAccumulator>()
         for (song in songs) {
-            val edited = editedGenres(song.id, editedGenresBySongId)
-            for (name in namesFor(song, edited)) {
+            for (name in namesFor(song, editedGenresBySongId)) {
                 val key = name.lowercase()
                 val acc = groups.getOrPut(key) { GenreAccumulator(name) }
                 acc.songs.add(song)
@@ -60,8 +68,7 @@ object LibraryGenreIndex {
         if (key.isEmpty()) return emptyList()
         return sortSongs(
             songs.filter { song ->
-                val edited = editedGenres(song.id, editedGenresBySongId)
-                namesFor(song, edited).any { it.lowercase() == key }
+                namesFor(song, editedGenresBySongId).any { it.lowercase() == key }
             }.distinctBy { it.id }
         )
     }

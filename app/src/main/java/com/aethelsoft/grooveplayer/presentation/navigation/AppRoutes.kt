@@ -12,7 +12,7 @@ object AppRoutes {
     const val RECENTLY_PLAYED = "recently_played"
     const val MOST_PLAYED = "most_played"
     const val GENRES = "genres"
-    const val GENRE_TRACKS = "genre_tracks?name={genreName}"
+    const val GENRE_TRACKS = "genre_tracks?genreName={genreName}"
     const val FAVORITE_TRACKS = "favorite_tracks"
     const val FAVORITE_ARTISTS = "favorite_artists"
     const val FAVORITE_ALBUMS = "favorite_albums"
@@ -36,5 +36,5 @@ object AppRoutes {
     fun nearbyDiscoveryRoute(isSender: Boolean = true) = "nearby_discovery?isSender=$isSender"
     fun albumDetailRoute(albumId: String) = "album/${Uri.encode(albumId)}"
     fun artistDetailRoute(artistId: String) = "artist/${Uri.encode(artistId)}"
-    fun genreTracksRoute(genreName: String) = "genre_tracks?name=${Uri.encode(genreName)}"
+    fun genreTracksRoute(genreName: String) = "genre_tracks?genreName=${Uri.encode(genreName)}"
 }
