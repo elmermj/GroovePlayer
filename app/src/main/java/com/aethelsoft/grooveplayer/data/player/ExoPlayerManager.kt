@@ -241,6 +241,8 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                     _isPlaying.value = false
                 }
                 if (state == Player.STATE_READY) {
+                    // A later expiry on this same song can refresh again.
+                    streamRetrySongId = null
                     scheduleNextCloudPrefetch()
                 }
             }
