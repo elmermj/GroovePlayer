@@ -48,7 +48,7 @@ object LibraryGenreIndex {
                     },
                 )
             }
-            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
+            .sortedWith(compareBy<LibraryGenre, String>(String.CASE_INSENSITIVE_ORDER) { it.name })
     }
 
     fun songsIn(
@@ -83,7 +83,7 @@ object LibraryGenreIndex {
 
     private fun sortSongs(songs: List<Song>): List<Song> =
         songs.sortedWith(
-            compareBy<Song>(String.CASE_INSENSITIVE_ORDER) { it.title }
+            compareBy<Song, String>(String.CASE_INSENSITIVE_ORDER) { it.title }
                 .thenBy(String.CASE_INSENSITIVE_ORDER) { it.artist }
         )
 

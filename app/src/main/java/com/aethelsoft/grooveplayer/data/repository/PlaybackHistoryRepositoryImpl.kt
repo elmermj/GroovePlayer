@@ -166,16 +166,14 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
             genre = genre,
             durationMs = 0L,
             artworkUrl = artworkUrl,
-            album = album?.let { albumName ->
-                Album(
-                    id = albumName,
-                    name = albumName,
-                    artist = artist,
-                    artworkUrl = artworkUrl,
-                    songs = emptyList(),
-                    year = null
-                )
-            }
+            album = Album(
+                id = album,
+                name = album,
+                artist = artist,
+                artworkUrl = artworkUrl,
+                songs = emptyList(),
+                year = null
+            )
         )
     }
 
