@@ -7,9 +7,11 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
+import com.aethelsoft.grooveplayer.data.local.db.dao.FavoriteTrackResult
 import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
 import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
+import com.aethelsoft.grooveplayer.domain.model.MostPlayedTrack
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.model.makeAlbumId
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
@@ -103,25 +105,16 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
     override fun getFavoriteTracks(sinceTimestamp: Long, limit: Int): Flow<List<Song>> {
         return dao.getFavoriteTracks(sinceTimestamp, limit).map { results ->
             android.util.Log.d("PlaybackHistoryRepo", "getFavoriteTracks: Found ${results.size} entries (timestamp=$sinceTimestamp)")
+            results.map { it.toSong() }
+        }
+    }
+
+    override fun getMostPlayed(limit: Int): Flow<List<MostPlayedTrack>> {
+        return dao.getMostPlayed(limit).map { results ->
             results.map { result ->
-                Song(
-                    id = result.songId,
-                    title = result.songTitle,
-                    artist = result.artist,
-                    uri = result.uri,
-                    genre = result.genre,
-                    durationMs = 0L,
-                    artworkUrl = result.artworkUrl,
-                    album = result.album?.let { albumName ->
-                        Album(
-                            id = albumName,
-                            name = albumName,
-                            artist = result.artist,
-                            artworkUrl = result.artworkUrl,
-                            songs = emptyList(),
-                            year = null
-                        )
-                    }
+                MostPlayedTrack(
+                    song = result.toSong(),
+                    playCount = result.playCount,
                 )
             }
         }
@@ -164,6 +157,28 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
         }
     }
     
+    private fun FavoriteTrackResult.toSong(): Song {
+        return Song(
+            id = songId,
+            title = songTitle,
+            artist = artist,
+            uri = uri,
+            genre = genre,
+            durationMs = 0L,
+            artworkUrl = artworkUrl,
+            album = album?.let { albumName ->
+                Album(
+                    id = albumName,
+                    name = albumName,
+                    artist = artist,
+                    artworkUrl = artworkUrl,
+                    songs = emptyList(),
+                    year = null
+                )
+            }
+        )
+    }
+
     private fun PlaybackHistoryEntity.toDomain(): Song {
         return Song(
             id = songId,

@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.domain.repository
 
 interface SongMetadataRepository {
     suspend fun getMetadata(songId: String): SongMetadata?
+    suspend fun getAllMetadata(): List<SongMetadata>
     suspend fun saveMetadata(metadata: SongMetadata)
     suspend fun searchGenres(query: String): List<String>
     suspend fun getAllGenres(): List<String>

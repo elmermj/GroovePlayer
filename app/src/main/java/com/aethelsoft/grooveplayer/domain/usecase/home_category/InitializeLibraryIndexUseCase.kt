@@ -10,6 +10,8 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
+import com.aethelsoft.grooveplayer.domain.library.LibraryGenreIndex
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.utils.ArtistParser
 import kotlinx.coroutines.Dispatchers
@@ -32,7 +34,7 @@ class InitializeLibraryIndexUseCase @Inject constructor(
         // In-memory caches to minimize DB lookups
         val artistCache = mutableMapOf<String, Long>()              // name -> artistId
         val albumCache = mutableMapOf<Pair<String, String>, Long>() // (albumName, primaryArtist) -> albumId
-        val genreCache = mutableSetOf<String>()                     // genre names we've already ensured
+        val genreIdCache = mutableMapOf<String, Long>()             // lowercase name -> genreId
 
         val songs = musicRepository.getAllSongs()
 
@@ -91,15 +93,6 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 )
             }
 
-            // Ensure primary genre exists (MediaStore gives a single genre string)
-            val genreName = song.genre.trim()
-            if (genreName.isNotEmpty() && genreCache.add(genreName)) {
-                val existingGenre = genreDao.getByName(genreName)
-                if (existingGenre == null) {
-                    genreDao.insertOrUpdate(GenreEntity(name = genreName))
-                }
-            }
-
             // Ensure SongEntity + song-artist links
             val songEntity = SongEntity(
                 songId = song.id,
@@ -119,7 +112,36 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                     )
                 )
             }
+
+            // Link every genre tag on the song. Cross-refs require the song row.
+            for (genreName in LibraryGenreIndex.namesFor(song)) {
+                val genreId = ensureGenreId(genreName, genreIdCache) ?: continue
+                songDao.insertSongGenreCrossRef(
+                    SongGenreCrossRef(
+                        songId = song.id,
+                        genreId = genreId
+                    )
+                )
+            }
         }
+    }
+
+    private suspend fun ensureGenreId(
+        genreName: String,
+        genreIdCache: MutableMap<String, Long>,
+    ): Long? {
+        val cacheKey = genreName.lowercase()
+        genreIdCache[cacheKey]?.let { return it }
+        val existing = genreDao.getByName(genreName)
+        val ensured = if (existing == null) {
+            genreDao.insertOrUpdate(GenreEntity(name = genreName))
+            genreDao.getByName(genreName)
+        } else {
+            existing
+        }
+        val id = ensured?.genreId ?: return null
+        genreIdCache[cacheKey] = id
+        return id
     }
 }
 

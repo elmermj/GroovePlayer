@@ -26,8 +26,10 @@ import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
 import com.aethelsoft.grooveplayer.presentation.home.HomeViewModel
+import com.aethelsoft.grooveplayer.presentation.home.ui.GenresLibraryCard
 import com.aethelsoft.grooveplayer.presentation.home.ui.LastPlayedSectionComponent
 import com.aethelsoft.grooveplayer.presentation.home.ui.LibraryCardComponent
+import com.aethelsoft.grooveplayer.presentation.home.ui.MostPlayedLibraryCard
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -39,12 +41,16 @@ import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 fun LargeTabletHomeLayout(
     viewModel: HomeViewModel,
     onNavigateToSongs: () -> Unit,
+    onNavigateToGenres: () -> Unit,
     onNavigateToRecentlyPlayed: () -> Unit,
+    onNavigateToMostPlayed: () -> Unit,
     onNavigateToFavoriteTracks: () -> Unit,
     onNavigateToFavoriteArtists: () -> Unit,
     onNavigateToFavoriteAlbums: () -> Unit
 ) {
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
+    val mostPlayed by viewModel.mostPlayed.collectAsState()
+    val genres by viewModel.genres.collectAsState()
     val favoriteTracks by viewModel.favoriteTracks.collectAsState()
     val favoriteArtists by viewModel.favoriteArtists.collectAsState()
     val favoriteAlbums by viewModel.favoriteAlbums.collectAsState()
@@ -102,6 +108,12 @@ fun LargeTabletHomeLayout(
             )
         }
         item(span = { GridItemSpan(2) }) {
+            GenresLibraryCard(
+                genres = genres,
+                onClick = onNavigateToGenres,
+            )
+        }
+        item(span = { GridItemSpan(2) }) {
             LibraryCardComponent(
                 title = "Recently Played",
                 subtitle = if (recentlyPlayed.isNotEmpty()) "${recentlyPlayed.size} tracks" else "No recent tracks",
@@ -116,6 +128,12 @@ fun LargeTabletHomeLayout(
                 },
                 emptyNoticeText = "No recent tracks",
                 onClick = onNavigateToRecentlyPlayed
+            )
+        }
+        item(span = { GridItemSpan(2) }) {
+            MostPlayedLibraryCard(
+                mostPlayed = mostPlayed,
+                onClick = onNavigateToMostPlayed,
             )
         }
         item(span = { GridItemSpan(2) }) {
