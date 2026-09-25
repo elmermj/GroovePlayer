@@ -18,14 +18,15 @@ object Ipv4First {
     const val CONNECT_TIMEOUT_MS = 5_000L
 
     /**
-     * Bound for one typed DNS query. A is allowed this long. AAAA gets it only
-     * when no A record came back.
+     * Bound for one typed DNS query, and for the system-resolver fallback
+     * used below API 29 or when both typed queries are empty.
+     * A and AAAA run together, so this is not added twice.
      */
     const val DNS_QUERY_TIMEOUT_MS = 4_000L
 
     /**
-     * Extra wait for AAAA after A already answered. Long enough for a healthy
-     * DNS response, short enough that a blackholed AAAA lookup cannot eat startup.
+     * How long to keep waiting for an in-flight AAAA query after A has already
+     * answered. The AAAA lookup started at the same time as A.
      */
     const val AAAA_GRACE_MS = 1_000L
 

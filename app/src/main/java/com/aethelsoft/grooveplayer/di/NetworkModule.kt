@@ -11,6 +11,7 @@ import com.aethelsoft.grooveplayer.data.remote.Ipv4FirstDns
 import com.aethelsoft.grooveplayer.data.remote.R2Dns
 import com.aethelsoft.grooveplayer.domain.backup.R2Connect
 import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
+import com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery
 import com.aethelsoft.grooveplayer.domain.network.Ipv4First
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -113,6 +114,7 @@ object NetworkModule {
         return OkHttpClient.Builder()
             .backendDns()
             .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(StartupSessionRecovery.RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .authenticator(tokenRefreshAuthenticator)

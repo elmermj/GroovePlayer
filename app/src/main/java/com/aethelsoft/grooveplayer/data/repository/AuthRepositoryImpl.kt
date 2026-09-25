@@ -43,6 +43,8 @@ class AuthRepositoryImpl @Inject constructor(
     private val sessionGeneration = AtomicInteger(0)
     /** Bumped per restore so a timed-out startup fallback cannot clobber a newer `/v1/me`. */
     private val restoreAttempt = AtomicInteger(0)
+    /** Highest attempt that has already applied a server `/v1/me` user. */
+    private val publishedRemoteAttempt = AtomicInteger(0)
     private val _authUser = MutableStateFlow<AuthUser?>(null)
     private val _serverSyncError = MutableStateFlow<String?>(null)
 
@@ -227,23 +229,35 @@ class AuthRepositoryImpl @Inject constructor(
                     localUser = { localAuthUser() },
                 )
             }
-            if (boundByStartupTimeout) {
-                withTimeoutOrNull(StartupSessionRecovery.NETWORK_TIMEOUT_MS) { recover() }
-                    ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
+            val cap = if (boundByStartupTimeout) {
+                StartupSessionRecovery.NETWORK_TIMEOUT_MS
             } else {
-                recover()
+                StartupSessionRecovery.RETRY_TIMEOUT_MS
             }
+            withTimeoutOrNull(cap) { recover() }
+                ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
         } catch (e: CancellationException) {
             throw e
         }
 
         return mutex.withLock {
+            val newerRemotePublished = publishedRemoteAttempt.get() > attempt
             if (sessionGeneration.get() != generation || !tokenStore.hasSession()) {
                 Result.success(_authUser.value)
-            } else if (!StartupSessionRecovery.shouldPublish(attempt, restoreAttempt.get(), outcome)) {
-                // Startup already gave up. A newer restore (Profile Retry) owns the screen.
+            } else if (
+                !StartupSessionRecovery.shouldPublish(
+                    attempt,
+                    restoreAttempt.get(),
+                    outcome,
+                    newerRemotePublished,
+                )
+            ) {
+                // Stale fallback, or an older /v1/me after a newer one was published.
                 Result.success(_authUser.value)
             } else {
+                if (outcome is StartupSessionRecovery.Outcome.Remote) {
+                    publishedRemoteAttempt.updateAndGet { published -> maxOf(published, attempt) }
+                }
                 applyStartupOutcome(outcome)
             }
         }

@@ -19,6 +19,12 @@ object StartupSessionRecovery {
     /** Bound for the startup network attempt. Past this, use the local profile. */
     const val NETWORK_TIMEOUT_MS = 12_000L
 
+    /**
+     * Bound for a Profile Retry. Longer than startup so a slow but working
+     * IPv4 path can finish, short enough that "Retrying…" cannot sit for a minute.
+     */
+    const val RETRY_TIMEOUT_MS = 30_000L
+
     enum class FailureKind {
         /** HTTP 401. Refresh, then retry. */
         UNAUTHORIZED,
@@ -47,13 +53,29 @@ object StartupSessionRecovery {
     }
 
     /**
-     * A startup attempt that already fell back must not overwrite a newer
-     * `/v1/me` (Profile Retry). A remote user from an older attempt may still
-     * replace a fallback. Session clear is handled by the caller.
+     * Whether [attempt]'s [outcome] may change the signed-in user.
+     *
+     * A rejected refresh always applies, including from an older attempt: the
+     * refresh token is dead and the session must be dropped. A stale fallback
+     * is ignored. An older server user is ignored only after a newer attempt
+     * has already published one, so a late response cannot overwrite tier or quota.
+     *
+     * [newerRemotePublished] is true when an attempt newer than [attempt] has
+     * already applied [Outcome.Remote].
      */
-    fun shouldPublish(attempt: Int, latestAttempt: Int, outcome: Outcome): Boolean {
-        if (attempt == latestAttempt) return true
-        return outcome is Outcome.Remote
+    fun shouldPublish(
+        attempt: Int,
+        latestAttempt: Int,
+        outcome: Outcome,
+        newerRemotePublished: Boolean,
+    ): Boolean {
+        if (outcome is Outcome.RefreshRejected) return true
+        if (attempt >= latestAttempt) return true
+        return when (outcome) {
+            is Outcome.LocalFallback -> false
+            is Outcome.Remote -> !newerRemotePublished
+            Outcome.RefreshRejected -> true
+        }
     }
 
     fun failureKind(error: Throwable): FailureKind {

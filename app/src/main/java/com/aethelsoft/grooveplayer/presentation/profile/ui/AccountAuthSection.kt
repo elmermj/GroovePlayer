@@ -47,6 +47,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
     val authError by viewModel.authError.collectAsState()
     val serverSyncError by viewModel.serverSyncError.collectAsState()
     val serverRetryInFlight by viewModel.serverRetryInFlight.collectAsState()
+    val openRestoreInFlight by viewModel.openRestoreInFlight.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
 
     val signedIn = authUser != null
@@ -180,7 +181,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
             onClick = { viewModel.retryServerSync() },
             modifier = Modifier.fillMaxWidth(),
             title = if (serverRetryInFlight) "Retrying…" else "Retry",
-            isActive = !serverRetryInFlight && !authLoading,
+            isActive = !serverRetryInFlight && !openRestoreInFlight && !authLoading,
         )
     }
     if (showSignOutConfirm) {

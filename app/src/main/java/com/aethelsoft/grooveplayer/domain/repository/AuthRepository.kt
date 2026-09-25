@@ -23,9 +23,9 @@ interface AuthRepository {
     suspend fun deleteAccount(): Result<Unit>
     suspend fun refreshSession(): Result<AuthUser>
     /**
-     * Load `/v1/me` (tier, quota, storage). [boundByStartupTimeout] caps the
-     * cold-start attempt at [com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery.NETWORK_TIMEOUT_MS].
-     * Profile Retry passes false so that attempt is not replaced by the startup fallback.
+     * Load `/v1/me` (tier, quota, storage). [boundByStartupTimeout] uses the
+     * 12s startup cap. Profile Retry passes false and is capped at
+     * [com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery.RETRY_TIMEOUT_MS].
      */
     suspend fun restoreSession(boundByStartupTimeout: Boolean = true): Result<AuthUser?>
     suspend fun getAccessToken(): String?

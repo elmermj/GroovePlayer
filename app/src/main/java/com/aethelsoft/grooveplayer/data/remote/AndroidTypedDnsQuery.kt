@@ -16,11 +16,13 @@ import java.util.concurrent.atomic.AtomicReference
  * before it returns A records; [DnsResolver] can ask for A on its own.
  */
 internal object AndroidTypedDnsQuery {
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+    private val executor: ExecutorService = Executors.newCachedThreadPool { runnable ->
         Thread(runnable, "backend-dns").apply { isDaemon = true }
     }
 
     fun lookup(type: Int, hostname: String, timeoutMs: Long): List<InetAddress> {
+        // minSdk is 24. Typed DnsResolver queries exist only on API 29+.
+        // Callers bound Dns.SYSTEM; returning empty here must not hang on getaddrinfo.
         if (Build.VERSION.SDK_INT < 29) return emptyList()
         return queryApi29(type, hostname, timeoutMs)
     }
@@ -49,12 +51,22 @@ internal object AndroidTypedDnsQuery {
                     }
                 },
             )
+        } catch (e: InterruptedException) {
+            signal.cancel()
+            Thread.currentThread().interrupt()
+            throw e
         } catch (_: Exception) {
             signal.cancel()
             return emptyList()
         }
-        if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+        try {
+            if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
+                signal.cancel()
+            }
+        } catch (e: InterruptedException) {
             signal.cancel()
+            Thread.currentThread().interrupt()
+            throw e
         }
         return result.get()
     }

@@ -38,16 +38,15 @@ class Ipv4FirstTest {
     }
 
     @Test
-    fun oneDeadConnectStillFitsUnderTheStartupCap() {
+    fun oneDnsBoundPlusOneConnectFitsUnderTheStartupCap() {
         assertTrue(Ipv4First.CONNECT_TIMEOUT_MS in 1L..5_000L)
         assertTrue(Ipv4First.DNS_QUERY_TIMEOUT_MS in 1L..5_000L)
-        assertTrue(Ipv4First.AAAA_GRACE_MS in 1L..1_000L)
+        assertTrue(Ipv4First.AAAA_GRACE_MS in 1L..Ipv4First.DNS_QUERY_TIMEOUT_MS)
         assertEquals(1, Ipv4First.TYPE_A)
         assertEquals(28, Ipv4First.TYPE_AAAA)
-        // A, a short AAAA grace, then one handshake — still inside the startup cap.
-        val budget = Ipv4First.DNS_QUERY_TIMEOUT_MS +
-            Ipv4First.AAAA_GRACE_MS +
-            Ipv4First.CONNECT_TIMEOUT_MS
+        // A and AAAA overlap, and the system fallback uses this same DNS bound
+        // only when typed queries return nothing. Do not add those waits together.
+        val budget = Ipv4First.DNS_QUERY_TIMEOUT_MS + Ipv4First.CONNECT_TIMEOUT_MS
         assertTrue(budget < StartupSessionRecovery.NETWORK_TIMEOUT_MS)
     }
 
