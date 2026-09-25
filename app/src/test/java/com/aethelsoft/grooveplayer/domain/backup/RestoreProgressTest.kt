@@ -17,7 +17,7 @@ class RestoreProgressTest {
         progress.onFileBytes(0, 50L, 100L)
         steps += progress.snapshot().fraction!!
         assertEquals("Downloading 1 of 2 files", progress.snapshot().status)
-        assertEquals("50 B of 100 B", progress.snapshot().detail)
+        assertEquals("50 B of 200 B", progress.snapshot().detail)
         assertEquals(RestoreUiPhase.DOWNLOADING, progress.snapshot().phase)
 
         progress.onFileBytes(0, 100L, 100L)
@@ -25,7 +25,7 @@ class RestoreProgressTest {
         steps += progress.snapshot().fraction!!
         assertEquals("Verifying 1 of 2 files", progress.snapshot().status)
         progress.onVerifyBytes(0, 40L, 100L)
-        assertEquals("40 B of 100 B", progress.snapshot().detail)
+        assertEquals("100 B of 200 B", progress.snapshot().detail)
         steps += progress.snapshot().fraction!!
         progress.finishFile(0)
 
@@ -64,7 +64,7 @@ class RestoreProgressTest {
 
         progress.onFileBytes(0, 40L, 80L)
         assertEquals(0.25f, progress.snapshot().fraction!!, 0.0001f)
-        assertEquals("40 B of 80 B", progress.snapshot().detail)
+        assertEquals("0 B of 80 B", progress.snapshot().detail)
 
         progress.finishFile(0)
         progress.beginFile(1)
@@ -109,7 +109,7 @@ class RestoreProgressTest {
         assertEquals("Retrying (1/3)…", retried.retry)
         assertEquals("Downloading 2 of 2 files", retried.status)
         assertEquals(0.5f, retried.fraction!!, 0.0001f)
-        assertEquals("0 B of 100 B", retried.detail)
+        assertEquals("100 B of 200 B", retried.detail)
 
         progress.onFileBytes(1, 40L, 100L)
         val duringRetry = progress.snapshot()
@@ -153,5 +153,60 @@ class RestoreProgressTest {
     fun applyingHoldIsLongEnoughToBeSeen() {
         assertTrue(RestoreProgressLabel.MIN_APPLYING_VISIBLE_MS >= 500L)
         assertEquals("Applying restored data…", RestoreProgressLabel.APPLYING)
+    }
+
+    @Test
+    fun manifestTotalStaysFixedWhileEachFileDownloads() {
+        val progress = RestoreProgress()
+        val sizes = listOf(5_767_168L, 8_388_608L, 5_242_880L, 6_291_456L)
+        progress.planDownloads(sizes)
+        val totalLabel = RestoreProgressLabel.formatBytes(sizes.sum())
+        assertTrue(progress.snapshot().detail!!.endsWith("of $totalLabel"))
+
+        val seenTotals = mutableListOf(totalLabel)
+        progress.onFileBytes(0, 1_000_000L, sizes[0])
+        progress.finishFile(0)
+        progress.beginFile(1)
+        progress.onFileBytes(1, 2_000_000L, 9_999_999L)
+        progress.finishFile(1)
+        progress.beginFile(2)
+        progress.onFileBytes(2, 100L, sizes[2])
+        seenTotals += progress.snapshot().detail!!.substringAfter("of ")
+        progress.beginVerify(2)
+        progress.onVerifyBytes(2, 10L, sizes[2])
+        seenTotals += progress.snapshot().detail!!.substringAfter("of ")
+
+        assertTrue(seenTotals.all { it == totalLabel })
+        val shown = progress.snapshot().detail!!.substringBefore(" of ").let { label ->
+            // Numerator moved forward from the initial 0 B and did not rewind on verify.
+            label != "0 B"
+        }
+        assertTrue(shown)
+        assertEquals("Verifying 3 of 4 files", progress.snapshot().status)
+    }
+
+    @Test
+    fun contentLengthDoesNotInventANewManifestTotal() {
+        val progress = RestoreProgress()
+        progress.planDownloads(listOf(null))
+        progress.onFileBytes(0, 5_000_000L, 8_200_000L)
+        assertNull(progress.snapshot().detail)
+    }
+
+    @Test
+    fun verifyingStepStaysAfterTheLastDownloadStatus() {
+        val progress = RestoreProgress()
+        progress.planDownloads(listOf(100L, 100L))
+        progress.onFileBytes(0, 100L, 100L)
+        progress.finishFile(0)
+        progress.onFileBytes(1, 100L, 100L)
+        progress.finishFile(1)
+        assertEquals("Downloading 2 of 2 files", progress.snapshot().status)
+        progress.showVerifyingFiles()
+        val shown = progress.snapshot()
+        assertEquals(RestoreUiPhase.VERIFYING, shown.phase)
+        assertEquals("Verifying 2 of 2 files", shown.status)
+        assertEquals("200 B of 200 B", shown.detail)
+        assertTrue(RestoreProgressLabel.MIN_VERIFY_VISIBLE_MS >= 500L)
     }
 }

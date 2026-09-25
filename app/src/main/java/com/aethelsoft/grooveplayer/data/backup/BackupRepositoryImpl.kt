@@ -32,6 +32,7 @@ import com.aethelsoft.grooveplayer.domain.backup.LoginRestorePrompt
 import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.RestoreProgress
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressLabel
 import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
 import com.aethelsoft.grooveplayer.domain.model.BackupJobStep
@@ -1639,8 +1640,6 @@ class BackupRepositoryImpl @Inject constructor(
                 localPath = dest.absolutePath,
             )
         }
-        restoreProgress.onCatalogVerify()
-        publishRestore()
         StagedCatalogRewriter.rewrite(stagedDb, placements)
         val missing = BackupCatalogPaths.missingLocalBytes(placements) { path ->
             val file = File(path)
@@ -1652,6 +1651,15 @@ class BackupRepositoryImpl @Inject constructor(
                     "The library database was not replaced.",
             )
         }
+        // Hashing each file is faster than a frame, so "Verifying N of M" never
+        // painted between "Downloading M of M" and Applying. Hold it once here.
+        if (plannedSizes.isNotEmpty()) {
+            restoreProgress.showVerifyingFiles()
+        } else {
+            restoreProgress.onCatalogVerify()
+        }
+        publishRestore()
+        delay(RestoreProgressLabel.MIN_VERIFY_VISIBLE_MS)
     }
 
     /**
