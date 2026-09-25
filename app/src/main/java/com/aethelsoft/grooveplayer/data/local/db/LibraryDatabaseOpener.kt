@@ -9,15 +9,23 @@ import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import java.io.File
 
 /**
- * Opens Room once per process. If a previous restore left a file Room cannot open,
- * the file is replaced with a fresh database so startup can reach Home. Downloads
- * live outside this file and are indexed again from MediaStore.
+ * Opens Room once per process. A database newer than this build is left on disk and the
+ * UI asks the user to update the app. A corrupt file from an interrupted restore can still
+ * be replaced. Likes, history, and playlists are not deleted on upgrade or downgrade.
  */
 object LibraryDatabaseOpener {
     private const val TAG = "LibraryDatabaseOpener"
 
+    @Volatile
+    var needsAppUpdate: Boolean = false
+
     fun open(context: Context): GroovePlayerDatabase {
         reconcileInterruptedSwap(context)
+        val onDisk = SqliteUserVersion.read(context.getDatabasePath(GroovePlayerDatabase.DATABASE_NAME))
+        if (DatabaseOpenPolicy.isDowngrade(onDisk, GroovePlayerDatabase.SCHEMA_VERSION)) {
+            needsAppUpdate = true
+            return inMemory(context)
+        }
         val first = build(context)
         try {
             first.openHelper.writableDatabase
@@ -26,6 +34,10 @@ object LibraryDatabaseOpener {
         } catch (error: Exception) {
             Log.e(TAG, "Room failed to open; recovering without a crash loop", error)
             runCatching { first.close() }
+            if (DatabaseOpenPolicy.keepFileOnOpenFailure(error)) {
+                needsAppUpdate = true
+                return inMemory(context)
+            }
             if (RestoreApplyRecovery.isUnrecoverableDatabaseFailure(error)) {
                 val restored = runCatching {
                     RoomDbSwapFiles.forContext(context).restorePreviousIfPresent()
@@ -45,6 +57,10 @@ object LibraryDatabaseOpener {
                     } catch (retryError: Exception) {
                         Log.e(TAG, "Rollback database still failed to open", retryError)
                         runCatching { retry.close() }
+                        if (DatabaseOpenPolicy.keepFileOnOpenFailure(retryError)) {
+                            needsAppUpdate = true
+                            return inMemory(context)
+                        }
                     }
                 }
                 deleteRoomFiles(context)
@@ -55,8 +71,12 @@ object LibraryDatabaseOpener {
             second.openHelper.writableDatabase
             second
         } catch (error: Exception) {
-            Log.e(TAG, "Room still failed to open; recreating an empty library database", error)
+            Log.e(TAG, "Room still failed to open", error)
             runCatching { second.close() }
+            if (DatabaseOpenPolicy.keepFileOnOpenFailure(error)) {
+                needsAppUpdate = true
+                return inMemory(context)
+            }
             deleteRoomFiles(context)
             build(context)
         }
@@ -68,14 +88,12 @@ object LibraryDatabaseOpener {
             GroovePlayerDatabase::class.java,
             GroovePlayerDatabase.DATABASE_NAME,
         )
-            .addMigrations(
-                GroovePlayerMigrations.MIGRATION_16_17,
-                GroovePlayerMigrations.MIGRATION_17_18,
-                GroovePlayerMigrations.MIGRATION_18_19,
-            )
-            .fallbackToDestructiveMigration()
-            .fallbackToDestructiveMigrationOnDowngrade()
+            .addMigrations(*GroovePlayerMigrations.ALL.toTypedArray())
             .build()
+    }
+
+    private fun inMemory(context: Context): GroovePlayerDatabase {
+        return Room.inMemoryDatabaseBuilder(context, GroovePlayerDatabase::class.java).build()
     }
 
     /**

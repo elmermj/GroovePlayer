@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.domain.backup
 
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStream
 import java.security.MessageDigest
 
 /** SHA-256 of file bytes. Backup identity is this hash plus size; filenames are cosmetic. */
@@ -34,6 +35,20 @@ object ContentHash {
         if (onProgress != null && sinceEmit > 0L) {
             onProgress(readTotal, total)
         }
-        return digest.digest().joinToString("") { b -> "%02x".format(b) }
+        return hex(digest.digest())
     }
+
+    fun sha256(input: InputStream): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buf = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buf)
+            if (read < 0) break
+            digest.update(buf, 0, read)
+        }
+        return hex(digest.digest())
+    }
+
+    private fun hex(bytes: ByteArray): String =
+        bytes.joinToString("") { b -> "%02x".format(b) }
 }
