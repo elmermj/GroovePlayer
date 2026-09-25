@@ -6,6 +6,8 @@ import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
+import com.aethelsoft.grooveplayer.data.remote.R2Dns
+import com.aethelsoft.grooveplayer.domain.backup.R2Connect
 import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -82,6 +84,10 @@ object NetworkModule {
      * before restore could reach Applying. HTTP/1.1 avoids HTTP/2 stream resets
      * on those whole-object bodies.
      *
+     * Connect is short, and DNS prefers A records. The library snapshot is the
+     * first request to R2; a 30s connect timeout on blackholed AAAA addresses
+     * held "0 B" for about a minute before any snapshot byte arrived.
+     *
      * R2 cost rules for backup restore only:
      * - One whole-object GetObject (no Range spam)
      * - No client HeadObject (HEAD rejected; complete does server Head once)
@@ -121,7 +127,8 @@ object NetworkModule {
             chain.proceed(next)
         }
         val builder = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
+            .dns(R2Dns())
+            .connectTimeout(R2Connect.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .readTimeout(5, TimeUnit.MINUTES)
             .writeTimeout(5, TimeUnit.MINUTES)
             .callTimeout(RestoreDownloadRetry.R2_CALL_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)

@@ -27,6 +27,12 @@ object RestoreProgressLabel {
     /** Long enough for the applying screen to paint before the process restarts. */
     const val MIN_APPLYING_VISIBLE_MS = 800L
 
+    /**
+     * Hash checks finish faster than a frame, and the next status replaces them.
+     * Hold the verifying line this long so it actually paints.
+     */
+    const val MIN_VERIFY_VISIBLE_MS = 600L
+
     fun downloading(current: Int, total: Int): String = "Downloading $current of $total files"
 
     fun verifying(current: Int, total: Int): String = "Verifying $current of $total files"
@@ -62,6 +68,10 @@ object RestoreProgressLabel {
  * Finished files only move the bar forward. A retry deletes the partial object, so
  * the bar returns to the last finished file instead of keeping bytes that are gone.
  * Inside one attempt, and from verifying through applying, the fraction does not decrease.
+ *
+ * The byte line is one total: the sum of manifest sizes from [planDownloads].
+ * A file's Content-Length is never added to that total, so it cannot jump
+ * between objects. The count moves forward during an attempt.
  */
 class RestoreProgress {
     private var planned = false
@@ -72,6 +82,10 @@ class RestoreProgress {
     private var lastRead = LongArray(0)
     private var finished = BooleanArray(0)
     private var byteBased = false
+    /** Sum of positive manifest sizes. Fixed for the whole download. */
+    private var manifestTotal = 0L
+    /** Bytes shown in the detail line. Drops only when a retry deletes a partial. */
+    private var displayedBytes = 0L
 
     private var phase = RestoreUiPhase.DOWNLOADING
     private var status = RestoreProgressLabel.DOWNLOADING_LIBRARY
@@ -88,6 +102,8 @@ class RestoreProgress {
         lastRead = LongArray(0)
         finished = BooleanArray(0)
         byteBased = false
+        manifestTotal = 0L
+        displayedBytes = 0L
         phase = RestoreUiPhase.DOWNLOADING
         status = RestoreProgressLabel.DOWNLOADING_LIBRARY
         retry = null
@@ -119,6 +135,8 @@ class RestoreProgress {
         lastRead = LongArray(fileCount)
         finished = BooleanArray(fileCount)
         byteBased = fileCount > 0 && sizes.all { it != null && it > 0L }
+        manifestTotal = fileSizes.sumOf { it?.takeIf { size -> size > 0L } ?: 0L }
+        displayedBytes = 0L
         planned = true
         retry = null
         if (fileCount == 0) {
@@ -129,8 +147,8 @@ class RestoreProgress {
         } else {
             phase = RestoreUiPhase.DOWNLOADING
             status = RestoreProgressLabel.downloading(1, fileCount)
-            detail = sizes[0]?.takeIf { it > 0L }?.let { RestoreProgressLabel.bytes(0L, it) }
             fraction = 0f
+            refreshDetail(allowDrop = true)
         }
     }
 
@@ -141,7 +159,7 @@ class RestoreProgress {
         inflight[index] = 0L
         phase = RestoreUiPhase.DOWNLOADING
         status = RestoreProgressLabel.downloading(index + 1, fileCount)
-        detail = capOf(index)?.let { RestoreProgressLabel.bytes(0L, it) }
+        refreshDetail(allowDrop = false)
         advance(allowDrop = false)
     }
 
@@ -156,7 +174,7 @@ class RestoreProgress {
         inflight[index] = if (cap != null) bytesRead.coerceIn(0L, cap) else 0L
         phase = RestoreUiPhase.DOWNLOADING
         status = RestoreProgressLabel.downloading(index + 1, fileCount)
-        detail = cap?.let { RestoreProgressLabel.bytes(inflight[index], it) }
+        refreshDetail(allowDrop = false)
         advance(allowDrop = false)
     }
 
@@ -167,7 +185,7 @@ class RestoreProgress {
         retry = RestoreProgressLabel.retrying(retryNumber, maxAttempts)
         phase = RestoreUiPhase.DOWNLOADING
         status = RestoreProgressLabel.downloading(index + 1, fileCount)
-        detail = capOf(index)?.let { RestoreProgressLabel.bytes(0L, it) }
+        refreshDetail(allowDrop = true)
         advance(allowDrop = true)
     }
 
@@ -181,16 +199,19 @@ class RestoreProgress {
         }
         phase = RestoreUiPhase.VERIFYING
         status = RestoreProgressLabel.verifying(index + 1, fileCount)
-        detail = cap?.let { RestoreProgressLabel.bytes(0L, it) }
+        refreshDetail(allowDrop = false)
         advance(allowDrop = false)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun onVerifyBytes(index: Int, bytesRead: Long, totalBytes: Long) {
         if (!inRange(index) || finished[index]) return
+        // bytesRead/totalBytes are the hash scan. They start again at 0, so they
+        // must not replace the manifest byte line.
         retry = null
         phase = RestoreUiPhase.VERIFYING
         status = RestoreProgressLabel.verifying(index + 1, fileCount)
-        detail = RestoreProgressLabel.bytes(bytesRead, totalBytes)
+        refreshDetail(allowDrop = false)
         advance(allowDrop = false)
     }
 
@@ -199,6 +220,23 @@ class RestoreProgress {
         finished[index] = true
         inflight[index] = 0L
         retry = null
+        refreshDetail(allowDrop = false)
+        advance(allowDrop = false)
+    }
+
+    /**
+     * After every downloaded file has been hashed. Per-file verify updates are
+     * shorter than a frame, so the screen publishes this once and holds it.
+     */
+    fun showVerifyingFiles() {
+        if (!planned || fileCount == 0) {
+            onCatalogVerify()
+            return
+        }
+        phase = RestoreUiPhase.VERIFYING
+        status = RestoreProgressLabel.verifying(fileCount, fileCount)
+        retry = null
+        refreshDetail(allowDrop = false)
         advance(allowDrop = false)
     }
 
@@ -229,6 +267,29 @@ class RestoreProgress {
     )
 
     private fun inRange(index: Int) = planned && index in 0 until fileCount
+
+    /**
+     * Manifest total is fixed at [planDownloads]. Learned Content-Lengths fill a
+     * file's own slice of the bar, but they are not added to the displayed total.
+     */
+    private fun refreshDetail(allowDrop: Boolean) {
+        if (!planned || manifestTotal <= 0L) {
+            if (planned) detail = null
+            return
+        }
+        val done = bytesDone().coerceIn(0L, manifestTotal)
+        displayedBytes = if (allowDrop) done else max(displayedBytes, done)
+        detail = RestoreProgressLabel.bytes(displayedBytes, manifestTotal)
+    }
+
+    private fun bytesDone(): Long {
+        var done = 0L
+        for (i in 0 until fileCount) {
+            val size = sizes.getOrNull(i)?.takeIf { it > 0L } ?: continue
+            done += if (finished[i]) size else inflight[i].coerceIn(0L, size)
+        }
+        return done
+    }
 
     private fun capOf(index: Int): Long? {
         val plannedSize = sizes.getOrNull(index)
