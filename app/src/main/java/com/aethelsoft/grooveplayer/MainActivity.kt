@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,7 +40,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.aethelsoft.grooveplayer.data.local.db.LibraryDatabaseOpener
 import com.aethelsoft.grooveplayer.presentation.common.AppThemeViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalBottomBarSecondaryContent
@@ -148,12 +146,8 @@ class MainActivity : ComponentActivity() {
                     LocalPlayerViewModel provides playerViewModel,
                     LocalBluetoothViewModel provides bluetoothViewModel
                 ) {
-                    if (LibraryDatabaseOpener.needsAppUpdate) {
-                        PleaseUpdateLibrary()
-                    } else {
-                        LibraryImportHost {
-                            GroovePlayerAppMain()
-                        }
+                    LibraryImportHost {
+                        GroovePlayerAppMain()
                     }
                 }
             }
@@ -173,18 +167,6 @@ class MainActivity : ComponentActivity() {
         val nfc = NfcShareDiscovery(this)
         val info = nfc.readSessionFromIntent(intent)
         info?.let { ShareNfcReceiver.tryEmit(it) }
-    }
-}
-
-@Composable
-private fun PleaseUpdateLibrary() {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Please update the app to open your library. Your songs, likes, and history are still saved on this device.",
-        )
     }
 }
 
