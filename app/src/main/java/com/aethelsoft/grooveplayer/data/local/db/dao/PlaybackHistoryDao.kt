@@ -12,6 +12,12 @@ interface PlaybackHistoryDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPlayback(playback: PlaybackHistoryEntity): Long
+
+    @Query("SELECT songId FROM playback_history")
+    suspend fun allSongIds(): List<String>
+
+    @Query("UPDATE playback_history SET songId = :toId WHERE songId = :fromId")
+    suspend fun retargetSongId(fromId: String, toId: String)
     
     @Query("""
         SELECT * FROM playback_history p1

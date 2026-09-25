@@ -16,9 +16,10 @@ data class BackupProgressLine(
 )
 
 object BackupProgressLabel {
-    /** Folder scan stays at or below this so consolidate (5–40) cannot jump backward. */
+    /** Library scan stays at or below this so file upload (5–90) cannot jump backward. */
     const val PREPARING_PERCENT_CAP = 4
 
+    @Suppress("UNUSED_PARAMETER")
     fun status(
         step: BackupJobStep,
         consolidateCompleted: Int,
@@ -26,9 +27,7 @@ object BackupProgressLabel {
         uploadCompleted: Int,
         uploadTotal: Int,
     ): String = when (step) {
-        BackupJobStep.PREPARING -> "Preparing included folders…"
-        BackupJobStep.CONSOLIDATING ->
-            "Consolidating $consolidateCompleted/$consolidateTotal files"
+        BackupJobStep.PREPARING -> "Preparing library…"
         BackupJobStep.UPLOADING_FILES -> "Uploading files $uploadCompleted/$uploadTotal"
         BackupJobStep.UPLOADING_CATALOG -> "Uploading catalog"
     }
@@ -40,8 +39,7 @@ object BackupProgressLabel {
     ): Int {
         val (start, end) = when (step) {
             BackupJobStep.PREPARING -> return PREPARING_PERCENT_CAP
-            BackupJobStep.CONSOLIDATING -> 5 to 40
-            BackupJobStep.UPLOADING_FILES -> 40 to 90
+            BackupJobStep.UPLOADING_FILES -> 5 to 90
             BackupJobStep.UPLOADING_CATALOG -> return 95
         }
         if (total <= 0) return end
@@ -49,17 +47,7 @@ object BackupProgressLabel {
         return (start + fraction * (end - start)).toInt().coerceIn(0, 99)
     }
 
-    /**
-     * Consolidate band is 5–40. [bytesDone] moves the bar inside that band while a file
-     * is still hashing or copying, so one large song is not stuck until it finishes.
-     */
-    fun consolidatePercent(bytesDone: Long, bytesTotal: Long): Int {
-        if (bytesTotal <= 0L) return 5
-        val done = bytesDone.coerceAtLeast(0L).coerceAtMost(bytesTotal)
-        val fraction = done.toDouble() / bytesTotal.toDouble()
-        return (5.0 + fraction * 35.0).toInt().coerceIn(5, 40)
-    }
-
+    @Suppress("UNUSED_PARAMETER")
     fun failure(
         step: BackupJobStep,
         consolidateCompleted: Int,
@@ -69,15 +57,13 @@ object BackupProgressLabel {
         detail: String?,
     ): String {
         val where = when (step) {
-            BackupJobStep.PREPARING -> "Backup failed while preparing folders."
-            BackupJobStep.CONSOLIDATING ->
-                "Consolidating failed at $consolidateCompleted/$consolidateTotal files."
+            BackupJobStep.PREPARING -> "Backup failed while preparing the library."
             BackupJobStep.UPLOADING_FILES ->
                 "Uploading files failed at $uploadCompleted/$uploadTotal."
             BackupJobStep.UPLOADING_CATALOG -> "Uploading catalog failed."
         }
         val safe = when (step) {
-            BackupJobStep.CONSOLIDATING, BackupJobStep.UPLOADING_FILES ->
+            BackupJobStep.UPLOADING_FILES ->
                 " The library snapshot was not uploaded."
             BackupJobStep.UPLOADING_CATALOG ->
                 " Song files already in the cloud are kept."
@@ -87,6 +73,7 @@ object BackupProgressLabel {
         return "$where$why$safe Tap Retry."
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun lines(
         phase: CloudBackupPhase,
         step: BackupJobStep,
@@ -96,16 +83,11 @@ object BackupProgressLabel {
         uploadTotal: Int,
     ): List<BackupProgressLine> {
         return listOf(
-            BackupJobStep.CONSOLIDATING,
             BackupJobStep.UPLOADING_FILES,
             BackupJobStep.UPLOADING_CATALOG,
         ).map { stage ->
             val tone = tone(stage, step, phase)
             val text = when (stage) {
-                BackupJobStep.CONSOLIDATING -> when {
-                    tone == BackupProgressTone.PENDING || consolidateTotal == 0 -> "Consolidating"
-                    else -> "Consolidating $consolidateCompleted/$consolidateTotal files"
-                }
                 BackupJobStep.UPLOADING_FILES -> when {
                     tone == BackupProgressTone.PENDING || uploadTotal == 0 -> "Uploading files"
                     else -> "Uploading files $uploadCompleted/$uploadTotal"
@@ -114,7 +96,7 @@ object BackupProgressLabel {
                     BackupProgressTone.FAILED -> "Uploading catalog failed"
                     else -> "Uploading catalog"
                 }
-                BackupJobStep.PREPARING -> "Preparing included folders…"
+                BackupJobStep.PREPARING -> "Preparing library…"
             }
             BackupProgressLine(text, tone)
         }
@@ -130,51 +112,5 @@ object BackupProgressLabel {
         if (stage.ordinal < current.ordinal) return BackupProgressTone.DONE
         if (stage == current && phase != CloudBackupPhase.IDLE) return BackupProgressTone.ACTIVE
         return BackupProgressTone.PENDING
-    }
-}
-
-/**
- * Byte budget for copying approved songs into the app library.
- * Bytes only increase, so the bar cannot move backward inside one backup run.
- * A new run starts a new instance after the preparing step resets the UI to 0.
- */
-class ConsolidateByteProgress(
-    val fileCount: Int,
-    plannedBytes: Long,
-) {
-    private val planned = plannedBytes.coerceAtLeast(1L)
-    private var bytesDone = 0L
-    private var opRead = 0L
-
-    /** Files whose consolidate work has started. Stays 0 while the app library is indexed. */
-    var filesShown: Int = 0
-        private set
-
-    fun percent(): Int = BackupProgressLabel.consolidatePercent(bytesDone, planned)
-
-    fun beginOperation() {
-        opRead = 0L
-    }
-
-    /** [bytesRead] is the absolute offset within the current hash or copy. */
-    fun onAbsoluteRead(bytesRead: Long) {
-        val read = bytesRead.coerceAtLeast(0L)
-        val delta = (read - opRead).coerceAtLeast(0L)
-        opRead = read
-        bytesDone += delta
-    }
-
-    /** Count work that will not be performed, such as a skipped copy of a reused file. */
-    fun credit(bytes: Long) {
-        if (bytes > 0L) bytesDone += bytes
-    }
-
-    fun showFile(oneBasedInclusive: Int) {
-        filesShown = oneBasedInclusive.coerceIn(0, fileCount.coerceAtLeast(0))
-    }
-
-    fun complete() {
-        if (bytesDone < planned) bytesDone = planned
-        filesShown = fileCount
     }
 }

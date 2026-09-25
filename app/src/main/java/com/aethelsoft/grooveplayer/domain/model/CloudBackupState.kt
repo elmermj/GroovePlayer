@@ -6,8 +6,6 @@ package com.aethelsoft.grooveplayer.domain.model
 enum class CloudBackupPhase {
     IDLE,
     PREPARING,
-    /** Copying included-folder audio into the app library and updating Room paths. */
-    CONSOLIDATING,
     UPLOADING,
     SUCCESS,
     ERROR,
@@ -16,18 +14,16 @@ enum class CloudBackupPhase {
     BLOCKED_NOT_PREMIUM,
 }
 
-/** Ordered backup stages. Song upload and the catalog start only after consolidate finishes. */
+/** Ordered backup stages. Catalog upload starts only after song files finish. */
 enum class BackupJobStep {
     PREPARING,
-    CONSOLIDATING,
     UPLOADING_FILES,
     UPLOADING_CATALOG,
 }
 
-/** True while a manual backup is consolidating files or uploading them. */
+/** True while a manual backup is preparing or uploading. */
 fun CloudBackupPhase.isUploadInProgress(): Boolean =
     this == CloudBackupPhase.PREPARING ||
-        this == CloudBackupPhase.CONSOLIDATING ||
         this == CloudBackupPhase.UPLOADING
 
 data class CloudBackupState(

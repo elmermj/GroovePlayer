@@ -30,5 +30,9 @@ data class SongEntity(
     val durationMs: Long? = null,
     /** Filesystem path at last library index. Kept so a missing file can still match cloud audio. */
     val sourcePath: String? = null,
+    /** SHA-256 of the audio bytes. Likes, history, and playlists follow this hash. */
+    val contentHash: String? = null,
+    /** True when [sourcePath] is inside the app-private library. Shared-folder rows stay false. */
+    val inPrivateLibrary: Boolean = false,
 )
 

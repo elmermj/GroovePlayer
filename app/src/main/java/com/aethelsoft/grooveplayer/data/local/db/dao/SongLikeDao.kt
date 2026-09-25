@@ -29,4 +29,10 @@ interface SongLikeDao {
 
     @Query("SELECT * FROM song_likes")
     fun observeAll(): Flow<List<SongLikeEntity>>
+
+    @Query("SELECT songId FROM song_likes")
+    suspend fun allSongIds(): List<String>
+
+    @Query("UPDATE song_likes SET songId = :toId WHERE songId = :fromId")
+    suspend fun retargetSongId(fromId: String, toId: String)
 }

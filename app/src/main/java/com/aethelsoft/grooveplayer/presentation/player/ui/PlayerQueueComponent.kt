@@ -27,6 +27,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +42,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -54,6 +56,9 @@ import androidx.compose.ui.zIndex
 import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
+import com.aethelsoft.grooveplayer.presentation.library.importing.rememberTrackPresence
+import com.aethelsoft.grooveplayer.utils.theme.ui.HighlightPrimary
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.utils.M_PADDING
@@ -252,15 +257,18 @@ private fun SideQueueRow(
     modifier: Modifier = Modifier,
     containerColor: Color = Color.Transparent,
 ) {
+    val presence = rememberTrackPresence(song)
+    val import = LocalLibraryImport.current
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(containerColor),
+            .background(containerColor)
+            .alpha(if (presence.playable) 1f else 0.45f),
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick),
+                .clickable(enabled = presence.playable, onClick = onClick),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(S_PADDING),
         ) {
@@ -276,7 +284,7 @@ private fun SideQueueRow(
                 )
                 Spacer(modifier = Modifier.height(XS_PADDING / 2))
                 Text(
-                    text = song.artist,
+                    text = if (presence.playable) song.artist else "${song.artist} · Unavailable",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.End,
                     style = MaterialTheme.typography.labelSmall,
@@ -284,6 +292,14 @@ private fun SideQueueRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (presence.canRestore) {
+                    TextButton(
+                        onClick = { import.restoreSong(song) },
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Restore", color = HighlightPrimary)
+                    }
+                }
                 Spacer(modifier = Modifier.height(S_PADDING))
             }
             val availability = com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark(song)

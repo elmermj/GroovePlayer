@@ -45,6 +45,7 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalBluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.common.LocalBottomBarSecondaryContent
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.library.importing.LibraryImportHost
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
 import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptDialog
@@ -145,7 +146,9 @@ class MainActivity : ComponentActivity() {
                     LocalPlayerViewModel provides playerViewModel,
                     LocalBluetoothViewModel provides bluetoothViewModel
                 ) {
-                    GroovePlayerAppMain()
+                    LibraryImportHost {
+                        GroovePlayerAppMain()
+                    }
                 }
             }
         }
