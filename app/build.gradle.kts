@@ -76,6 +76,64 @@ val ADMOB_TEST_INTERSTITIAL_UNIT_ID = "ca-app-pub-3940256099942544/1033173712"
 fun projectProp(name: String): String? =
     findProperty(name)?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 
+/** -P, then the environment, then local.properties, then the default. */
+fun explicitOrLocal(key: String, default: String): String {
+    val fromProp = projectProp(key)
+    val fromEnv = System.getenv(key)?.trim()?.takeIf { it.isNotEmpty() }
+    val fromLocal = localPropMap[key]?.trim()?.takeIf { it.isNotEmpty() }
+    return escapeBuildConfig(fromProp ?: fromEnv ?: fromLocal ?: default)
+}
+
+/**
+ * Switch for the default dev variant (what Android Studio runs).
+ * -P and GROOVE_ENV in the environment win over local.properties.
+ * GitHub Actions ignores the file: Distribute sets the API and the Gradle task.
+ */
+fun grooveEnv(): String {
+    val explicit = projectProp("GROOVE_ENV")
+        ?: System.getenv("GROOVE_ENV")?.trim()?.takeIf { it.isNotEmpty() }
+    if (explicit != null) return explicit.lowercase()
+    if (System.getenv("GITHUB_ACTIONS") == "true") return ""
+    return localPropMap["GROOVE_ENV"]?.trim()?.lowercase().orEmpty()
+}
+
+fun googleServicesListsPackage(packageName: String): Boolean {
+    if (!googleServicesJson.exists()) return false
+    return Regex("\"package_name\"\\s*:\\s*\"" + Regex.escape(packageName) + "\"")
+        .containsMatchIn(googleServicesJson.readText())
+}
+
+val devGoogleServicesOverlay = file("src/dev/google-services.json")
+
+fun syncDevGoogleServicesOverlay(env: String) {
+    if (!hasGoogleServices) return
+    val useDerivedClient = env == "staging" && !googleServicesListsPackage(STAGING_APPLICATION_ID)
+    if (!useDerivedClient) {
+        if (devGoogleServicesOverlay.exists()) devGoogleServicesOverlay.delete()
+        return
+    }
+    val updated = googleServicesJson.readText().replace(
+        Regex("\"package_name\"\\s*:\\s*\"com\\.aethelsoft\\.grooveplayer\""),
+        "\"package_name\": \"$STAGING_APPLICATION_ID\""
+    )
+    if (!updated.contains(STAGING_APPLICATION_ID)) {
+        throw GradleException(
+            "Could not derive a google-services client for $STAGING_APPLICATION_ID"
+        )
+    }
+    devGoogleServicesOverlay.parentFile.mkdirs()
+    if (!devGoogleServicesOverlay.exists() || devGoogleServicesOverlay.readText() != updated) {
+        devGoogleServicesOverlay.writeText(updated)
+    }
+    logger.warn(
+        "GROOVE_ENV=staging is using a derived google-services client for " +
+            "$STAGING_APPLICATION_ID. Add that package to app/google-services.json " +
+            "for the real Firebase app."
+    )
+}
+
+syncDevGoogleServicesOverlay(grooveEnv())
+
 val resolvedVersionCode: Int =
     projectProp("versionCode")?.toIntOrNull()
         ?: System.getenv("VERSION_CODE")?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
@@ -126,14 +184,20 @@ android {
     productFlavors {
         create("dev") {
             dimension = "environment"
-            // Android Studio / matchingFallbacks default day-to-day variant
+            // Android Studio / matchingFallbacks default day-to-day variant.
+            // build-prod.sh / build-staging.sh set GROOVE_ENV so Run and Debug
+            // pick the package and label without changing the Build Variant.
             isDefault = true
+            if (grooveEnv() == "staging") {
+                applicationIdSuffix = ".staging"
+                resValue("string", "app_name", "GroovePlayer Staging")
+            }
 
-            // Local / LAN API — override with API_BASE_URL in local.properties
+            // Local / LAN API unless API_BASE_URL is set. -P and the environment win.
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${localProp("API_BASE_URL", "http://10.0.2.2:8080")}\""
+                "\"${explicitOrLocal("API_BASE_URL", "http://10.0.2.2:8080")}\""
             )
             // Always Google sample/test AdMob IDs (never prod units in dev)
             buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$ADMOB_TEST_BANNER_UNIT_ID\"")
@@ -359,12 +423,6 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 }
 
-
-fun googleServicesListsPackage(packageName: String): Boolean {
-    if (!googleServicesJson.exists()) return false
-    return Regex("\"package_name\"\\s*:\\s*\"" + Regex.escape(packageName) + "\"")
-        .containsMatchIn(googleServicesJson.readText())
-}
 
 // The google-services plugin rejects a variant whose applicationId is missing from
 // app/google-services.json. Fail here with the setup that unblocks GroovePlayer Staging.
