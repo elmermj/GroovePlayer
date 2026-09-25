@@ -25,9 +25,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaStyleNotificationHelper
 import androidx.palette.graphics.Palette
-import coil3.ImageLoader
+import coil3.imageLoader
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.size.Size
 import coil3.toBitmap
 import com.aethelsoft.grooveplayer.MainActivity
@@ -62,7 +61,6 @@ class MusicPlaybackService : Service() {
 
     private lateinit var notificationManager: NotificationManager
     private lateinit var mediaSession: MediaSession
-    private lateinit var imageLoader: ImageLoader
     private lateinit var dummyPlayer: Player
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -85,11 +83,6 @@ class MusicPlaybackService : Service() {
         createNotificationChannel()
 
         mediaSession = MediaSession.Builder(this, exoPlayerManager.livePlayer).build()
-
-        // Initialize image loader
-        imageLoader = ImageLoader.Builder(this)
-            .crossfade(true)
-            .build()
 
         // Start as foreground service immediately
         val initialNotification = buildEmptyNotification()
