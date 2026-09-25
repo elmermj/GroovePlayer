@@ -363,29 +363,31 @@ class ResolvePlaybackSourceUseCaseTest {
     }
 
     @Test
-    fun appLibraryFilePlaysInsteadOfAReadableContentUri() = runBlocking {
-        val dir = File(System.getProperty("java.io.tmpdir"), "groove-lib-${System.nanoTime()}")
-        dir.mkdirs()
-        val songFile = File(dir, "song.mp3")
-        songFile.writeBytes(byteArrayOf(1, 2, 3))
-        val useCase = ResolvePlaybackSourceUseCase(
-            localAudio = object : LocalAudioAvailability {
-                override fun isReadable(uri: String, filePath: String?) = true
-            },
-            cache = FakeCache(),
-            catalog = object : SongCatalog {
-                override suspend fun contains(songId: String) = true
-                override suspend fun sourcePath(songId: String) = songFile.absolutePath
-                override suspend fun purge(songIds: List<String>) = Unit
-            },
-            cloud = FakeCloud(),
-            tickets = FakeTickets(),
-            appLibraryPaths = AppLibraryPaths { path -> path == songFile.absolutePath },
-        )
-        val resolved = useCase.resolveOne(song("1"))
-        assertTrue(resolved is ResolvedPlayback.Playable)
-        assertEquals(songFile.toURI().toString(), (resolved as ResolvedPlayback.Playable).song.uri)
-        dir.deleteRecursively()
+    fun appLibraryFilePlaysInsteadOfAReadableContentUri() {
+        runBlocking {
+            val dir = File(System.getProperty("java.io.tmpdir"), "groove-lib-${System.nanoTime()}")
+            dir.mkdirs()
+            val songFile = File(dir, "song.mp3")
+            songFile.writeBytes(byteArrayOf(1, 2, 3))
+            val useCase = ResolvePlaybackSourceUseCase(
+                localAudio = object : LocalAudioAvailability {
+                    override fun isReadable(uri: String, filePath: String?) = true
+                },
+                cache = FakeCache(),
+                catalog = object : SongCatalog {
+                    override suspend fun contains(songId: String) = true
+                    override suspend fun sourcePath(songId: String) = songFile.absolutePath
+                    override suspend fun purge(songIds: List<String>) = Unit
+                },
+                cloud = FakeCloud(),
+                tickets = FakeTickets(),
+                appLibraryPaths = AppLibraryPaths { path -> path == songFile.absolutePath },
+            )
+            val resolved = useCase.resolveOne(song("1"))
+            assertTrue(resolved is ResolvedPlayback.Playable)
+            assertEquals(songFile.toURI().toString(), (resolved as ResolvedPlayback.Playable).song.uri)
+            dir.deleteRecursively()
+        }
     }
 
     private fun useCase(
