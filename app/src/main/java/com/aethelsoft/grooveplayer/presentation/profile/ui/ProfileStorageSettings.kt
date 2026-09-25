@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.FolderSizeEntry
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.S_PADDING
@@ -44,13 +45,7 @@ fun ProfileStorageSection(viewModel: ProfileViewModel) {
     val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
 
     ProfileSectionComponent(sectionTitle = "Storage") {
-        ExcludedFoldersRow(
-            viewModel = viewModel,
-            isExpanded = storageActiveRowId == "excluded_folders",
-            onExpandedChange = { expanded ->
-                viewModel.setStorageActiveRowId(if (expanded) "excluded_folders" else null)
-            }
-        )
+        ImportFolderRow()
         Spacer(Modifier.height(S_PADDING))
         StorageUsageRow(
             viewModel = viewModel,
@@ -75,6 +70,18 @@ fun ProfileStorageSection(viewModel: ProfileViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun ImportFolderRow() {
+    val import = LocalLibraryImport.current
+    ProfileSettingRow(
+        icon = { ProfileRowIcon(XExcludedFolder) },
+        title = "Import folder",
+        subtitle = "Copy music into GroovePlayer",
+        actionType = ActionType.LINK,
+        onClick = import.pickFolder,
+    )
 }
 
 @Composable

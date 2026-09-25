@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -61,6 +63,8 @@ import com.aethelsoft.grooveplayer.presentation.common.SongLikeButton
 import com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.rememberNavigationActions
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
+import com.aethelsoft.grooveplayer.presentation.library.importing.rememberTrackPresence
 import com.aethelsoft.grooveplayer.utils.DefaultSPadding
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XCircle
@@ -120,6 +124,7 @@ fun GeneralItemComponent(
     onLongClick: (() -> Unit)? = null,
     /** Decorative trailing content drawn before [metaText]. Null draws nothing and no spacer. */
     beforeMeta: (@Composable () -> Unit)? = null,
+    contentAlpha: Float = 1f,
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     val hasOptions = optionsConfig != null && (
@@ -175,6 +180,7 @@ fun GeneralItemComponent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(contentAlpha)
             .clip(GrooveTheme.radii.cardShape)
             .background(backgroundColor)
             .graphicsLayer {
@@ -402,20 +408,31 @@ fun SongItemComponent(
 ) {
     val navigation = rememberNavigationActions()
     val availability = rememberSongAvailabilityMark(song)
+    val presence = rememberTrackPresence(song)
+    val import = LocalLibraryImport.current
     GeneralItemComponent(
         title = song.title,
-        subtitle = song.artist,
+        subtitle = if (presence.playable) song.artist else "${song.artist} · Unavailable",
         artworkUrl = song.artworkUrl,
         metaText = metaText ?: formatDuration(song.durationMs),
-        onClick = onClick,
+        onClick = { if (presence.playable) onClick() },
+        contentAlpha = if (presence.playable) 1f else 0.45f,
         padding = padding,
         artworkKind = MediaArtworkKind.SONG,
         contentDescription = "${song.title} by ${song.artist}",
         optionsConfig = ItemOptionsConfig(
-            onPlayNext = onPlayNext?.let { cb -> { cb(song) } },
+            onPlayNext = if (presence.playable) onPlayNext?.let { cb -> { cb(song) } } else null,
             onEditMetadata = { onEditMetadata(song) },
-            onShareViaTap = { navigation.openShareViaNfcWithSongs(listOf(song)) },
-            onShareViaNearby = { navigation.openShareViaNearbyWithSongs(listOf(song)) }
+            onShareViaTap = if (presence.playable) {
+                { navigation.openShareViaNfcWithSongs(listOf(song)) }
+            } else {
+                null
+            },
+            onShareViaNearby = if (presence.playable) {
+                { navigation.openShareViaNearbyWithSongs(listOf(song)) }
+            } else {
+                null
+            },
         ),
         selectionConfig = selectionConfig,
         onLongClick = { onLongPress(song) },
@@ -426,6 +443,11 @@ fun SongItemComponent(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 SongLikeButton(song = song, iconSize = 20.dp)
+                if (presence.canRestore) {
+                    TextButton(onClick = { import.restoreSong(song) }) {
+                        Text("Restore", color = HighlightPrimary)
+                    }
+                }
                 if (availability != null) {
                     SongAvailabilityBadge(mark = availability, iconSize = 16.dp)
                 }
