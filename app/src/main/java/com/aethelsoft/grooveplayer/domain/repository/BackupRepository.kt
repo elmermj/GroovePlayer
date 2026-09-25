@@ -20,12 +20,9 @@ interface BackupRepository {
     /** Persisted library-restore phase. [RestorePhase.IDLE] when nothing is in progress. */
     fun restorePhase(): RestorePhase
 
-    /** Folders that would be included in a backup (music folders minus exclusions). */
-    suspend fun resolveIncludedFolders(): List<String>
-
     /**
      * Manual backup. Gates on Premium + quota + grace + over_quota.
-     * Copies approved audio into the app library, uploads those files, then the Room snapshot.
+     * Uploads private-library songs, then the Room snapshot.
      */
     suspend fun startBackup(entitlement: StorageEntitlement?, isPremium: Boolean): Result<Unit>
 

@@ -66,6 +66,7 @@ class LibraryImportController @Inject constructor(
     val state: StateFlow<LibraryImportUiState> = _state.asStateFlow()
 
     private var eligibleOriginals: List<ImportFileResult> = emptyList()
+    private var pickedTreeDocumentId: String = ""
     private var documentDeleted = 0
     private var documentFailed = 0
 
@@ -95,6 +96,7 @@ class LibraryImportController @Inject constructor(
         try {
             cancel.set(false)
             eligibleOriginals = emptyList()
+            pickedTreeDocumentId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrDefault("")
             val root = grooveDownloads.directory()
             root.mkdirs()
             val documents = withContext(Dispatchers.IO) {
@@ -188,6 +190,8 @@ class LibraryImportController @Inject constructor(
                     context.contentResolver,
                     item.displayName,
                     item.sizeBytes,
+                    pickedTreeDocumentId,
+                    item.sha256,
                 )
             } else {
                 null

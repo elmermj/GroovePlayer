@@ -152,10 +152,8 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshLocalState() {
-        val folders = resolveIncludedFolders()
         _state.update {
             it.copy(
-                includedFolders = folders,
                 lastBackupAtEpochMs = prefs.getLong(KEY_LAST_BACKUP, 0L).takeIf { t -> t > 0L },
                 lastError = prefs.getString(KEY_LAST_ERROR, null),
                 canRetry = prefs.getBoolean(KEY_CAN_RETRY, false),
@@ -173,10 +171,6 @@ class BackupRepositoryImpl @Inject constructor(
                 },
             )
         }
-    }
-
-    override suspend fun resolveIncludedFolders(): List<String> = withContext(Dispatchers.IO) {
-        listOf(grooveDownloads.directory().absolutePath)
     }
 
     override suspend fun startBackup(
@@ -255,7 +249,6 @@ class BackupRepositoryImpl @Inject constructor(
                         }
                     }
                     try {
-            val folders = resolveIncludedFolders()
             _state.update {
                 it.copy(
                     phase = CloudBackupPhase.PREPARING,
@@ -271,7 +264,6 @@ class BackupRepositoryImpl @Inject constructor(
                     uploadTotal = 0,
                     filesDeduped = 0,
                     filesSkipped = 0,
-                    includedFolders = folders,
                     lastError = null,
                     lastRunDryRun = false,
                     canRetry = false,

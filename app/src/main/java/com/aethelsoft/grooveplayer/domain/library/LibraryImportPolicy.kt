@@ -6,6 +6,7 @@ import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
 import com.aethelsoft.grooveplayer.domain.model.Song
 import java.io.File
 import java.io.InputStream
+import java.nio.file.FileAlreadyExistsException
 import java.security.MessageDigest
 
 /** Audio the folder picker may copy into the private library. */
@@ -240,10 +241,9 @@ object LibraryImporter {
                         )
                     } else {
                         val dest = PrivateLibrarySongs.destination(root, source.displayName)
-                        val moved = moveVerified(partial, dest, copied.sizeBytes)
+                        val moved = LibraryFilePlacement.placeVerified(partial, dest, copied.sizeBytes)
                         if (!moved) {
                             if (partial.exists()) partial.delete()
-                            if (dest.exists() && dest.length() != copied.sizeBytes) dest.delete()
                             ImportFileResult(
                                 displayName = source.displayName,
                                 stableKey = source.stableKey,
@@ -274,22 +274,6 @@ object LibraryImporter {
         }
         onProgress(results.count { it.status != ImportFileStatus.CANCELLED }, total, "")
         return ImportRunResult(results)
-    }
-
-    private fun moveVerified(partial: File, dest: File, size: Long): Boolean {
-        if (!partial.isFile || partial.length() != size) return false
-        dest.parentFile?.mkdirs()
-        if (dest.exists()) return false
-        if (partial.renameTo(dest) && dest.isFile && dest.length() == size) return true
-        return try {
-            partial.copyTo(dest, overwrite = false)
-            val ok = dest.isFile && dest.length() == size
-            if (ok) partial.delete() else if (dest.exists()) dest.delete()
-            ok
-        } catch (_: Exception) {
-            if (dest.exists() && dest.length() != size) dest.delete()
-            false
-        }
     }
 
     private fun sanitize(name: String): String =
@@ -481,6 +465,81 @@ fun trackPresence(localFilePresent: Boolean, cloudCopyExists: Boolean): TrackPre
         playable = localFilePresent,
         canRestore = !localFilePresent && cloudCopyExists,
     )
+}
+
+/**
+ * Moves a verified partial onto [dest]. A file that already exists at [dest] is never deleted.
+ * Only a destination this call itself creates is removed when the size check fails.
+ */
+object LibraryFilePlacement {
+    fun placeVerified(partial: File, dest: File, size: Long): Boolean {
+        if (!partial.isFile || partial.length() != size) return false
+        dest.parentFile?.mkdirs()
+        if (dest.exists()) return false
+        if (partial.renameTo(dest)) {
+            if (dest.isFile && dest.length() == size) return true
+            dest.delete()
+            return false
+        }
+        if (dest.exists()) return false
+        return try {
+            partial.copyTo(dest, overwrite = false)
+            if (dest.isFile && dest.length() == size) {
+                partial.delete()
+                true
+            } else {
+                dest.delete()
+                false
+            }
+        } catch (_: FileAlreadyExistsException) {
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
+
+/** Name-and-size MediaStore hits. A row is deletable only when its folder matches the picked tree. */
+data class MediaStoreAudioRow(
+    val id: Long,
+    val relativePath: String?,
+    val contentHash: String? = null,
+)
+
+object MediaStoreOriginalMatch {
+    fun uniqueId(
+        rows: List<MediaStoreAudioRow>,
+        pickedTreeDocumentId: String,
+        importedSha256: String?,
+    ): Long? {
+        return rows.filter { isExact(it, pickedTreeDocumentId, importedSha256) }
+            .singleOrNull()
+            ?.id
+    }
+
+    fun isExact(
+        row: MediaStoreAudioRow,
+        pickedTreeDocumentId: String,
+        importedSha256: String?,
+    ): Boolean {
+        if (!folderMatches(row.relativePath, pickedTreeDocumentId)) return false
+        val want = importedSha256?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+        val have = row.contentHash?.trim()?.takeIf { it.isNotEmpty() } ?: return true
+        return have.equals(want, ignoreCase = true)
+    }
+
+    fun folderMatches(relativePath: String?, pickedTreeDocumentId: String): Boolean {
+        val picked = folderKey(pickedTreeDocumentId) ?: return false
+        val folder = folderKey(relativePath) ?: return false
+        return folder.equals(picked, ignoreCase = true) ||
+            folder.startsWith("$picked/", ignoreCase = true)
+    }
+
+    fun folderKey(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        val path = raw.substringAfter(':', raw).trim().trim('/')
+        return path.ifBlank { null }
+    }
 }
 
 fun folderDisplayName(treeDocumentId: String): String {
