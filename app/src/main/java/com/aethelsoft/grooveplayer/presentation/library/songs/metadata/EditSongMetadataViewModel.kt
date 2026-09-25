@@ -33,24 +33,34 @@ data class EditMetadataUiState(
     val artistSuggestions: List<String> = emptyList(),
     val albumSuggestions: List<String> = emptyList(),
     val isSaving: Boolean = false,
-    val saveError: String? = null
+    val saveError: String? = null,
+    /** True until file tags and library metadata have been read for this song. */
+    val isLoading: Boolean = true,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as EditMetadataUiState
+        if (other !is EditMetadataUiState) return false
         if (title != other.title) return false
         if (genres != other.genres) return false
         if (artists != other.artists) return false
         if (album != other.album) return false
         if (year != other.year) return false
         if (trackNumber != other.trackNumber) return false
+        if (useAlbumYear != other.useAlbumYear) return false
+        if (artworkMimeType != other.artworkMimeType) return false
+        if (genreSuggestions != other.genreSuggestions) return false
+        if (artistSuggestions != other.artistSuggestions) return false
+        if (albumSuggestions != other.albumSuggestions) return false
+        if (isSaving != other.isSaving) return false
+        if (saveError != other.saveError) return false
+        if (isLoading != other.isLoading) return false
         if (artworkBytes != null) {
             if (other.artworkBytes == null) return false
             if (!artworkBytes.contentEquals(other.artworkBytes)) return false
         } else if (other.artworkBytes != null) return false
         return true
     }
+
     override fun hashCode(): Int {
         var result = title.hashCode()
         result = 31 * result + genres.hashCode()
@@ -58,6 +68,14 @@ data class EditMetadataUiState(
         result = 31 * result + (album?.hashCode() ?: 0)
         result = 31 * result + (year ?: 0)
         result = 31 * result + (trackNumber ?: 0)
+        result = 31 * result + useAlbumYear.hashCode()
+        result = 31 * result + (artworkMimeType?.hashCode() ?: 0)
+        result = 31 * result + genreSuggestions.hashCode()
+        result = 31 * result + artistSuggestions.hashCode()
+        result = 31 * result + albumSuggestions.hashCode()
+        result = 31 * result + isSaving.hashCode()
+        result = 31 * result + (saveError?.hashCode() ?: 0)
+        result = 31 * result + isLoading.hashCode()
         result = 31 * result + (artworkBytes?.contentHashCode() ?: 0)
         return result
     }
@@ -79,26 +97,52 @@ class EditSongMetadataViewModel @Inject constructor(
     val uiState: StateFlow<EditMetadataUiState> = _uiState.asStateFlow()
     
     private var currentSong: Song? = null
+    private var loadToken = 0
     
     fun loadMetadata(song: Song) {
         currentSong = song
+        val token = ++loadToken
+        _uiState.value = EditMetadataUiState(
+            title = song.title,
+            genres = song.genres.map { it.name }.ifEmpty {
+                if (song.genre.isNotBlank()) listOf(song.genre) else emptyList()
+            },
+            artists = song.artists.map { it.name }.ifEmpty {
+                if (song.artist.isNotBlank()) listOf(song.artist) else emptyList()
+            },
+            album = song.album?.name,
+            year = song.year,
+            useAlbumYear = song.useAlbumYear,
+            isLoading = true,
+            saveError = null,
+        )
         viewModelScope.launch {
-            // Load from file tags first (real metadata), fallback to DB overrides
-            val fileTags = readAudioTagsUseCase(song.uri)
-            val dbMetadata = getSongMetadataUseCase(song.id)
-            _uiState.value = EditMetadataUiState(
-                title = fileTags?.title ?: dbMetadata?.title ?: song.title,
-                genres = fileTags?.genres?.ifEmpty { null } ?: dbMetadata?.genres
-                    ?: (if (song.genre.isNotBlank()) listOf(song.genre) else emptyList()),
-                artists = fileTags?.artists?.ifEmpty { null } ?: dbMetadata?.artists
-                    ?: (if (song.artist.isNotBlank()) listOf(song.artist) else emptyList()),
-                album = fileTags?.album ?: dbMetadata?.album ?: song.album?.name,
-                year = fileTags?.year ?: dbMetadata?.year ?: song.year,
-                trackNumber = fileTags?.trackNumber,
-                useAlbumYear = dbMetadata?.useAlbumYear ?: false,
-                artworkBytes = fileTags?.artworkBytes,
-                artworkMimeType = fileTags?.artworkMimeType
-            )
+            try {
+                // Load from file tags first (real metadata), fallback to DB overrides
+                val fileTags = readAudioTagsUseCase(song.uri)
+                val dbMetadata = getSongMetadataUseCase(song.id)
+                if (token != loadToken) return@launch
+                _uiState.value = EditMetadataUiState(
+                    title = fileTags?.title ?: dbMetadata?.title ?: song.title,
+                    genres = fileTags?.genres?.ifEmpty { null } ?: dbMetadata?.genres
+                        ?: (if (song.genre.isNotBlank()) listOf(song.genre) else emptyList()),
+                    artists = fileTags?.artists?.ifEmpty { null } ?: dbMetadata?.artists
+                        ?: (if (song.artist.isNotBlank()) listOf(song.artist) else emptyList()),
+                    album = fileTags?.album ?: dbMetadata?.album ?: song.album?.name,
+                    year = fileTags?.year ?: dbMetadata?.year ?: song.year,
+                    trackNumber = fileTags?.trackNumber,
+                    useAlbumYear = dbMetadata?.useAlbumYear ?: false,
+                    artworkBytes = fileTags?.artworkBytes,
+                    artworkMimeType = fileTags?.artworkMimeType,
+                    isLoading = false,
+                )
+            } catch (error: Exception) {
+                if (token != loadToken) return@launch
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    saveError = error.message ?: "Couldn't read this song's tags",
+                )
+            }
         }
     }
     
