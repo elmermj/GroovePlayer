@@ -8,4 +8,11 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:colorBackground">@color/black</item>
     </style>
+
+    <!-- System splash. postSplashScreenTheme is applied as soon as the first frame is allowed. -->
+    <style name="Theme.GroovePlayer.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/black</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.GroovePlayer</item>
+    </style>
 </resources>

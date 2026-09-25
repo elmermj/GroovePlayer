@@ -2,12 +2,14 @@ package com.aethelsoft.grooveplayer
 
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.activity.SystemBarStyle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -29,6 +31,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +67,7 @@ import com.aethelsoft.grooveplayer.utils.requestedOrientationFor
 import com.aethelsoft.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.ui.GroovePlayerTheme
+import com.aethelsoft.grooveplayer.domain.auth.ColdStartPresentation
 import com.aethelsoft.grooveplayer.presentation.ads.AdsConsentHelper
 import com.aethelsoft.grooveplayer.presentation.ads.AdsViewModel
 import com.aethelsoft.grooveplayer.presentation.ads.StartupInterstitialHelper
@@ -71,6 +75,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import java.util.concurrent.atomic.AtomicBoolean
 
 private sealed interface BottomBarState {
     data object None : BottomBarState
@@ -118,10 +123,22 @@ class MainActivity : ComponentActivity() {
     private val bluetoothViewModel: BluetoothViewModel by viewModels()
     private val appThemeViewModel: AppThemeViewModel by viewModels()
 
+    /** Set from the first composition. The splash must not wait on this forever. */
+    private val coldStartFrameReady = AtomicBoolean(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
-        // UMP consent (EEA/UK) before MobileAds / showing ads
-        AdsConsentHelper.requestConsentThenInitAds(this)
+        val startedAt = SystemClock.elapsedRealtime()
+        // Released by the first Compose frame, or by SPLASH_MAX_MS if that frame
+        // never arrives. Auth (/v1/me, refresh, offline, 401, 5xx) is not a gate.
+        splashScreen.setKeepOnScreenCondition {
+            ColdStartPresentation.keepOnScreen(
+                frameReady = coldStartFrameReady.get(),
+                elapsedMs = SystemClock.elapsedRealtime() - startedAt,
+                blocker = ColdStartPresentation.StartupBlocker.NONE,
+            )
+        }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -129,6 +146,7 @@ class MainActivity : ComponentActivity() {
         handleNfcIntent(intent)
 
         setContent {
+            SideEffect { coldStartFrameReady.set(true) }
             val grooveStyle by appThemeViewModel.style.collectAsState()
             GroovePlayerTheme(style = grooveStyle) {
                 val adaptiveWindowInfo = rememberAdaptiveWindowInfo()
@@ -152,6 +170,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        // Consent can do binder work. It runs after setContent so it cannot hold the first frame.
+        AdsConsentHelper.requestConsentThenInitAds(this)
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -391,11 +411,14 @@ fun GroovePlayerAppMain() {
                 val showLoginRestorePrompt by loginRestorePrompt.visible.collectAsState()
                 AppNavHost(
                     navController = navController,
-                    startDestination = if (restoreLaunch.startOnApplyScreen) {
-                        AppRoutes.restoreApplyRoute(startDownload = restoreLaunch.resumeDownload)
-                    } else {
-                        AppRoutes.HOME
-                    },
+                    startDestination = ColdStartPresentation.startDestination(
+                        candidate = if (restoreLaunch.startOnApplyScreen) {
+                            AppRoutes.restoreApplyRoute(startDownload = restoreLaunch.resumeDownload)
+                        } else {
+                            AppRoutes.HOME
+                        },
+                        home = AppRoutes.HOME,
+                    ),
                     onBackupRestoreVisible = loginRestorePrompt::onBackupRestoreVisible,
                     onManualRestoreOpened = loginRestorePrompt::onManualRestoreOpened,
                 )
