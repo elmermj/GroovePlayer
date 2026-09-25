@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.presentation.navigation
 
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -9,12 +10,15 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.aethelsoft.grooveplayer.domain.auth.ColdStartPresentation
 import com.aethelsoft.grooveplayer.presentation.home.HomeScreen
 import com.aethelsoft.grooveplayer.presentation.library.albums.AlbumDetailScreen
 import com.aethelsoft.grooveplayer.presentation.library.artists.ArtistDetailScreen
@@ -55,14 +59,23 @@ fun AppNavHost(
     onBackupRestoreVisible: (Boolean) -> Unit = {},
     onManualRestoreOpened: () -> Unit = {},
 ) {
+    // The first entrance used to slide the start destination in from the right,
+    // on top of a black splash. If that transition never finished, the window
+    // stayed black while taps still hit the activity. Later navigations still slide.
+    val coldStartEntrance = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+    SideEffect { coldStartEntrance.set(false) }
     NavHost(
         navController = navController,
         startDestination = startDestination,
         enterTransition = {
-            slideInHorizontally(
-                initialOffsetX = { fullWidth -> fullWidth },
-                animationSpec = tween(durationMillis = 300)
-            )
+            if (ColdStartPresentation.playEntrance(coldStartEntrance.get())) {
+                slideInHorizontally(
+                    initialOffsetX = { fullWidth -> fullWidth },
+                    animationSpec = tween(durationMillis = 300)
+                )
+            } else {
+                EnterTransition.None
+            }
         },
         exitTransition = {
             slideOutHorizontally(
@@ -86,11 +99,15 @@ fun AppNavHost(
         composable(
             route = AppRoutes.HOME,
             enterTransition = {
-                // Slide in from right (iOS style)
-                slideInHorizontally(
-                    initialOffsetX = { fullWidth -> fullWidth },
-                    animationSpec = tween(durationMillis = 300)
-                )
+                // Cold start must appear in place. A later visit still slides in from the right.
+                if (ColdStartPresentation.playEntrance(coldStartEntrance.get())) {
+                    slideInHorizontally(
+                        initialOffsetX = { fullWidth -> fullWidth },
+                        animationSpec = tween(durationMillis = 300)
+                    )
+                } else {
+                    EnterTransition.None
+                }
             },
             exitTransition = {
                 // Slide out to left

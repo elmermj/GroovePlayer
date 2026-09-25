@@ -82,7 +82,7 @@
             android:label="@string/app_name"
             android:resizeableActivity="true"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|uiMode"
-            android:theme="@style/Theme.GroovePlayer">
+            android:theme="@style/Theme.GroovePlayer.Starting">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

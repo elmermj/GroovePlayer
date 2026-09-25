@@ -70,6 +70,45 @@ class StartupSessionRecoveryTest {
     }
 
     @Test
+    fun unreachableMeFallsBackLocallyWithoutRefresh() = runBlocking {
+        var refreshCount = 0
+        val outcome = StartupSessionRecovery.restore(
+            accessToken = "access",
+            refreshToken = { "refresh-1" },
+            me = { throw java.net.UnknownHostException("offline") },
+            refresh = {
+                refreshCount += 1
+                error("refresh must not run when the server was never reached")
+            },
+            localUser = { user("local") },
+        )
+
+        assertEquals(0, refreshCount)
+        assertTrue(outcome is StartupSessionRecovery.Outcome.LocalFallback)
+        assertEquals("local", (outcome as StartupSessionRecovery.Outcome.LocalFallback).user?.id)
+    }
+
+    @Test
+    fun serverErrorFallsBackWhenRefreshAlsoFails() = runBlocking {
+        var refreshCount = 0
+        val outcome = StartupSessionRecovery.restore(
+            accessToken = "access",
+            refreshToken = { "refresh-1" },
+            me = { throw AuthStatusException(500) },
+            refresh = {
+                refreshCount += 1
+                throw AuthStatusException(503)
+            },
+            localUser = { user("local") },
+        )
+
+        assertEquals(1, refreshCount)
+        assertEquals(StartupSessionRecovery.FailureKind.OTHER, StartupSessionRecovery.failureKind(AuthStatusException(500)))
+        assertTrue(outcome is StartupSessionRecovery.Outcome.LocalFallback)
+        assertEquals("local", (outcome as StartupSessionRecovery.Outcome.LocalFallback).user?.id)
+    }
+
+    @Test
     fun refreshUnauthorizedSignsOutInsteadOfHanging() = runBlocking {
         val outcome = StartupSessionRecovery.restore(
             accessToken = "expired-access",
