@@ -8,6 +8,7 @@ import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
 import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
 import com.aethelsoft.grooveplayer.domain.model.LibraryGenre
 import com.aethelsoft.grooveplayer.domain.model.MostPlayedTrack
+import com.aethelsoft.grooveplayer.domain.model.Playlist
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteAlbumsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteArtistsUseCase
@@ -18,6 +19,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetRecentlyPlaye
 import com.aethelsoft.grooveplayer.domain.usecase.library_category.GetLibraryGenresUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.InitializeLibraryIndexUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ObservePlaylistsUseCase
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
 import com.aethelsoft.grooveplayer.presentation.common.UiState
@@ -46,6 +48,7 @@ class HomeViewModel @Inject constructor(
     private val getLastPlayedSongsUseCase: GetLastPlayedSongsUseCase,
     private val initializeLibraryIndexUseCase: InitializeLibraryIndexUseCase,
     private val musicRepository: MusicRepository,
+    observePlaylistsUseCase: ObservePlaylistsUseCase,
 ) : BaseViewModel(application) {
     
     // All playback history features are now reactive with Flows
@@ -70,6 +73,9 @@ class HomeViewModel @Inject constructor(
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     val lastPlayedSongs: StateFlow<List<Song>> = getLastPlayedSongsUseCase(allTimeTimestamp, 8)
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val playlists: StateFlow<List<Playlist>> = observePlaylistsUseCase()
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     var songs: List<Song> = emptyList()

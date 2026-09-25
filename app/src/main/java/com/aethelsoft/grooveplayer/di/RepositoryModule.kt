@@ -9,6 +9,7 @@ import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongLikeRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.TransferRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.PlaylistRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.AuthRepositoryImpl
@@ -20,6 +21,8 @@ import com.aethelsoft.grooveplayer.data.playback.CloudPlaybackCacheStore
 import com.aethelsoft.grooveplayer.data.playback.LocalAudioProbe
 import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
 import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
+import com.aethelsoft.grooveplayer.data.library.FileM3uLocationHash
+import com.aethelsoft.grooveplayer.data.library.PlaylistLibraryIndex
 import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
 import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
@@ -28,6 +31,8 @@ import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
 import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTickets
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
+import com.aethelsoft.grooveplayer.domain.playlist.M3uLocationHash
+import com.aethelsoft.grooveplayer.domain.playlist.PlaylistLibrary
 import com.aethelsoft.grooveplayer.data.ads.StartupAdQuotaStore
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.BillingRepository
@@ -38,6 +43,7 @@ import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
 import com.aethelsoft.grooveplayer.domain.repository.SongLikeRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
@@ -140,6 +146,11 @@ abstract class RepositoryModule {
     ): TransferRepository
 
     @Binds
+    abstract fun bindPlaylistRepository(
+        impl: PlaylistRepositoryImpl
+    ): PlaylistRepository
+
+    @Binds
     abstract fun bindLocalAudioAvailability(
         impl: LocalAudioProbe
     ): LocalAudioAvailability
@@ -174,4 +185,16 @@ abstract class RepositoryModule {
     abstract fun bindPlaybackStreamTickets(
         impl: PlaybackStreamTicketStore
     ): PlaybackStreamTickets
+
+    @Binds
+    @Singleton
+    abstract fun bindPlaylistLibrary(
+        impl: PlaylistLibraryIndex,
+    ): PlaylistLibrary
+
+    @Binds
+    @Singleton
+    abstract fun bindM3uLocationHash(
+        impl: FileM3uLocationHash,
+    ): M3uLocationHash
 }

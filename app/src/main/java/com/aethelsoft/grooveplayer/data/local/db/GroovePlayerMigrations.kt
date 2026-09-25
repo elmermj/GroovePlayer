@@ -39,4 +39,17 @@ object GroovePlayerMigrations {
             )
         }
     }
+
+    /**
+     * User playlists. Schema 18 is SCRUM-84 (songs.contentHash). This step only
+     * adds tables, keyed by that hash. Renumber [MIGRATION_18_19] with
+     * [GroovePlayerDatabase] if another migration lands on 18 first.
+     */
+    val MIGRATION_18_19 = object : Migration(18, 19) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            com.aethelsoft.grooveplayer.domain.playlist.PlaylistSchemaMigration.STATEMENTS.forEach {
+                db.execSQL(it)
+            }
+        }
+    }
 }

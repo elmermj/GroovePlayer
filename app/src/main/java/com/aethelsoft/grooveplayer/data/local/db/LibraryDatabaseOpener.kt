@@ -71,6 +71,7 @@ object LibraryDatabaseOpener {
             .addMigrations(
                 GroovePlayerMigrations.MIGRATION_16_17,
                 GroovePlayerMigrations.MIGRATION_17_18,
+                GroovePlayerMigrations.MIGRATION_18_19,
             )
             .fallbackToDestructiveMigration()
             .fallbackToDestructiveMigrationOnDowngrade()

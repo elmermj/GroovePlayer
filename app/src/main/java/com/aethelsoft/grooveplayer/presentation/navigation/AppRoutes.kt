@@ -8,6 +8,8 @@ object AppRoutes {
     const val ALBUMS = "albums"
     const val ARTISTS = "artists"
     const val PLAYLISTS = "playlists"
+    const val PLAYLIST_DETAIL = "playlist/{playlistId}"
+    const val PLAYLIST_ADD_TRACKS = "playlist/{playlistId}/add"
     const val FULL_PLAYER = "full_player"
     const val RECENTLY_PLAYED = "recently_played"
     const val MOST_PLAYED = "most_played"
@@ -40,4 +42,6 @@ object AppRoutes {
     fun albumDetailRoute(albumId: String) = "album/${Uri.encode(albumId)}"
     fun artistDetailRoute(artistId: String) = "artist/${Uri.encode(artistId)}"
     fun genreTracksRoute(genreName: String) = "genre_tracks?genreName=${Uri.encode(genreName)}"
+    fun playlistDetailRoute(playlistId: Long) = "playlist/$playlistId"
+    fun playlistAddTracksRoute(playlistId: Long) = "playlist/$playlistId/add"
 }

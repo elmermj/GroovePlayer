@@ -62,4 +62,7 @@ object AppModule {
 
     @Provides
     fun provideSongLikeDao(database: GroovePlayerDatabase) = database.songLikeDao()
+
+    @Provides
+    fun providePlaylistDao(database: GroovePlayerDatabase) = database.playlistDao()
 }
