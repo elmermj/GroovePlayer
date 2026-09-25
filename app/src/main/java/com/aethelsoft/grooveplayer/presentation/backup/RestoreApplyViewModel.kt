@@ -4,8 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.data.backup.LibraryRestoreGate
 import com.aethelsoft.grooveplayer.domain.backup.ColdStartAction
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressLabel
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.RestoreCloudLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +19,10 @@ import javax.inject.Inject
 
 data class RestoreApplyUiState(
     val status: String = "Applying restored data…",
+    val retry: String? = null,
+    val detail: String? = null,
+    /** Determinate 0f..1f once download work is known. Null shows an indeterminate spinner. */
+    val fraction: Float? = null,
     val busy: Boolean = true,
     val error: String? = null,
     val finished: Boolean = false,
@@ -45,25 +53,49 @@ class RestoreApplyViewModel @Inject constructor(
         if (!started.compareAndSet(false, true)) return
         viewModelScope.launch {
             if (startDownload) {
-                _ui.value = RestoreApplyUiState(status = "Downloading restored data…")
+                _ui.value = RestoreApplyUiState(
+                    status = RestoreProgressLabel.DOWNLOADING_LIBRARY,
+                    fraction = null,
+                )
+                val collect = launch {
+                    restoreCloudLibraryUseCase.observeProgress().collect { snap ->
+                        _ui.value = snap.toUi()
+                    }
+                }
                 val staged = restoreCloudLibraryUseCase.stage()
+                collect.cancelAndJoin()
                 if (staged.isFailure) {
                     _ui.value = failed(staged.exceptionOrNull())
                     return@launch
                 }
             }
-            _ui.value = RestoreApplyUiState(status = "Applying restored data…")
+            _ui.value = RestoreApplyUiState(
+                status = RestoreProgressLabel.APPLYING,
+                fraction = 1f,
+            )
+            delay(RestoreProgressLabel.MIN_APPLYING_VISIBLE_MS)
             val applied = restoreCloudLibraryUseCase.apply()
             if (applied.isFailure) {
                 _ui.value = failed(applied.exceptionOrNull())
                 return@launch
             }
             _ui.value = RestoreApplyUiState(
-                status = "Applying restored data…",
+                status = RestoreProgressLabel.APPLYING,
+                fraction = 1f,
                 busy = false,
                 finished = true,
             )
         }
+    }
+
+    private fun RestoreProgressSnapshot.toUi(): RestoreApplyUiState {
+        return RestoreApplyUiState(
+            status = status,
+            retry = retry,
+            detail = detail,
+            fraction = fraction,
+            busy = true,
+        )
     }
 
     private fun failed(error: Throwable?): RestoreApplyUiState {

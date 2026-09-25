@@ -7,11 +7,15 @@ import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
 import com.aethelsoft.grooveplayer.domain.model.StorageEntitlement
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupRequest
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupResult
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 interface BackupRepository {
     fun observeBackupState(): Flow<CloudBackupState>
+
+    /** Latest restore-apply progress. Idle until [stageLibraryRestore] publishes work. */
+    fun observeRestoreProgress(): Flow<RestoreProgressSnapshot>
 
     /** Persisted library-restore phase. [RestorePhase.IDLE] when nothing is in progress. */
     fun restorePhase(): RestorePhase

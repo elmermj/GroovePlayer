@@ -4,8 +4,9 @@ import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 
 /**
  * Whether to ask a signed-in Premium user to restore a cloud library backup.
- * Choice A is remembered for this backup revision so later cold starts stay quiet
- * until the revision changes or the user opens Restore from Backup.
+ * "No" is remembered for this backup revision. A backup that just finished
+ * restoring is remembered too, so the prompt stays quiet after the app restarts.
+ * A different cloud backup, or a fresh sign-in that has not restored it, still asks.
  */
 object LoginRestorePrompt {
     const val TITLE = "Do you want to restore your backup data?"
@@ -37,7 +38,12 @@ object LoginRestorePrompt {
         val snapshot = input.snapshot ?: return null
         val revision = revisionOf(snapshot) ?: return null
         val key = memoryKey(userId, revision)
-        if (key == input.persistedDeclinedKey || key == input.sessionHandledKey) return null
+        if (key == input.persistedDeclinedKey ||
+            key == input.sessionHandledKey ||
+            key == input.persistedRestoredKey
+        ) {
+            return null
+        }
         return key
     }
 }
@@ -52,4 +58,6 @@ data class LoginRestorePromptInput(
     val onBackupOrRestoreScreen: Boolean,
     val persistedDeclinedKey: String?,
     val sessionHandledKey: String?,
+    /** Backup revision applied by the last successful restore, if any. */
+    val persistedRestoredKey: String? = null,
 )
