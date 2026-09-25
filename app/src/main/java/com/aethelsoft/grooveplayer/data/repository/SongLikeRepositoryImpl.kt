@@ -1,9 +1,11 @@
 package com.aethelsoft.grooveplayer.data.repository
 
 import androidx.room.withTransaction
+import com.aethelsoft.grooveplayer.data.artwork.SongArtworkModels
 import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongLikeDao
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongLikeEntity
+import com.aethelsoft.grooveplayer.domain.artwork.EmbeddedArtworkKeys
 import com.aethelsoft.grooveplayer.domain.library.SongLikeIndex
 import com.aethelsoft.grooveplayer.domain.model.FavoriteAlbum
 import com.aethelsoft.grooveplayer.domain.model.FavoriteArtist
@@ -22,6 +24,7 @@ import javax.inject.Singleton
 class SongLikeRepositoryImpl @Inject constructor(
     private val database: GroovePlayerDatabase,
     private val dao: SongLikeDao,
+    private val artworkModels: SongArtworkModels,
 ) : SongLikeRepository {
 
     private val toggleMutex = Mutex()
@@ -32,19 +35,19 @@ class SongLikeRepositoryImpl @Inject constructor(
 
     override fun observeFavoriteTracks(limit: Int): Flow<List<Song>> {
         return dao.observeAll().map { rows ->
-            SongLikeIndex.tracks(rows.map { it.toDomain() }, limit)
+            SongLikeIndex.tracks(rows.toLikes(), limit)
         }
     }
 
     override fun observeFavoriteArtists(limit: Int): Flow<List<FavoriteArtist>> {
         return dao.observeAll().map { rows ->
-            SongLikeIndex.artists(rows.map { it.toDomain() }, limit)
+            SongLikeIndex.artists(rows.toLikes(), limit)
         }
     }
 
     override fun observeFavoriteAlbums(limit: Int): Flow<List<FavoriteAlbum>> {
         return dao.observeAll().map { rows ->
-            SongLikeIndex.albums(rows.map { it.toDomain() }, limit)
+            SongLikeIndex.albums(rows.toLikes(), limit)
         }
     }
 
@@ -58,6 +61,15 @@ class SongLikeRepositoryImpl @Inject constructor(
                     dao.insert(song.toSongLike(System.currentTimeMillis()).toEntity())
                 }
             }
+        }
+    }
+
+    private suspend fun List<SongLikeEntity>.toLikes(): List<SongLike> {
+        val models = artworkModels.urls(map { it.songId })
+        return map { row ->
+            val like = row.toDomain()
+            val url = EmbeddedArtworkKeys.prefer(like.artworkUrl, models[row.songId])
+            if (url == like.artworkUrl) like else like.copy(artworkUrl = url)
         }
     }
 }

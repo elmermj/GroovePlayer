@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.data.repository
 
+import com.aethelsoft.grooveplayer.data.artwork.SongArtworkModels
 import com.aethelsoft.grooveplayer.data.local.db.dao.AlbumDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.ArtistDao
 import com.aethelsoft.grooveplayer.data.local.db.dao.PlaybackHistoryDao
@@ -8,6 +9,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.AlbumEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.ArtistEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
 import com.aethelsoft.grooveplayer.data.local.db.dao.FavoriteTrackResult
+import com.aethelsoft.grooveplayer.domain.artwork.EmbeddedArtworkKeys
 import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.MostPlayedTrack
 import com.aethelsoft.grooveplayer.domain.model.Song
@@ -23,7 +25,8 @@ import javax.inject.Singleton
 class PlaybackHistoryRepositoryImpl @Inject constructor(
     private val dao: PlaybackHistoryDao,
     private val artistDao: ArtistDao,
-    private val albumDao: AlbumDao
+    private val albumDao: AlbumDao,
+    private val artworkModels: SongArtworkModels,
 ) : PlaybackHistoryRepository {
     
     override suspend fun recordPlayback(song: Song) {
@@ -96,15 +99,16 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
     override fun getRecentlyPlayed(limit: Int): Flow<List<Song>> {
         return dao.getRecentlyPlayed(limit).map { entities ->
             android.util.Log.d("PlaybackHistoryRepo", "getRecentlyPlayed: Found ${entities.size} entries")
-            entities.map { it.toDomain() }
+            entities.map { it.toDomain() }.withHashArtwork()
         }
     }
     
     override fun getMostPlayed(limit: Int): Flow<List<MostPlayedTrack>> {
         return dao.getMostPlayed(limit).map { results ->
-            results.map { result ->
+            val songs = results.map { it.toSong() }.withHashArtwork()
+            results.zip(songs).map { (result, song) ->
                 MostPlayedTrack(
-                    song = result.toSong(),
+                    song = song,
                     playCount = result.playCount,
                 )
             }
@@ -119,6 +123,23 @@ class PlaybackHistoryRepositoryImpl @Inject constructor(
             }
             entities.map { entity ->
                 entity.toDomain()
+            }.withHashArtwork()
+        }
+    }
+
+    private suspend fun List<Song>.withHashArtwork(): List<Song> {
+        val models = artworkModels.urls(map { it.id })
+        return map { song ->
+            val url = EmbeddedArtworkKeys.prefer(song.artworkUrl, models[song.id])
+            if (url == song.artworkUrl) {
+                song
+            } else {
+                song.copy(
+                    artworkUrl = url,
+                    album = song.album?.copy(
+                        artworkUrl = EmbeddedArtworkKeys.prefer(song.album.artworkUrl, models[song.id]),
+                    ),
+                )
             }
         }
     }

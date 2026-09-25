@@ -11,6 +11,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.GenreEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongArtistCrossRef
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
+import com.aethelsoft.grooveplayer.domain.artwork.EmbeddedArtworkKeys
 import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.library.LibraryGenreIndex
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
@@ -86,8 +87,14 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 } else {
                     existingAlbum
                 }
-                albumCache[albumKey] = ensured.albumId
-                ensured.albumId
+                val artwork = EmbeddedArtworkKeys.prefer(ensured.artworkUrl, song.artworkUrl)
+                val row = if (artwork == ensured.artworkUrl) {
+                    ensured
+                } else {
+                    ensured.copy(artworkUrl = artwork).also { albumDao.insertOrUpdate(it) }
+                }
+                albumCache[albumKey] = row.albumId
+                row.albumId
             }
 
             // Link album to all artists

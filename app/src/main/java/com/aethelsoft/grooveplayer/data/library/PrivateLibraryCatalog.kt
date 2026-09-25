@@ -4,6 +4,7 @@ import android.media.MediaMetadataRetriever
 import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
 import com.aethelsoft.grooveplayer.data.local.db.dao.SongDao
 import com.aethelsoft.grooveplayer.data.local.mediastore.storageUsageFor
+import com.aethelsoft.grooveplayer.domain.artwork.EmbeddedArtworkKeys
 import com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySongs
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
@@ -37,7 +38,8 @@ class PrivateLibraryCatalog @Inject constructor(
                     artist = tags.artist ?: PrivateLibrarySongs.ARTIST,
                     albumName = tags.album ?: PrivateLibrarySongs.ALBUM,
                     genre = tags.genre.orEmpty(),
-                    artworkUrl = artworkFor(root, row?.contentHash),
+                    artworkUrl = EmbeddedArtworkKeys.uri(row?.contentHash)
+                        ?: artworkFor(root, row?.contentHash),
                 )
                 if (row == null) base else base.copy(id = row.songId)
             }
