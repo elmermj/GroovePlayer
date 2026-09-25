@@ -41,6 +41,10 @@ class AuthRepositoryImpl @Inject constructor(
     private val mutex = Mutex()
     /** Bumped when the session is cleared so an in-flight startup refresh cannot restore it. */
     private val sessionGeneration = AtomicInteger(0)
+    /** Bumped per restore so a timed-out startup fallback cannot clobber a newer `/v1/me`. */
+    private val restoreAttempt = AtomicInteger(0)
+    /** Highest attempt that has already applied a server `/v1/me` user. */
+    private val publishedRemoteAttempt = AtomicInteger(0)
     private val _authUser = MutableStateFlow<AuthUser?>(null)
     private val _serverSyncError = MutableStateFlow<String?>(null)
 
@@ -196,7 +200,7 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun restoreSession(): Result<AuthUser?> {
+    override suspend fun restoreSession(boundByStartupTimeout: Boolean): Result<AuthUser?> {
         // Network runs outside the mutex. Holding it across /v1/me deadlocks
         // the first frame if the UI thread waits on the same lock.
         val generation = mutex.withLock {
@@ -214,8 +218,9 @@ class AuthRepositoryImpl @Inject constructor(
         }
         if (generation == null) return Result.success(null)
 
+        val attempt = restoreAttempt.incrementAndGet()
         val outcome = try {
-            withTimeoutOrNull(StartupSessionRecovery.NETWORK_TIMEOUT_MS) {
+            val recover = suspend {
                 StartupSessionRecovery.restore(
                     accessToken = tokenStore.getAccessToken(),
                     refreshToken = { tokenStore.getRefreshToken() },
@@ -223,15 +228,36 @@ class AuthRepositoryImpl @Inject constructor(
                     refresh = { token -> refreshForStartup(token, generation) },
                     localUser = { localAuthUser() },
                 )
-            } ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
+            }
+            val cap = if (boundByStartupTimeout) {
+                StartupSessionRecovery.NETWORK_TIMEOUT_MS
+            } else {
+                StartupSessionRecovery.RETRY_TIMEOUT_MS
+            }
+            withTimeoutOrNull(cap) { recover() }
+                ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
         } catch (e: CancellationException) {
             throw e
         }
 
         return mutex.withLock {
+            val newerRemotePublished = publishedRemoteAttempt.get() > attempt
             if (sessionGeneration.get() != generation || !tokenStore.hasSession()) {
                 Result.success(_authUser.value)
+            } else if (
+                !StartupSessionRecovery.shouldPublish(
+                    attempt,
+                    restoreAttempt.get(),
+                    outcome,
+                    newerRemotePublished,
+                )
+            ) {
+                // Stale fallback, or an older /v1/me after a newer one was published.
+                Result.success(_authUser.value)
             } else {
+                if (outcome is StartupSessionRecovery.Outcome.Remote) {
+                    publishedRemoteAttempt.updateAndGet { published -> maxOf(published, attempt) }
+                }
                 applyStartupOutcome(outcome)
             }
         }
@@ -292,9 +318,15 @@ class AuthRepositoryImpl @Inject constructor(
                 Result.success(outcome.user)
             }
             is StartupSessionRecovery.Outcome.LocalFallback -> {
+                val synced = _authUser.value
+                // A /v1/me that already returned quota must not be replaced by a
+                // slower startup fallback. That hid Cloud backup after Retry.
+                if (_serverSyncError.value == null && synced?.storage != null) {
+                    return Result.success(synced)
+                }
                 _serverSyncError.value =
                     "Can't reach server. Check Wi‑Fi or API URL, then retry."
-                val user = outcome.user ?: _authUser.value
+                val user = outcome.user ?: synced
                 if (user != null) {
                     _authUser.value = user
                 }

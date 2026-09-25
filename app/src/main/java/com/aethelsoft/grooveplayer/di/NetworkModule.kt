@@ -7,9 +7,12 @@ import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
+import com.aethelsoft.grooveplayer.data.remote.Ipv4FirstDns
 import com.aethelsoft.grooveplayer.data.remote.R2Dns
 import com.aethelsoft.grooveplayer.domain.backup.R2Connect
 import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
+import com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery
+import com.aethelsoft.grooveplayer.domain.network.Ipv4First
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
@@ -78,7 +81,7 @@ object NetworkModule {
             }
         }
         val client = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
+            .backendDns()
             .readTimeout(15, TimeUnit.SECONDS)
             .callTimeout(20, TimeUnit.SECONDS)
             .addInterceptor(logging)
@@ -106,9 +109,12 @@ object NetworkModule {
                 HttpLoggingInterceptor.Level.NONE
             }
         }
+        // IPv4 before IPv6, short handshake. A blackholed AAAA route used to
+        // outlast the 12s startup cap, so /v1/me never ran and Profile hid quota.
         return OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
+            .backendDns()
             .readTimeout(20, TimeUnit.SECONDS)
+            .callTimeout(StartupSessionRecovery.RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .authenticator(tokenRefreshAuthenticator)
@@ -182,6 +188,11 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(client, moshi)
+
+    /** Shared by every Retrofit client that talks to grooveplayer-backend. */
+    private fun OkHttpClient.Builder.backendDns(): OkHttpClient.Builder =
+        dns(Ipv4FirstDns())
+            .connectTimeout(Ipv4First.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
 
     private fun retrofit(client: OkHttpClient, moshi: Moshi): Retrofit {
         val base = BuildConfig.API_BASE_URL.trimEnd('/') + "/"

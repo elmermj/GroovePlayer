@@ -25,6 +25,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.user_category.GetUserSettingsU
 import com.aethelsoft.grooveplayer.domain.usecase.user_category.UpdateUserSettingsUseCase
 import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,6 +39,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -86,6 +88,13 @@ class ProfileViewModel @Inject constructor(
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
+
+    /** One restore at a time so startup and Retry do not both use the refresh token. */
+    private val restoreGate = AtomicBoolean(false)
+    private val _openRestoreInFlight = MutableStateFlow(false)
+    val openRestoreInFlight: StateFlow<Boolean> = _openRestoreInFlight.asStateFlow()
+    private val _serverRetryInFlight = MutableStateFlow(false)
+    val serverRetryInFlight: StateFlow<Boolean> = _serverRetryInFlight.asStateFlow()
 
     val authUser: StateFlow<AuthUser?> =
         authRepository.observeAuthUser()
@@ -140,14 +149,7 @@ class ProfileViewModel @Inject constructor(
             committedExcludedFolders = initial
             _pendingExcludedFolders.value = initial
         }
-        viewModelScope.launch {
-            restoreAuthSessionUseCase().onFailure { e ->
-                if (!e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
-                    _authError.value = e.message?.takeIf { it.isNotBlank() }
-                        ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
-                }
-            }
-        }
+        launchRestore(userInitiated = false)
     }
 
     fun signInWithGoogle(activity: Activity) = viewModelScope.launch {
@@ -188,6 +190,51 @@ class ProfileViewModel @Inject constructor(
 
     fun clearAuthError() {
         _authError.value = null
+    }
+
+    /**
+     * Re-fetches `/v1/me` (tier, quota, storage that shows Cloud backup).
+     * Capped at [com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery.RETRY_TIMEOUT_MS],
+     * not the 12s startup cap. Ignored while the on-open restore is still running.
+     */
+    fun retryServerSync() {
+        launchRestore(userInitiated = true)
+    }
+
+    private fun launchRestore(userInitiated: Boolean) {
+        if (!restoreGate.compareAndSet(false, true)) return
+        if (userInitiated) {
+            _serverRetryInFlight.value = true
+            _authError.value = null
+        } else {
+            _openRestoreInFlight.value = true
+        }
+        viewModelScope.launch {
+            try {
+                val result = if (userInitiated) {
+                    restoreAuthSessionUseCase(boundByStartupTimeout = false)
+                } else {
+                    restoreAuthSessionUseCase()
+                }
+                result.onFailure { error ->
+                    if (error is CancellationException) throw error
+                    showRestoreError(error)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showRestoreError(e)
+            } finally {
+                _serverRetryInFlight.value = false
+                _openRestoreInFlight.value = false
+                restoreGate.set(false)
+            }
+        }
+    }
+
+    private fun showRestoreError(error: Throwable) {
+        _authError.value = error.message?.takeIf { it.isNotBlank() }
+            ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
     }
 
     override fun refresh() {

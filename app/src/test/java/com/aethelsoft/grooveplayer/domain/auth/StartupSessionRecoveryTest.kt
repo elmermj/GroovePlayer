@@ -4,6 +4,7 @@ import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -79,6 +80,23 @@ class StartupSessionRecoveryTest {
         )
 
         assertTrue(outcome is StartupSessionRecovery.Outcome.RefreshRejected)
+    }
+
+    @Test
+    fun staleFallbackIsDroppedButRejectedRefreshAlwaysApplies() {
+        val local = StartupSessionRecovery.Outcome.LocalFallback(user("local"))
+        val remote = StartupSessionRecovery.Outcome.Remote(user("remote"))
+        val rejected = StartupSessionRecovery.Outcome.RefreshRejected
+        assertTrue(StartupSessionRecovery.shouldPublish(2, 2, local, newerRemotePublished = false))
+        assertTrue(StartupSessionRecovery.shouldPublish(2, 2, remote, newerRemotePublished = false))
+        // Older /v1/me may fill in until a newer attempt has published one.
+        assertTrue(StartupSessionRecovery.shouldPublish(1, 2, remote, newerRemotePublished = false))
+        assertFalse(StartupSessionRecovery.shouldPublish(1, 2, remote, newerRemotePublished = true))
+        assertFalse(StartupSessionRecovery.shouldPublish(1, 2, local, newerRemotePublished = false))
+        assertFalse(StartupSessionRecovery.shouldPublish(1, 2, local, newerRemotePublished = true))
+        // A dead refresh token signs the user out even if this attempt is older.
+        assertTrue(StartupSessionRecovery.shouldPublish(1, 2, rejected, newerRemotePublished = false))
+        assertTrue(StartupSessionRecovery.shouldPublish(1, 2, rejected, newerRemotePublished = true))
     }
 
     private fun user(id: String) = AuthUser(
