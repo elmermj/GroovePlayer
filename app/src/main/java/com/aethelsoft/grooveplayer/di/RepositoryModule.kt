@@ -21,6 +21,8 @@ import com.aethelsoft.grooveplayer.data.playback.CloudPlaybackCacheStore
 import com.aethelsoft.grooveplayer.data.playback.LocalAudioProbe
 import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
 import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
+import com.aethelsoft.grooveplayer.data.library.FileM3uLocationHash
+import com.aethelsoft.grooveplayer.data.library.PlaylistLibraryIndex
 import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
 import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
@@ -29,6 +31,8 @@ import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
 import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
 import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTickets
 import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
+import com.aethelsoft.grooveplayer.domain.playlist.M3uLocationHash
+import com.aethelsoft.grooveplayer.domain.playlist.PlaylistLibrary
 import com.aethelsoft.grooveplayer.data.ads.StartupAdQuotaStore
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.BillingRepository
@@ -181,4 +185,16 @@ abstract class RepositoryModule {
     abstract fun bindPlaybackStreamTickets(
         impl: PlaybackStreamTicketStore
     ): PlaybackStreamTickets
+
+    @Binds
+    @Singleton
+    abstract fun bindPlaylistLibrary(
+        impl: PlaylistLibraryIndex,
+    ): PlaylistLibrary
+
+    @Binds
+    @Singleton
+    abstract fun bindM3uLocationHash(
+        impl: FileM3uLocationHash,
+    ): M3uLocationHash
 }

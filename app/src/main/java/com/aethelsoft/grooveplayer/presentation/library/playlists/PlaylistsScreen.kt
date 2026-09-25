@@ -44,6 +44,7 @@ import com.aethelsoft.grooveplayer.domain.model.Playlist
 import com.aethelsoft.grooveplayer.domain.model.trackCountLabel
 import com.aethelsoft.grooveplayer.domain.playlist.PlaylistNames
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
@@ -217,13 +218,28 @@ fun PlaylistsScreen(
             titleContentColor = GrooveTheme.colors.onSurface,
             textContentColor = SoftWhite.copy(alpha = 0.85f),
             title = { Text(if (success != null) "Playlist imported" else "Import failed") },
-            text = { Text(importSummary(result)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(importSummary(result))
+                    if (success != null && success.missingLocations.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                viewModel.dismissImportResult()
+                                LocalLibraryImport.current.pickFolder()
+                            },
+                        ) {
+                            Text("Import folder", color = SoftWhite)
+                        }
+                    }
+                }
+            },
             confirmButton = {
-                if (success != null) {
+                val playlistId = success?.playlistId
+                if (playlistId != null) {
                     TextButton(
                         onClick = {
                             viewModel.dismissImportResult()
-                            onOpenPlaylist(success.playlistId)
+                            onOpenPlaylist(playlistId)
                         },
                     ) {
                         Text("Open", color = SoftWhite)
@@ -412,8 +428,12 @@ private fun importSummary(result: M3uImportResult): String = when (result) {
         if (missing == 0) {
             "Imported ${result.importedCount} tracks into ${result.playlistName}."
         } else {
-            val files = if (missing == 1) "1 file was" else "$missing files were"
-            "Imported ${result.importedCount} tracks into ${result.playlistName}. $files not in your library."
+            val added = if (result.playlistId == null) {
+                "Nothing was added."
+            } else {
+                "Imported ${result.importedCount} tracks into ${result.playlistName}."
+            }
+            "$added Not in your library."
         }
     }
 }

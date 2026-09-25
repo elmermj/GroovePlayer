@@ -26,12 +26,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.domain.model.PlaylistTrack
 import com.aethelsoft.grooveplayer.domain.playlist.PlaylistNames
+import com.aethelsoft.grooveplayer.domain.playlist.playlistQueueStart
 import com.aethelsoft.grooveplayer.presentation.common.GrooveActionButton
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
@@ -122,18 +125,14 @@ fun PlaylistDetailScreen(
             else -> {
                 PlaylistTrackList(
                     tracks = tracks,
-                    onPlay = { index ->
-                        playerViewModel.setQueue(tracks.map { it.song }, index)
-                    },
+                    onPlay = { index -> playPlaylist(playerViewModel, tracks, index) },
                     onMove = viewModel::move,
                     onRemove = viewModel::removeTrack,
                     header = {
                         Column(verticalArrangement = Arrangement.spacedBy(XS_PADDING)) {
                             GrooveActionButton(
                                 label = "Play",
-                                onClick = {
-                                    playerViewModel.setQueue(tracks.map { it.song }, 0)
-                                },
+                                onClick = { playPlaylist(playerViewModel, tracks, tappedIndex = null) },
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             if (!message.isNullOrBlank()) {
@@ -173,4 +172,19 @@ fun PlaylistDetailScreen(
             },
         )
     }
+}
+
+private fun playPlaylist(
+    playerViewModel: PlayerViewModel,
+    tracks: List<PlaylistTrack>,
+    tappedIndex: Int?,
+) {
+    val playable = tracks.filter { it.available }
+    val start = playlistQueueStart(
+        ids = tracks.map { it.song.id },
+        tappedIndex = tappedIndex,
+        playableIds = playable.map { it.song.id },
+    )
+    if (start < 0) return
+    playerViewModel.setQueue(playable.map { it.song }, start)
 }

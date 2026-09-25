@@ -41,61 +41,15 @@ object GroovePlayerMigrations {
     }
 
     /**
-     * User playlists (SCRUM-9). Creates empty tables on a schema 17 library and
-     * leaves song_likes and every other row in place.
-     *
-     * Also adds songs.sourcePath when a database reached version 17 without it
-     * (the playlists draft numbered its own schema 16, before test's sourcePath
-     * column). Test databases already have the column, so this is a no-op there.
+     * User playlists. Schema 18 is SCRUM-84 (songs.contentHash). This step only
+     * adds tables, keyed by that hash. Renumber [MIGRATION_18_19] with
+     * [GroovePlayerDatabase] if another migration lands on 18 first.
      */
-    val MIGRATION_17_18 = object : Migration(17, 18) {
+    val MIGRATION_18_19 = object : Migration(18, 19) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            if (!hasColumn(db, "songs", "sourcePath")) {
-                db.execSQL("ALTER TABLE `songs` ADD COLUMN `sourcePath` TEXT")
-            }
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS `playlists` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    `name` TEXT NOT NULL,
-                    `createdAt` INTEGER NOT NULL,
-                    `updatedAt` INTEGER NOT NULL
-                )
-                """.trimIndent(),
-            )
-            db.execSQL(
-                """
-                CREATE TABLE IF NOT EXISTS `playlist_tracks` (
-                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                    `playlistId` INTEGER NOT NULL,
-                    `position` INTEGER NOT NULL,
-                    `songId` TEXT NOT NULL,
-                    `title` TEXT NOT NULL,
-                    `artist` TEXT NOT NULL,
-                    `uri` TEXT NOT NULL,
-                    `filePath` TEXT,
-                    `durationMs` INTEGER NOT NULL,
-                    `artworkUrl` TEXT,
-                    `albumName` TEXT,
-                    `genre` TEXT NOT NULL,
-                    FOREIGN KEY(`playlistId`) REFERENCES `playlists`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
-                )
-                """.trimIndent(),
-            )
-            db.execSQL(
-                "CREATE INDEX IF NOT EXISTS `index_playlist_tracks_playlistId` ON `playlist_tracks` (`playlistId`)",
-            )
-        }
-    }
-
-    private fun hasColumn(db: SupportSQLiteDatabase, table: String, column: String): Boolean {
-        db.query("PRAGMA table_info(`$table`)").use { cursor ->
-            val nameIndex = cursor.getColumnIndex("name")
-            if (nameIndex < 0) return false
-            while (cursor.moveToNext()) {
-                if (cursor.getString(nameIndex) == column) return true
+            com.aethelsoft.grooveplayer.domain.playlist.PlaylistSchemaMigration.STATEMENTS.forEach {
+                db.execSQL(it)
             }
         }
-        return false
     }
 }

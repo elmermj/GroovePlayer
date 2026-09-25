@@ -6,8 +6,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * A playlist row. Song fields are stored on the row so playback and M3U export
- * still work if the library index is refreshed.
+ * Playlist membership is the song's [contentHash] (SCRUM-84), not a path or
+ * MediaStore id. [songId] is the id that hash had when the row was saved.
  */
 @Entity(
     tableName = "playlist_tracks",
@@ -19,18 +19,17 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("playlistId")],
+    indices = [Index("playlistId"), Index("contentHash")],
 )
 data class PlaylistTrackEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val playlistId: Long,
     val position: Int,
+    val contentHash: String,
     val songId: String,
     val title: String,
     val artist: String,
-    val uri: String,
-    val filePath: String?,
     val durationMs: Long,
     val artworkUrl: String?,
     val albumName: String?,

@@ -51,7 +51,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         PlaylistEntity::class,
         PlaylistTrackEntity::class,
     ],
-    version = 18,
+    version = 19,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -60,7 +60,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
         /** Room SQLite file name under Context.getDatabasePath. */
         const val DATABASE_NAME = "grooveplayer_database"
         /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
-        const val SCHEMA_VERSION = 18
+        const val SCHEMA_VERSION = 19
     }
 
     abstract fun playbackHistoryDao(): PlaybackHistoryDao

@@ -5,36 +5,39 @@ import com.aethelsoft.grooveplayer.domain.model.Playlist
 import com.aethelsoft.grooveplayer.domain.model.PlaylistTrack
 import com.aethelsoft.grooveplayer.domain.model.PlaylistWithTracks
 import com.aethelsoft.grooveplayer.domain.model.Song
-import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
-import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ExportM3uPlaylistUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ImportM3uPlaylistUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ReorderPlaylistUseCase
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ImportM3uPlaylistUseCaseTest {
 
     @Test
-    fun `import keeps library order and export writes the same paths`() = runBlocking {
+    fun `import keeps library order and export writes library file names`() = runBlocking {
         val first = librarySong("1", "/storage/emulated/0/Music/one.mp3")
-        val second = librarySong("2", "/storage/emulated/0/Music/two.mp3")
+        val second = librarySong("2", "/data/groove-library/two.mp3")
         val playlists = FakePlaylistRepository()
-        val music = FakeMusicRepository(listOf(first, second))
-        val importer = ImportM3uPlaylistUseCase(playlists, music)
+        val library = FixedLibrary(
+            listOf(
+                PlaylistLibrarySong(first, "aaa", "one.mp3"),
+                PlaylistLibrarySong(second, "bbb", "two.mp3"),
+            ),
+        )
+        val importer = ImportM3uPlaylistUseCase(playlists, library, M3uLocationHash { null })
         val exporter = ExportM3uPlaylistUseCase(playlists)
         val source = """
             #EXTM3U
             #PLAYLIST:Ignored when a file name is given
             #EXTINF:10,Missing
             /storage/emulated/0/Music/missing.mp3
-            file:///storage/emulated/0/Music/two.mp3
+            file:///data/groove-library/two.mp3
             /storage/emulated/0/Music/one.mp3
         """.trimIndent()
 
@@ -45,30 +48,41 @@ class ImportM3uPlaylistUseCaseTest {
         assertEquals(2, success.importedCount)
         assertEquals(listOf("/storage/emulated/0/Music/missing.mp3"), success.missingLocations)
 
-        val exported = exporter(success.playlistId)!!
+        val exported = exporter(success.playlistId!!)!!
         val parsed = M3uCodec.parse(exported)
         assertEquals("Road trip.m3u", parsed.name)
-        assertEquals(
-            listOf(
-                "/storage/emulated/0/Music/two.mp3",
-                "/storage/emulated/0/Music/one.mp3",
-            ),
-            parsed.tracks.map { it.location },
-        )
-        val rematch = PlaylistLibraryPaths.match(parsed.tracks, listOf(first, second))
-        assertEquals(listOf("2", "1"), rematch.matched.map { it.id })
-        assertTrue(rematch.missingLocations.isEmpty())
+        assertEquals(listOf("two.mp3", "one.mp3"), parsed.tracks.map { it.location })
+        val rematched = parsed.tracks.map { track ->
+            PlaylistM3uMatch.match(track.location, readableHash = null, library = library.copies())?.song?.id
+        }
+        assertEquals(listOf("2", "1"), rematched)
     }
 
     @Test
-    fun `import fails when nothing in the file is in the library`() = runBlocking {
+    fun `export skips unavailable tracks`() = runBlocking {
+        val playlists = FakePlaylistRepository()
+        val id = playlists.create("Mix")
+        playlists.addSongs(id, listOf(librarySong("a", "/data/groove-library/a.mp3")))
+        val row = playlists.stored.first()
+        row.tracks[0] = row.tracks[0].copy(available = false)
+
+        val exported = ExportM3uPlaylistUseCase(playlists).invoke(id)!!
+        assertTrue(M3uCodec.parse(exported).tracks.isEmpty())
+    }
+
+    @Test
+    fun `import reports not in library when nothing matches`() = runBlocking {
         val playlists = FakePlaylistRepository()
         val result = ImportM3uPlaylistUseCase(
             playlists,
-            FakeMusicRepository(emptyList()),
+            FixedLibrary(emptyList()),
+            M3uLocationHash { null },
         ).invoke("Mix", "/storage/emulated/0/Music/missing.mp3\n")
 
-        assertTrue(result is M3uImportResult.Failure)
+        val success = result as M3uImportResult.Success
+        assertNull(success.playlistId)
+        assertEquals(0, success.importedCount)
+        assertEquals(listOf("/storage/emulated/0/Music/missing.mp3"), success.missingLocations)
         assertTrue(playlists.stored.isEmpty())
     }
 
@@ -97,27 +111,17 @@ class ImportM3uPlaylistUseCaseTest {
         id = id,
         title = id,
         artist = "Ada",
-        uri = "content://media/external/audio/media/$id",
+        uri = "",
         genre = "",
         durationMs = 1_000,
         filePath = path,
     )
 }
 
-private class FakeMusicRepository(
-    private val songs: List<Song>,
-) : MusicRepository {
-    override suspend fun getAllSongs(): List<Song> = songs
-    override suspend fun getSongsPage(offset: Int, limit: Int): List<Song> = songs
-    override suspend fun getSongsByArtist(artist: String): List<Song> = emptyList()
-    override suspend fun getSongsByArtistPage(artist: String, offset: Int, limit: Int): List<Song> = emptyList()
-    override suspend fun getSongsByAlbum(album: String): List<Song> = emptyList()
-    override suspend fun getSongsByAlbumPage(album: String, offset: Int, limit: Int): List<Song> = emptyList()
-    override suspend fun searchSongs(query: String): List<Song> = emptyList()
-    override suspend fun getMusicFolderPaths(): List<String> = emptyList()
-    override suspend fun getStorageUsage(): StorageUsageData = error("unused")
-    override val catalogGeneration = MutableStateFlow(0L)
-    override fun bumpCatalogGeneration() = Unit
+private class FixedLibrary(
+    private val songs: List<PlaylistLibrarySong>,
+) : PlaylistLibrary {
+    override suspend fun copies(): List<PlaylistLibrarySong> = songs
 }
 
 private class FakePlaylistRepository : PlaylistRepository {

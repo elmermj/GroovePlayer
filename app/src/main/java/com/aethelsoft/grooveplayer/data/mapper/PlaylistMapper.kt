@@ -32,13 +32,15 @@ object PlaylistMapper {
                 PlaylistTrack(
                     entryId = entity.id,
                     position = entity.position,
-                    song = toSong(entity),
+                    song = snapshot(entity),
+                    contentHash = entity.contentHash,
+                    available = false,
                 )
             },
         )
     }
 
-    fun toSong(entity: PlaylistTrackEntity): Song {
+    fun snapshot(entity: PlaylistTrackEntity, filePath: String? = null): Song {
         val album = entity.albumName?.takeIf { it.isNotBlank() }?.let { albumName ->
             Album(
                 id = makeAlbumId(entity.artist, albumName),
@@ -52,24 +54,28 @@ object PlaylistMapper {
             id = entity.songId,
             title = entity.title,
             artist = entity.artist,
-            uri = entity.uri,
+            uri = "",
             genre = entity.genre,
             durationMs = entity.durationMs,
             artworkUrl = entity.artworkUrl,
             album = album,
-            filePath = entity.filePath,
+            filePath = filePath,
         )
     }
 
-    fun toEntity(playlistId: Long, position: Int, song: Song): PlaylistTrackEntity =
+    fun toEntity(
+        playlistId: Long,
+        position: Int,
+        song: Song,
+        contentHash: String,
+    ): PlaylistTrackEntity =
         PlaylistTrackEntity(
             playlistId = playlistId,
             position = position,
+            contentHash = contentHash.lowercase(),
             songId = song.id,
             title = song.title,
             artist = song.artist,
-            uri = song.uri,
-            filePath = song.filePath?.takeIf { it.isNotBlank() },
             durationMs = song.durationMs,
             artworkUrl = song.artworkUrl,
             albumName = song.album?.name,

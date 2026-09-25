@@ -18,7 +18,8 @@ data class M3uDocument(
 
 sealed class M3uImportResult {
     data class Success(
-        val playlistId: Long,
+        /** Null when every entry was missing, so no empty playlist is created. */
+        val playlistId: Long?,
         val playlistName: String,
         val importedCount: Int,
         val missingLocations: List<String>,

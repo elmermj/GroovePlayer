@@ -2,15 +2,17 @@ package com.aethelsoft.grooveplayer.domain.usecase.playlist_category
 
 import com.aethelsoft.grooveplayer.domain.model.M3uImportResult
 import com.aethelsoft.grooveplayer.domain.playlist.M3uCodec
-import com.aethelsoft.grooveplayer.domain.playlist.PlaylistLibraryPaths
+import com.aethelsoft.grooveplayer.domain.playlist.M3uLocationHash
+import com.aethelsoft.grooveplayer.domain.playlist.PlaylistLibrary
+import com.aethelsoft.grooveplayer.domain.playlist.PlaylistM3uMatch
 import com.aethelsoft.grooveplayer.domain.playlist.PlaylistNames
-import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
 import javax.inject.Inject
 
 class ImportM3uPlaylistUseCase @Inject constructor(
     private val playlistRepository: PlaylistRepository,
-    private val musicRepository: MusicRepository,
+    private val library: PlaylistLibrary,
+    private val locationHash: M3uLocationHash,
 ) {
     suspend operator fun invoke(requestedName: String, m3uText: String): M3uImportResult {
         val document = M3uCodec.parse(m3uText)
@@ -23,19 +25,32 @@ class ImportM3uPlaylistUseCase @Inject constructor(
         val nameError = PlaylistNames.validationError(name)
         if (nameError != null) return M3uImportResult.Failure(nameError)
 
-        val match = PlaylistLibraryPaths.match(document.tracks, musicRepository.getAllSongs())
-        if (match.matched.isEmpty()) {
-            return M3uImportResult.Failure(
-                "None of the ${document.tracks.size} tracks matched your library",
+        val copies = library.copies()
+        val matched = mutableListOf<com.aethelsoft.grooveplayer.domain.model.Song>()
+        val missing = mutableListOf<String>()
+        for (track in document.tracks) {
+            val hit = PlaylistM3uMatch.match(
+                location = track.location,
+                readableHash = locationHash.sha256OrNull(track.location),
+                library = copies,
+            )
+            if (hit == null) missing += track.location else matched += hit.song
+        }
+        if (matched.isEmpty()) {
+            return M3uImportResult.Success(
+                playlistId = null,
+                playlistName = name,
+                importedCount = 0,
+                missingLocations = missing,
             )
         }
         val id = playlistRepository.create(name)
-        playlistRepository.addSongs(id, match.matched)
+        playlistRepository.addSongs(id, matched)
         return M3uImportResult.Success(
             playlistId = id,
             playlistName = name,
-            importedCount = match.matched.size,
-            missingLocations = match.missingLocations,
+            importedCount = matched.size,
+            missingLocations = missing,
         )
     }
 }

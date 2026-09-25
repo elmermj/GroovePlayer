@@ -38,7 +38,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.alpha
 import com.aethelsoft.grooveplayer.domain.model.PlaylistTrack
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
+import com.aethelsoft.grooveplayer.presentation.library.importing.rememberTrackPresence
+import com.aethelsoft.grooveplayer.utils.theme.ui.HighlightPrimary
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelsoft.grooveplayer.presentation.common.grooveBottomContentInset
@@ -202,9 +207,13 @@ private fun PlaylistTrackRow(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val song = track.song
+    val presence = rememberTrackPresence(song)
+    val import = LocalLibraryImport.current
+    val playable = track.available && presence.playable
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .alpha(if (playable) 1f else 0.45f)
             .clip(GrooveTheme.radii.cardShape)
             .background(GrooveTheme.colors.surface)
             .padding(vertical = XS_PADDING, horizontal = S_PADDING),
@@ -214,7 +223,10 @@ private fun PlaylistTrackRow(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .clickable(onClick = onPlay),
+                .clickable(onClick = {
+                    if (!playable) return@clickable
+                    onPlay()
+                }),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(S_PADDING),
         ) {
@@ -234,12 +246,17 @@ private fun PlaylistTrackRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = song.artist,
+                    text = if (playable) song.artist else "${song.artist} · Unavailable",
                     style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
                     color = SoftWhite,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+        if (presence.canRestore) {
+            TextButton(onClick = { import.restoreSong(song) }) {
+                Text("Restore", color = HighlightPrimary)
             }
         }
         Box {
