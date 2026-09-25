@@ -29,6 +29,13 @@ interface BackupRepository {
      */
     suspend fun startBackup(entitlement: StorageEntitlement?, isPremium: Boolean): Result<Unit>
 
+    /**
+     * GET /v1/backup/lease.
+     * Sets [com.aethelsoft.grooveplayer.domain.model.CloudBackupState.otherDeviceHoldingLease]
+     * when a different install holds a non-expired lease.
+     */
+    suspend fun refreshBackupLease()
+
     suspend fun refreshLocalState()
 
     /** POST /v1/backup/download-url then GET bytes (skipped when dry_run). Allowed in grace. */

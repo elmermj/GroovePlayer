@@ -8,6 +8,8 @@ import com.aethelsoft.grooveplayer.data.local.db.RoomDbSwapFiles
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseRequestDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseResponseDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupObjectDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupMatchRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
@@ -17,8 +19,11 @@ import com.aethelsoft.grooveplayer.di.NetworkModule
 import com.aethelsoft.grooveplayer.domain.backup.AppPrivateLibrary
 import com.aethelsoft.grooveplayer.domain.backup.BackupCatalogPaths
 import com.aethelsoft.grooveplayer.domain.backup.BackupJobGate
+import com.aethelsoft.grooveplayer.domain.backup.BackupLeaseCopy
+import com.aethelsoft.grooveplayer.domain.backup.BackupLeasePolicy
 import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
 import com.aethelsoft.grooveplayer.domain.backup.BackupTransfer
+import com.aethelsoft.grooveplayer.domain.backup.RemoteBackupLease
 import com.aethelsoft.grooveplayer.domain.backup.CloudHashDedup
 import com.aethelsoft.grooveplayer.domain.backup.ConsolidateByteProgress
 import com.aethelsoft.grooveplayer.domain.backup.ContentHash
@@ -53,13 +58,19 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import kotlin.math.max
+import com.squareup.moshi.Moshi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -72,6 +83,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.zip.GZIPInputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.GZIPOutputStream
 import javax.inject.Inject
 import javax.inject.Named
@@ -100,6 +113,8 @@ class BackupRepositoryImpl @Inject constructor(
     private val authRepository: AuthRepository,
     private val loginRestorePromptMemory: LoginRestorePromptMemory,
     private val backupApi: BackupApi,
+    private val installDeviceId: InstallDeviceId,
+    private val moshi: Moshi,
     @Named(NetworkModule.R2_HTTP_CLIENT) private val r2HttpClient: OkHttpClient,
 ) : BackupRepository {
 
@@ -114,6 +129,14 @@ class BackupRepositoryImpl @Inject constructor(
     /** Snapshot for sync HTTP error mapping (403 read_only vs over_quota). */
     @Volatile
     private var gateEntitlement: StorageEntitlement? = null
+
+    /** Set by the heartbeat when the lease is lost or another device takes it. */
+    private val backupLeaseLost = AtomicReference<LeaseLoss?>(null)
+
+    /** Bumped when a backup acquire starts so an in-flight status GET cannot overwrite it. */
+    private val leaseRefreshGeneration = AtomicLong(0)
+
+    private val leaseAdapter by lazy { moshi.adapter(BackupLeaseResponseDto::class.java) }
 
     private val _state = MutableStateFlow(restoredBackupState())
     private val restoreProgress = RestoreProgress()
@@ -215,7 +238,27 @@ class BackupRepositoryImpl @Inject constructor(
             ) {
                 error(BackupJobGate.BUSY_MESSAGE)
             }
+            var heldLease: LeaseGate.Acquired? = null
+            val deviceId = installDeviceId.get()
             try {
+                when (val gate = acquireBackupLease(deviceId)) {
+                    is LeaseGate.Acquired -> heldLease = gate
+                    LeaseGate.HeldByOther -> throw OtherDeviceBackupException()
+                    LeaseGate.EndpointMissing ->
+                        Log.w(TAG, "backup lease endpoint missing — continuing without cross-device lock")
+                }
+                backupLeaseLost.set(null)
+                coroutineScope {
+                    val heartbeat = heldLease?.let { held ->
+                        launch {
+                            heartbeatBackupLease(
+                                deviceId,
+                                held.leaseId,
+                                held.heartbeatIntervalMs,
+                            )
+                        }
+                    }
+                    try {
             val folders = resolveIncludedFolders()
             _state.update {
                 it.copy(
@@ -272,6 +315,7 @@ class BackupRepositoryImpl @Inject constructor(
 
             // Paths in Room change before any upload. Progress is per file, and a failure
             // here never reaches the song or catalog upload.
+            throwIfBackupLeaseLost()
             val uploadFiles = canonicalizeApprovedSongs(files)
             prepared = uploadFiles.sumOf { it.length() }
             val consolidateCompleted = _state.value.consolidateCompleted
@@ -307,6 +351,7 @@ class BackupRepositoryImpl @Inject constructor(
             )
 
             for (file in uploadFiles) {
+                throwIfBackupLeaseLost()
                 val size = file.length()
                 if (size <= 0L) {
                     completed++
@@ -474,6 +519,7 @@ class BackupRepositoryImpl @Inject constructor(
                 uploadCompleted = completed,
                 uploadTotal = uploadFiles.size,
             )
+            throwIfBackupLeaseLost()
             val roomResult = uploadRoomDbSnapshot(remainingQuotaHeadroom)
             anyDryRun = anyDryRun || roomResult.anyDryRun
             dedupedCount += if (roomResult.deduped) 1 else 0
@@ -530,10 +576,23 @@ class BackupRepositoryImpl @Inject constructor(
                     "uploadedBytes=$uploadedBytes dryRun=$anyDryRun",
             )
             Unit
+                    } finally {
+                        heartbeat?.cancel()
+                        if (heartbeat != null) runCatching { heartbeat.join() }
+                    }
+                }
             } finally {
+                val releaseId = heldLease?.leaseId
+                if (releaseId != null) {
+                    withContext(NonCancellable) { releaseBackupLease(deviceId, releaseId) }
+                }
                 jobGate.release(BackupTransfer.BACKUP)
             }
         }.onFailure { e ->
+            if (e is OtherDeviceBackupException) {
+                _state.update { it.copy(otherDeviceHoldingLease = true) }
+                if (_state.value.phase !in ACTIVE_BACKUP_PHASES) return@onFailure
+            }
             if (_state.value.phase !in setOf(
                     CloudBackupPhase.BLOCKED_NOT_PREMIUM,
                     CloudBackupPhase.BLOCKED_GRACE,
@@ -562,6 +621,218 @@ class BackupRepositoryImpl @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    override suspend fun refreshBackupLease() {
+        if (!authRepository.isSignedIn()) {
+            _state.update { it.copy(otherDeviceHoldingLease = false) }
+            return
+        }
+        if (_state.value.phase.isUploadInProgress()) return
+        val generation = leaseRefreshGeneration.get()
+        val deviceId = installDeviceId.get()
+        val response = try {
+            backupApi.getLease(deviceId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "backup lease status failed: ${e.message}")
+            return
+        }
+        if (generation != leaseRefreshGeneration.get()) return
+        if (_state.value.phase.isUploadInProgress()) return
+        applyLeaseStatus(response, deviceId)
+    }
+
+    private sealed class LeaseGate {
+        data class Acquired(
+            val leaseId: String,
+            val heartbeatIntervalMs: Long,
+        ) : LeaseGate()
+
+        data object HeldByOther : LeaseGate()
+        data object EndpointMissing : LeaseGate()
+    }
+
+    private enum class LeaseLoss {
+        OTHER_DEVICE,
+        NOT_FOUND,
+    }
+
+    private suspend fun acquireBackupLease(deviceId: String): LeaseGate {
+        leaseRefreshGeneration.incrementAndGet()
+        refreshBackupLease()
+        val response = try {
+            backupApi.acquireLease(
+                BackupLeaseRequestDto(
+                    deviceId = deviceId,
+                    deviceLabel = installDeviceId.deviceName(),
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            throw IllegalStateException(
+                "Can't reach the backup lock. Check the connection, then try again.",
+                e,
+            )
+        }
+        val code = response.code()
+        if (code == 403) throw mapBackupHttp(HttpException(response))
+        if (code == 409) {
+            val snapshot = parseLeaseBody(response).toRemoteLease(System.currentTimeMillis())
+            if (leaseBlocks(snapshot, deviceId, 409)) {
+                _state.update { it.copy(otherDeviceHoldingLease = true) }
+                return LeaseGate.HeldByOther
+            }
+            throw IllegalStateException(
+                "Backup lock was refused. Tap Back up now to try again.",
+            )
+        }
+        if (code == 404 || code == 405 || code == 501) {
+            val snapshot = parseLeaseBody(response).toRemoteLease(System.currentTimeMillis())
+            if (snapshot.code == BackupLeasePolicy.CODE_NOT_FOUND) {
+                throw IllegalStateException(
+                    "Backup lock expired. Tap Retry backup to start again.",
+                )
+            }
+            if (leaseBlocks(snapshot, deviceId, code)) {
+                _state.update { it.copy(otherDeviceHoldingLease = true) }
+                return LeaseGate.HeldByOther
+            }
+            _state.update { it.copy(otherDeviceHoldingLease = false) }
+            return LeaseGate.EndpointMissing
+        }
+        if (!response.isSuccessful) throw mapBackupHttp(HttpException(response))
+        val dto = response.body()
+        val snapshot = dto.toRemoteLease(System.currentTimeMillis())
+        if (leaseBlocks(snapshot, deviceId, code)) {
+            _state.update { it.copy(otherDeviceHoldingLease = true) }
+            return LeaseGate.HeldByOther
+        }
+        val body = dto ?: error("backup lease missing lease_id")
+        val leaseId = body.leaseId?.takeIf { it.isNotBlank() }
+            ?: error("backup lease missing lease_id")
+        _state.update { it.copy(otherDeviceHoldingLease = false) }
+        return LeaseGate.Acquired(
+            leaseId = leaseId,
+            heartbeatIntervalMs = BackupLeasePolicy.heartbeatIntervalMs(body.heartbeatIntervalSec),
+        )
+    }
+
+    private suspend fun heartbeatBackupLease(
+        deviceId: String,
+        leaseId: String,
+        intervalMs: Long,
+    ) {
+        var interval = intervalMs
+        while (currentCoroutineContext().isActive) {
+            delay(interval)
+            if (!currentCoroutineContext().isActive) return
+            try {
+                val response = backupApi.heartbeatLease(
+                    BackupLeaseRequestDto(deviceId = deviceId, leaseId = leaseId),
+                )
+                when (response.code()) {
+                    200 -> {
+                        interval = BackupLeasePolicy.heartbeatIntervalMs(
+                            response.body()?.heartbeatIntervalSec,
+                        )
+                    }
+                    409 -> {
+                        backupLeaseLost.set(LeaseLoss.OTHER_DEVICE)
+                        _state.update { it.copy(otherDeviceHoldingLease = true) }
+                        return
+                    }
+                    404 -> {
+                        backupLeaseLost.set(LeaseLoss.NOT_FOUND)
+                        return
+                    }
+                    else -> Log.w(TAG, "lease heartbeat HTTP ${response.code()}")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "lease heartbeat failed: ${e.message}")
+            }
+        }
+    }
+
+    private suspend fun releaseBackupLease(deviceId: String, leaseId: String) {
+        try {
+            val response = backupApi.releaseLease(
+                BackupLeaseRequestDto(deviceId = deviceId, leaseId = leaseId),
+            )
+            if (!response.isSuccessful) {
+                Log.w(TAG, "lease release HTTP ${response.code()}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "lease release failed: ${e.message}")
+        }
+    }
+
+    private fun applyLeaseStatus(
+        response: retrofit2.Response<BackupLeaseResponseDto>,
+        deviceId: String,
+    ) {
+        val code = response.code()
+        if (code == 404 || code == 405 || code == 501) {
+            _state.update { it.copy(otherDeviceHoldingLease = false) }
+            return
+        }
+        if (!response.isSuccessful && code != 409) {
+            Log.w(TAG, "backup lease status HTTP $code")
+            return
+        }
+        val dto = if (response.isSuccessful) response.body() else parseLeaseBody(response)
+        val httpStatus = if (code == 409) 409 else null
+        _state.update {
+            it.copy(otherDeviceHoldingLease = leaseBlocks(dto.toRemoteLease(System.currentTimeMillis()), deviceId, httpStatus))
+        }
+    }
+
+    private fun leaseBlocks(
+        snapshot: RemoteBackupLease,
+        deviceId: String,
+        httpStatus: Int?,
+    ): Boolean = BackupLeasePolicy.blocksThisDevice(
+        lease = snapshot,
+        localDeviceId = deviceId,
+        nowEpochMs = System.currentTimeMillis(),
+        httpStatus = httpStatus,
+    )
+
+    private fun parseLeaseBody(
+        response: retrofit2.Response<BackupLeaseResponseDto>,
+    ): BackupLeaseResponseDto? {
+        val raw = try {
+            response.errorBody()?.string()
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        return runCatching { leaseAdapter.fromJson(raw) }.getOrNull()
+    }
+
+    private fun BackupLeaseResponseDto?.toRemoteLease(nowEpochMs: Long): RemoteBackupLease {
+        if (this == null) return RemoteBackupLease()
+        val expiry = AuthMapper.parseIsoEpochMs(expiresAt)
+            ?: expiresInSec?.let { nowEpochMs + it * 1000L }
+        return RemoteBackupLease(
+            active = active,
+            heldByThisDevice = heldByThisDevice,
+            otherDeviceActive = otherDeviceActive,
+            code = code,
+            deviceId = deviceId,
+            expiresAtEpochMs = expiry,
+        )
+    }
+
+    private fun throwIfBackupLeaseLost() {
+        when (backupLeaseLost.get()) {
+            LeaseLoss.OTHER_DEVICE -> throw OtherDeviceBackupException()
+            LeaseLoss.NOT_FOUND -> error("Backup lock expired. Tap Retry backup to start again.")
+            null -> Unit
         }
     }
 
@@ -1392,6 +1663,7 @@ class BackupRepositoryImpl @Inject constructor(
         }
         val canonical = LinkedHashMap<String, File>()
         pending.forEachIndexed { index, source ->
+            throwIfBackupLeaseLost()
             progress.showFile(index + 1)
             publishConsolidate(progress, force = true)
             progress.beginOperation()
@@ -1979,3 +2251,7 @@ private data class RoomUploadResult(
 
 /** complete 422: R2 HeadObject missing / size mismatch — local files safe; UI offers Retry. */
 private class CloudUploadIncompleteException(message: String) : IllegalStateException(message)
+
+/** Another install holds the backup lease. The primary button uses the exact disabled label. */
+private class OtherDeviceBackupException :
+    IllegalStateException(BackupLeaseCopy.OTHER_DEVICE_BUTTON)

@@ -17,6 +17,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.backup_category.FetchCloudLibr
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.GetIncludedBackupFoldersUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ListBackupObjectsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ObserveCloudBackupStateUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.backup_category.RefreshBackupLeaseUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.StartCloudBackupUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.TrimCloudBackupUseCase
 import com.aethelsoft.grooveplayer.presentation.common.BaseViewModel
@@ -36,6 +37,7 @@ class BackupViewModel @Inject constructor(
     application: Application,
     observeCloudBackupStateUseCase: ObserveCloudBackupStateUseCase,
     private val startCloudBackupUseCase: StartCloudBackupUseCase,
+    private val refreshBackupLeaseUseCase: RefreshBackupLeaseUseCase,
     private val getIncludedBackupFoldersUseCase: GetIncludedBackupFoldersUseCase,
     private val listBackupObjectsUseCase: ListBackupObjectsUseCase,
     private val deleteBackupObjectUseCase: DeleteBackupObjectUseCase,
@@ -115,6 +117,7 @@ class BackupViewModel @Inject constructor(
                     _librarySnapshot.value = null
                     _restoreMessage.value = null
                 }
+                refreshBackupLeaseUseCase()
             }
         }
         // Same live /v1/me + objects path as PTR / onResume / Backup open.
@@ -126,6 +129,7 @@ class BackupViewModel @Inject constructor(
     }
 
     fun startBackup() = viewModelScope.launch {
+        refreshBackupLeaseUseCase()
         startCloudBackupUseCase()
         _includedFolders.value = getIncludedBackupFoldersUseCase()
         loadObjects()
@@ -147,6 +151,7 @@ class BackupViewModel @Inject constructor(
                 _objectsError.value = e.message?.takeIf { it.isNotBlank() }
                     ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
             }
+            refreshBackupLeaseUseCase()
             _includedFolders.value = getIncludedBackupFoldersUseCase()
             loadObjectsInternal()
             loadLibrarySnapshotInternal()

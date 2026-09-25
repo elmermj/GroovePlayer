@@ -18,6 +18,7 @@ fun ProfileSettingsButton(
     title: String,
     isInverse: Boolean = false,
     isActive: Boolean = true,
+    enabled: Boolean = true,
     textStyle: TextStyle = GrooveTheme.typography.buttonLabel.toTextStyle(),
     textColor: Color? = null,
 ) {
@@ -38,6 +39,7 @@ fun ProfileSettingsButton(
 
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         colors = ButtonColors(
             containerColor = containerColor,
