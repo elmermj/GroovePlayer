@@ -4,6 +4,7 @@ import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
@@ -79,6 +80,18 @@ class StartupSessionRecoveryTest {
         )
 
         assertTrue(outcome is StartupSessionRecovery.Outcome.RefreshRejected)
+    }
+
+    @Test
+    fun staleStartupFallbackDoesNotReplaceANewerAttempt() {
+        val local = StartupSessionRecovery.Outcome.LocalFallback(user("local"))
+        val remote = StartupSessionRecovery.Outcome.Remote(user("remote"))
+        assertTrue(StartupSessionRecovery.shouldPublish(2, 2, local))
+        assertTrue(StartupSessionRecovery.shouldPublish(1, 2, remote))
+        assertFalse(StartupSessionRecovery.shouldPublish(1, 2, local))
+        assertFalse(
+            StartupSessionRecovery.shouldPublish(1, 2, StartupSessionRecovery.Outcome.RefreshRejected),
+        )
     }
 
     private fun user(id: String) = AuthUser(

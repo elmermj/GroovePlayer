@@ -46,6 +46,16 @@ object StartupSessionRecovery {
         data object RefreshRejected : Outcome()
     }
 
+    /**
+     * A startup attempt that already fell back must not overwrite a newer
+     * `/v1/me` (Profile Retry). A remote user from an older attempt may still
+     * replace a fallback. Session clear is handled by the caller.
+     */
+    fun shouldPublish(attempt: Int, latestAttempt: Int, outcome: Outcome): Boolean {
+        if (attempt == latestAttempt) return true
+        return outcome is Outcome.Remote
+    }
+
     fun failureKind(error: Throwable): FailureKind {
         val status = findStatus(error)
         if (status == 401) return FailureKind.UNAUTHORIZED

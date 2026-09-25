@@ -38,6 +38,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -86,6 +87,10 @@ class ProfileViewModel @Inject constructor(
 
     private val _authError = MutableStateFlow<String?>(null)
     val authError: StateFlow<String?> = _authError.asStateFlow()
+
+    private val serverRetryGate = AtomicBoolean(false)
+    private val _serverRetryInFlight = MutableStateFlow(false)
+    val serverRetryInFlight: StateFlow<Boolean> = _serverRetryInFlight.asStateFlow()
 
     val authUser: StateFlow<AuthUser?> =
         authRepository.observeAuthUser()
@@ -188,6 +193,30 @@ class ProfileViewModel @Inject constructor(
 
     fun clearAuthError() {
         _authError.value = null
+    }
+
+    /**
+     * Re-fetches `/v1/me` (tier, quota, storage that shows Cloud backup).
+     * Not capped by the startup timeout, so a timed-out cold start does not
+     * stick after the network can reach the API.
+     */
+    fun retryServerSync() {
+        if (!serverRetryGate.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            _serverRetryInFlight.value = true
+            _authError.value = null
+            try {
+                restoreAuthSessionUseCase(boundByStartupTimeout = false).onFailure { e ->
+                    if (!e.javaClass.simpleName.contains("Cancellation", ignoreCase = true)) {
+                        _authError.value = e.message?.takeIf { it.isNotBlank() }
+                            ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
+                    }
+                }
+            } finally {
+                _serverRetryInFlight.value = false
+                serverRetryGate.set(false)
+            }
+        }
     }
 
     override fun refresh() {

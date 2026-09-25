@@ -151,7 +151,8 @@ private class FakeAuthRepository(
 
     override suspend fun refreshSession(): Result<AuthUser> = error("unused")
 
-    override suspend fun restoreSession(): Result<AuthUser?> = Result.success(user.value)
+    override suspend fun restoreSession(boundByStartupTimeout: Boolean): Result<AuthUser?> =
+        Result.success(user.value)
 
     override suspend fun getAccessToken(): String? = token(accessToken)
 

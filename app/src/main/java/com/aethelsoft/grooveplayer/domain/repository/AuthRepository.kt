@@ -22,7 +22,12 @@ interface AuthRepository {
     /** Server hard-delete then local sign-out. Play Store requirement for Sign-In apps. */
     suspend fun deleteAccount(): Result<Unit>
     suspend fun refreshSession(): Result<AuthUser>
-    suspend fun restoreSession(): Result<AuthUser?>
+    /**
+     * Load `/v1/me` (tier, quota, storage). [boundByStartupTimeout] caps the
+     * cold-start attempt at [com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery.NETWORK_TIMEOUT_MS].
+     * Profile Retry passes false so that attempt is not replaced by the startup fallback.
+     */
+    suspend fun restoreSession(boundByStartupTimeout: Boolean = true): Result<AuthUser?>
     suspend fun getAccessToken(): String?
     suspend fun getRefreshToken(): String?
 

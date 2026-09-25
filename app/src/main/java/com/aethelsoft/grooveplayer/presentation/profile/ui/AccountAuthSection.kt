@@ -46,6 +46,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
     val authLoading by viewModel.authLoading.collectAsState()
     val authError by viewModel.authError.collectAsState()
     val serverSyncError by viewModel.serverSyncError.collectAsState()
+    val serverRetryInFlight by viewModel.serverRetryInFlight.collectAsState()
     val profile by viewModel.userProfile.collectAsState()
 
     val signedIn = authUser != null
@@ -164,12 +165,22 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
     }
 
     val syncBanner = authError ?: serverSyncError
+    val canRetryServer = signedIn && !serverSyncError.isNullOrBlank()
     if (!syncBanner.isNullOrBlank()) {
         Spacer(Modifier.height(S_PADDING))
         Text(
             text = syncBanner,
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = Color(0xFFFF8A80),
+        )
+    }
+    if (canRetryServer) {
+        Spacer(Modifier.height(S_PADDING))
+        ProfileSettingsButton(
+            onClick = { viewModel.retryServerSync() },
+            modifier = Modifier.fillMaxWidth(),
+            title = if (serverRetryInFlight) "Retrying…" else "Retry",
+            isActive = !serverRetryInFlight && !authLoading,
         )
     }
     if (showSignOutConfirm) {
