@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.di
 
 import com.aethelsoft.grooveplayer.BuildConfig
 import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
+import com.aethelsoft.grooveplayer.data.auth.TokenRefreshAuthenticator
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
@@ -13,6 +14,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Authenticator
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
@@ -28,6 +30,7 @@ import javax.inject.Singleton
 object NetworkModule {
 
     const val R2_HTTP_CLIENT = "r2HttpClient"
+    const val TOKEN_REFRESH_API = "tokenRefreshApi"
 
     @Provides
     @Singleton
@@ -57,9 +60,43 @@ object NetworkModule {
         chain.proceed(request)
     }
 
+    /**
+     * Refresh calls must not use the API client: that client's authenticator
+     * would call refresh again and deadlock on a 401.
+     */
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
+    @Named(TOKEN_REFRESH_API)
+    fun provideTokenRefreshAuthApi(moshi: Moshi): AuthApi {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+        val client = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .addInterceptor(logging)
+            .build()
+        return retrofit(client, moshi).create(AuthApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTokenRefreshAuthenticator(
+        tokenStore: SecureTokenStore,
+        @Named(TOKEN_REFRESH_API) refreshApi: AuthApi,
+    ): Authenticator = TokenRefreshAuthenticator(tokenStore, refreshApi)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        authInterceptor: Interceptor,
+        tokenRefreshAuthenticator: Authenticator,
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BASIC
@@ -72,6 +109,7 @@ object NetworkModule {
             .readTimeout(20, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
+            .authenticator(tokenRefreshAuthenticator)
             .build()
     }
 
@@ -136,7 +174,9 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit {
+    fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(client, moshi)
+
+    private fun retrofit(client: OkHttpClient, moshi: Moshi): Retrofit {
         val base = BuildConfig.API_BASE_URL.trimEnd('/') + "/"
         return Retrofit.Builder()
             .baseUrl(base)
