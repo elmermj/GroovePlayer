@@ -365,6 +365,10 @@ Product flavors: **`dev`** (default, LAN/test ads), **`staging`** (side-by-side 
 ./gradlew :app:assembleProdRelease
 ```
 
+### Local builds
+
+`build-prod.sh` and `build-staging.sh` point the default **devDebug** variant at production or GroovePlayer Staging. Each one updates `API_BASE_URL` and `GROOVE_ENV` in gitignored `local.properties`, leaves every other key alone, and builds the debug APK. `--install` runs `adb install -r`. Gradle Sync in Android Studio after either script so Run and Debug follow that setup. CI Distribute ignores `GROOVE_ENV` and keeps its own API and variant. Until `google-services.json` lists the staging package, the local staging debug build derives a client from the existing file so it can assemble. The CI staging flavor still needs the real Firebase client.
+
 ### Running
 ```bash
 ./gradlew :app:installDevDebug
