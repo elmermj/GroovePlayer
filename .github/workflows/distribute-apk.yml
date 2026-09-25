@@ -48,9 +48,15 @@ concurrency:
 jobs:
   distribute:
     runs-on: ubuntu-latest
+    env:
+      # Job-owned SDK. The runner image SDK under /usr/local is not writable, so caching
+      # it reports a hit, fails to extract, then cannot save ("another job may be creating
+      # this cache"). This directory is user-owned and is saved once under a stable key.
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Enough history for the release-notes commit list.
           fetch-depth: 50
@@ -60,25 +66,36 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # Writes are limited to the default branch (main) unless this is false.
+          # Distribute runs on test, so this job must restore and write the build cache.
+          # setup-java cache: gradle is intentionally not set; it would freeze caches/build-cache-1
+          # on the first key hit and can disable this action when the Gradle User Home already exists.
+          cache-read-only: false
+
+      - name: Restore Android SDK packages
+        id: android-sdk-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ github.workspace }}/android-sdk
+          # Stable key: no run id, SHA, or file hash. Save once on a miss; later runs only restore.
+          key: ${{ runner.os }}-android-sdk-platform-36-build-tools-36.0.0-cmdline-15859902-v1
+
+      - name: Prepare Android SDK directory
+        run: mkdir -p "${ANDROID_SDK_ROOT}"
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
-          # Empty skips this action's default `tools` package (unpublished; it breaks the job)
-          # and skips a separate sdkmanager call per package. Packages are installed below.
+          # Empty skips a package install here. Packages are installed below on a cache miss.
+          # cmdline-tools default is 15859902, which is part of the cache key above.
           packages: ''
 
-      - name: Cache Android SDK packages
-        id: android-sdk-cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.ANDROID_SDK_ROOT }}/platforms/android-36
-            ${{ env.ANDROID_SDK_ROOT }}/build-tools/36.0.0
-          key: ${{ runner.os }}-android-sdk-platform-36-build-tools-36.0.0-v1
-
       - name: Install Android SDK packages
+        if: steps.android-sdk-cache.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
@@ -115,6 +132,13 @@ jobs:
           )
           sys.exit(completed.returncode)
           PY
+
+      - name: Save Android SDK packages
+        if: steps.android-sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/android-sdk
+          key: ${{ steps.android-sdk-cache.outputs.cache-primary-key }}
 
       - name: Decode keystore
         env:
@@ -206,10 +230,12 @@ jobs:
               if old not in text:
                   raise SystemExit(f"gradle.properties is missing expected setting: {old}")
               text = text.replace(old, new, 1)
+          if "org.gradle.caching=true" not in text:
+              raise SystemExit("gradle.properties is missing org.gradle.caching=true")
           path.write_text(text, encoding="utf-8")
           print("Applied CI Gradle overrides.")
           print("parallel=true workers.max=4 heap=4g incremental=true fullClasspathDexing=false")
-          print("Kept daemon=true, vfs.watch=false, enableResourceOptimizations=false, enableAsmInstrumentation=false")
+          print("Kept daemon=true, caching=true, vfs.watch=false, enableResourceOptimizations=false, enableAsmInstrumentation=false")
           PY
 
       - name: Build dev release APK
@@ -221,7 +247,9 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}"
           # Configuration cache works for a fixed version, but versionCode/versionName are
           # read while configuring defaultConfig and change every run, so the entry would miss.
-          ./gradlew :app:assembleDevRelease --stacktrace --parallel --max-workers=4 \
+          # versionCode still comes from github.run_number. It is a task input only for the
+          # manifest, BuildConfig, and packaging tasks. No timestamp is added to task inputs.
+          ./gradlew :app:assembleDevRelease --stacktrace --build-cache --parallel --max-workers=4 \
             -Pandroid.incremental=true \
             -Pandroid.useFullClasspathForDexingTransform=false \
             -PversionCode="${VERSION_CODE}" \
@@ -245,7 +273,7 @@ jobs:
           echo "APK ready: $apk ($(wc -c < "$apk") bytes)."
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: grooveplayer-dev-release
           path: app/build/outputs/apk/dev/release/app-dev-release.apk
