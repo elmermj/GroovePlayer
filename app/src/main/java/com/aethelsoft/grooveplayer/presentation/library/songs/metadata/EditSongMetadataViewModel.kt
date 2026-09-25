@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.presentation.library.songs.metadata
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.data.repository.EditedSongContentHash
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.SongMetadata
 import com.aethelsoft.grooveplayer.domain.usecase.SaveSongMetadataUseCase
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class EditMetadataUiState(
@@ -90,7 +92,8 @@ class EditSongMetadataViewModel @Inject constructor(
     private val writeAudioTagsUseCase: WriteAudioTagsUseCase,
     private val searchGenresUseCase: SearchGenresUseCase,
     private val searchArtistsUseCase: SearchArtistsUseCase,
-    private val searchAlbumsUseCase: SearchAlbumsUseCase
+    private val searchAlbumsUseCase: SearchAlbumsUseCase,
+    private val editedSongContentHash: EditedSongContentHash,
 ) : AndroidViewModel(application) {
     
     private val _uiState = MutableStateFlow(EditMetadataUiState())
@@ -98,9 +101,11 @@ class EditSongMetadataViewModel @Inject constructor(
     
     private var currentSong: Song? = null
     private var loadToken = 0
+    private var artworkEdited = false
     
     fun loadMetadata(song: Song) {
         currentSong = song
+        artworkEdited = false
         val token = ++loadToken
         _uiState.value = EditMetadataUiState(
             title = song.title,
@@ -175,6 +180,7 @@ class EditSongMetadataViewModel @Inject constructor(
     }
 
     fun updateArtwork(bytes: ByteArray?, mimeType: String?) {
+        artworkEdited = true
         _uiState.value = _uiState.value.copy(artworkBytes = bytes, artworkMimeType = mimeType)
     }
 
@@ -220,13 +226,21 @@ class EditSongMetadataViewModel @Inject constructor(
             artworkMimeType = state.artworkMimeType
         )
 
-        val writeResult = writeAudioTagsUseCase(song.uri, audioTags)
+        val file = editableFile(song)
+        val targetUri = file?.toURI()?.toString() ?: song.uri
+        val writeResult = writeAudioTagsUseCase(targetUri, audioTags, artworkEdited)
         if (writeResult.isFailure) {
             _uiState.value = state.copy(
                 isSaving = false,
                 saveError = writeResult.exceptionOrNull()?.message ?: "Failed to write file tags"
             )
             return false
+        }
+        if (file != null) {
+            runCatching { editedSongContentHash.refresh(song.id, file) }
+                .onFailure { error ->
+                    android.util.Log.e("EditSongMetadata", "Couldn't refresh content hash", error)
+                }
         }
 
         val metadata = SongMetadata(
@@ -242,6 +256,16 @@ class EditSongMetadataViewModel @Inject constructor(
 
         _uiState.value = state.copy(isSaving = false)
         return true
+    }
+
+    private fun editableFile(song: Song): File? {
+        val fromPath = song.filePath?.takeIf { it.isNotBlank() }?.let { File(it) }
+        if (fromPath != null && fromPath.isFile) return fromPath
+        val uri = android.net.Uri.parse(song.uri)
+        val scheme = uri.scheme
+        if (scheme != null && !scheme.equals("file", ignoreCase = true)) return null
+        val path = uri.path ?: return null
+        return File(path).takeIf { it.isFile }
     }
 }
 
