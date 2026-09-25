@@ -499,11 +499,12 @@ object LibraryFilePlacement {
     }
 }
 
-/** Name-and-size MediaStore hits. A row is deletable only when its folder matches the picked tree. */
+/** Name-and-size MediaStore hits. A row is deletable only when its folder and volume match the picked tree. */
 data class MediaStoreAudioRow(
     val id: Long,
     val relativePath: String?,
     val contentHash: String? = null,
+    val volumeName: String? = null,
 )
 
 object MediaStoreOriginalMatch {
@@ -522,10 +523,24 @@ object MediaStoreOriginalMatch {
         pickedTreeDocumentId: String,
         importedSha256: String?,
     ): Boolean {
+        if (!volumeMatches(row.volumeName, pickedTreeDocumentId)) return false
         if (!folderMatches(row.relativePath, pickedTreeDocumentId)) return false
         val want = importedSha256?.trim()?.takeIf { it.isNotEmpty() } ?: return true
         val have = row.contentHash?.trim()?.takeIf { it.isNotEmpty() } ?: return true
         return have.equals(want, ignoreCase = true)
+    }
+
+    /** `primary` in a tree id is MediaStore volume external_primary. Other trees use the volume uuid. */
+    fun volumeMatches(volumeName: String?, pickedTreeDocumentId: String): Boolean {
+        val expected = expectedVolumeName(pickedTreeDocumentId) ?: return false
+        val have = volumeName?.trim()?.takeIf { it.isNotEmpty() } ?: return false
+        return have.equals(expected, ignoreCase = true)
+    }
+
+    fun expectedVolumeName(pickedTreeDocumentId: String): String? {
+        val raw = pickedTreeDocumentId.substringBefore(':', missingDelimiterValue = "").trim()
+        if (raw.isEmpty()) return null
+        return if (raw.equals("primary", ignoreCase = true)) "external_primary" else raw
     }
 
     fun folderMatches(relativePath: String?, pickedTreeDocumentId: String): Boolean {
