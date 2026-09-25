@@ -37,6 +37,11 @@ data class ResolvedQueue(
      * Those songs were skipped. Their catalog rows were not purged.
      */
     val premiumStreamBlocked: Boolean = false,
+    /**
+     * The song the user asked to start is not playable. Callers must leave the
+     * current queue in place instead of starting a different track or clearing it.
+     */
+    val keepExistingQueue: Boolean = false,
 )
 
 /**
@@ -84,14 +89,17 @@ class ResolvePlaybackSourceUseCase @Inject constructor(
             if (purgeIds.isNotEmpty()) {
                 purgeQuietly(purgeIds)
             }
+            val ids = songs.map { it.id }
+            val resolvedStart = adjustedQueueStartIndex(
+                originalIds = ids,
+                startIndex = startIndex,
+                playableIds = playableIds,
+            )
             ResolvedQueue(
                 songs = playable,
-                startIndex = adjustedQueueStartIndex(
-                    originalIds = songs.map { it.id },
-                    startIndex = startIndex,
-                    playableIds = playableIds,
-                ),
+                startIndex = resolvedStart.coerceAtLeast(0),
                 premiumStreamBlocked = premiumStreamBlocked,
+                keepExistingQueue = songs.isNotEmpty() && resolvedStart < 0,
             )
         }
 

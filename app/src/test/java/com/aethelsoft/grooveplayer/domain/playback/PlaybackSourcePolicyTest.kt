@@ -136,12 +136,13 @@ class PlaybackSourcePolicyTest {
     }
 
     @Test
-    fun queueStartFollowsTheNextSurvivingSong() {
+    fun queueStartStaysOnTheTappedSong() {
         val ids = listOf("a", "b", "c", "d")
         assertEquals(1, adjustedQueueStartIndex(ids, startIndex = 1, playableIds = listOf("a", "b", "c", "d")))
-        assertEquals(1, adjustedQueueStartIndex(ids, startIndex = 1, playableIds = listOf("a", "c", "d")))
-        assertEquals(0, adjustedQueueStartIndex(ids, startIndex = 3, playableIds = listOf("a")))
-        assertEquals(0, adjustedQueueStartIndex(ids, startIndex = 0, playableIds = emptyList()))
+        assertEquals(0, adjustedQueueStartIndex(ids, startIndex = 0, playableIds = listOf("a", "c", "d")))
+        assertEquals(-1, adjustedQueueStartIndex(ids, startIndex = 1, playableIds = listOf("a", "c", "d")))
+        assertEquals(-1, adjustedQueueStartIndex(ids, startIndex = 3, playableIds = listOf("a")))
+        assertEquals(-1, adjustedQueueStartIndex(ids, startIndex = 0, playableIds = emptyList()))
     }
 
     @Test
@@ -287,7 +288,7 @@ class ResolvePlaybackSourceUseCaseTest {
     }
 
     @Test
-    fun queueDropsPurgedSongAndStartsOnTheNext() = runBlocking {
+    fun queueDoesNotStartADifferentSongWhenTheTappedOneIsPurged() = runBlocking {
         val catalog = FakeCatalog(setOf("b"))
         val localIds = setOf("a", "c")
         val useCase = ResolvePlaybackSourceUseCase(
@@ -305,7 +306,7 @@ class ResolvePlaybackSourceUseCaseTest {
             startIndex = 1,
         )
         assertEquals(listOf("a", "c"), queue.songs.map { it.id })
-        assertEquals(1, queue.startIndex)
+        assertTrue(queue.keepExistingQueue)
         assertEquals(listOf(listOf("b")), catalog.purged)
         assertTrue(!queue.premiumStreamBlocked)
     }
@@ -339,7 +340,7 @@ class ResolvePlaybackSourceUseCaseTest {
             startIndex = 1,
         )
         assertEquals(listOf("local"), queue.songs.map { it.id })
-        assertEquals(0, queue.startIndex)
+        assertTrue(queue.keepExistingQueue)
     }
 
     @Test
@@ -357,7 +358,7 @@ class ResolvePlaybackSourceUseCaseTest {
         )
         val queue = useCase.resolveQueue(listOf(song("a"), song("b")), startIndex = 1)
         assertEquals(listOf("a"), queue.songs.map { it.id })
-        assertEquals(0, queue.startIndex)
+        assertTrue(queue.keepExistingQueue)
         assertTrue(queue.premiumStreamBlocked)
         assertTrue(catalog.purged.isEmpty())
     }

@@ -53,20 +53,8 @@ class RefreshMusicCatalogUseCase @Inject constructor(
         val currentIsExcluded = currentSong.id !in allowedIds || currentSong.id in removedSongIds
         if (!currentIsExcluded) return
 
-        if (allowedSongs.isEmpty()) {
-            // Nothing left to play — stop and clear so the mini/full player disappears.
-            playerRepository.pause()
-            playerRepository.setQueue(emptyList(), startIndex = 0, isEndlessQueue = false, autoPlay = false)
-            playerRepository.setFullScreenPlayerOpen(false)
-            return
-        }
-
-        val shuffled = allowedSongs.shuffled()
-        playerRepository.setQueue(
-            songs = shuffled,
-            startIndex = 0,
-            isEndlessQueue = true,
-            autoPlay = true
-        )
+        // The current song is no longer in the private library. Pause it.
+        // Do not start a different track and do not clear the saved queue.
+        playerRepository.pause()
     }
 }
