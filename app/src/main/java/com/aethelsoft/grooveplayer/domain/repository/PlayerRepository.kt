@@ -52,4 +52,10 @@ interface PlayerRepository {
      * and the user is not Premium. The catalog row was not purged.
      */
     fun observePremiumStreamRequired(): Flow<Unit>
+
+    /**
+     * A cloud stream URL was refreshed and playback still failed.
+     * The queue and the signed-in session are left in place.
+     */
+    fun observeStreamRefreshFailure(): Flow<String>
 }

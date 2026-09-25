@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,9 +44,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aethelsoft.grooveplayer.domain.model.Album
 import com.aethelsoft.grooveplayer.domain.model.Artist
 import com.aethelsoft.grooveplayer.domain.model.Song
@@ -67,6 +71,7 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.XNFC
 import com.aethelsoft.grooveplayer.utils.theme.icons.XWifiSync
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.HighlightPrimary
+import com.aethelsoft.grooveplayer.utils.theme.ui.SingleLineMarqueeText
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 
 /**
@@ -202,13 +207,13 @@ fun GeneralItemComponent(
                 )
                 Box(modifier = Modifier.width(S_PADDING))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+                    SingleLineMarqueeText(
                         text = title,
                         style = GrooveTheme.typography.menuSongTitle.toTextStyle(),
                         color = GrooveTheme.colors.onSurface,
                     )
                     if (subtitle != null) {
-                        Text(
+                        SingleLineMarqueeText(
                             text = subtitle,
                             style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
                             color = SoftWhite,
@@ -273,92 +278,109 @@ fun GeneralItemComponent(
             ) {
                 if (secondaryContent != null) {
                     secondaryContent()
-                } else if (hasOptions && optionsConfig != null) {
-                    DefaultOptionsContent(optionsConfig)
+                } else if (optionsConfig != null) {
+                    DefaultOptionsContent(
+                        optionsConfig = optionsConfig,
+                        horizontalPadding = padding,
+                    )
                 }
             }
         }
     }
 }
 
+private data class TrackStripAction(
+    val label: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit,
+)
+
 @Composable
-private fun DefaultOptionsContent(optionsConfig: ItemOptionsConfig) {
-    LazyRow(
+private fun DefaultOptionsContent(
+    optionsConfig: ItemOptionsConfig,
+    horizontalPadding: Dp,
+) {
+    val actions = buildList {
+        optionsConfig.onPlayNext?.let { onPlayNext ->
+            add(TrackStripAction("Play next", XPlay, onPlayNext))
+        }
+        optionsConfig.onEditMetadata?.let { onEdit ->
+            add(TrackStripAction("Edit song metadata", XEdit, onEdit))
+        }
+        optionsConfig.onShareViaTap?.let { onShare ->
+            add(TrackStripAction("Tap to share", XNFC, onShare))
+        }
+        optionsConfig.onShareViaNearby?.let { onNearby ->
+            add(TrackStripAction("Share with nearby", XWifiSync, onNearby))
+        }
+    }
+    if (actions.isEmpty()) return
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer{
-                clip = false
-            }
-            .padding(bottom = S_PADDING),
-        horizontalArrangement = Arrangement.spacedBy(S_PADDING)
+            .padding(
+                start = horizontalPadding,
+                end = horizontalPadding,
+                top = 2.dp,
+                bottom = S_PADDING,
+            ),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        item {
-            optionsConfig.onPlayNext?.let { onPlayNext ->
-                ExpandableOption(
-                    label = "Play next",
-                    icon = XPlay,
-                    onClick = onPlayNext
-                )
-            }
-        }
-        item {
-            optionsConfig.onEditMetadata?.let { onEdit ->
-                ExpandableOption(
-                    label = "Edit song metadata",
-                    icon = XEdit,
-                    onClick = onEdit
-                )
-            }
-        }
-        item {
-            optionsConfig.onShareViaTap?.let { onShare ->
-                ExpandableOption(
-                    label = "Tap to share",
-                    icon = XNFC,
-                    onClick = onShare
-                )
-            }
-        }
-        item {
-            optionsConfig.onShareViaNearby?.let { onNearby ->
-                ExpandableOption(
-                    label = "Share with nearby device",
-                    icon = XWifiSync,
-                    onClick = onNearby
-                )
-            }
+        actions.forEach { action ->
+            SlimTrackActionButton(
+                label = action.label,
+                icon = action.icon,
+                onClick = action.onClick,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
 
+/**
+ * Equal-width icon-and-label control. No filled card: same quiet icon chrome as the player.
+ * Long labels wrap onto a second line instead of truncating mid-word.
+ */
 @Composable
-private fun ExpandableOption(
+private fun SlimTrackActionButton(
     label: String,
-    icon: ImageVector? = null,
-    onClick: () -> Unit
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val colors = GrooveTheme.colors
+    val albumRole = GrooveTheme.typography.menuSongAlbum
+    val labelSize = albumRole.fontSizeSp.coerceAtMost(12f)
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = modifier
+            .clip(RoundedCornerShape(GrooveTheme.radii.button))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (icon != null) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colors.onSurface,
+            modifier = Modifier.size(GrooveTheme.iconSizes.sm),
+        )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = Color.White,
-            maxLines = 1
+            style = albumRole.toTextStyle().copy(
+                fontSize = labelSize.sp,
+                fontWeight = FontWeight.Medium,
+                lineHeight = (labelSize * 1.15f).sp,
+                textAlign = TextAlign.Center,
+                hyphens = Hyphens.None,
+            ),
+            color = colors.muted,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

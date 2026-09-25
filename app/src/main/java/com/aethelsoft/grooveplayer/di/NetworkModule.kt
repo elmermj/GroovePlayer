@@ -2,18 +2,24 @@ package com.aethelsoft.grooveplayer.di
 
 import com.aethelsoft.grooveplayer.BuildConfig
 import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
+import com.aethelsoft.grooveplayer.data.auth.TokenRefreshAuthenticator
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
+import com.aethelsoft.grooveplayer.data.remote.R2Dns
+import com.aethelsoft.grooveplayer.domain.backup.R2Connect
+import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Authenticator
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -26,6 +32,7 @@ import javax.inject.Singleton
 object NetworkModule {
 
     const val R2_HTTP_CLIENT = "r2HttpClient"
+    const val TOKEN_REFRESH_API = "tokenRefreshApi"
 
     @Provides
     @Singleton
@@ -55,9 +62,43 @@ object NetworkModule {
         chain.proceed(request)
     }
 
+    /**
+     * Refresh calls must not use the API client: that client's authenticator
+     * would call refresh again and deadlock on a 401.
+     */
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
+    @Named(TOKEN_REFRESH_API)
+    fun provideTokenRefreshAuthApi(moshi: Moshi): AuthApi {
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+        val client = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(20, TimeUnit.SECONDS)
+            .addInterceptor(logging)
+            .build()
+        return retrofit(client, moshi).create(AuthApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTokenRefreshAuthenticator(
+        tokenStore: SecureTokenStore,
+        @Named(TOKEN_REFRESH_API) refreshApi: AuthApi,
+    ): Authenticator = TokenRefreshAuthenticator(tokenStore, refreshApi)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(
+        authInterceptor: Interceptor,
+        tokenRefreshAuthenticator: Authenticator,
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.BASIC
@@ -70,12 +111,20 @@ object NetworkModule {
             .readTimeout(20, TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
+            .authenticator(tokenRefreshAuthenticator)
             .build()
     }
 
     /**
      * Plain client for R2 signed PUT/GET — must NOT attach Bearer.
-     * Longer timeouts for large audio uploads.
+     * Read/write timeouts cover stalled sockets. There is no call timeout:
+     * a 10-minute cap aborted long Call/Voice downloads (connection abort)
+     * before restore could reach Applying. HTTP/1.1 avoids HTTP/2 stream resets
+     * on those whole-object bodies.
+     *
+     * Connect is short, and DNS prefers A records. The library snapshot is the
+     * first request to R2; a 30s connect timeout on blackholed AAAA addresses
+     * held "0 B" for about a minute before any snapshot byte arrived.
      *
      * R2 cost rules for backup restore only:
      * - One whole-object GetObject (no Range spam)
@@ -115,11 +164,16 @@ object NetworkModule {
             }
             chain.proceed(next)
         }
-        return OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
+        val builder = OkHttpClient.Builder()
+            .dns(R2Dns())
+            .connectTimeout(R2Connect.CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             .readTimeout(5, TimeUnit.MINUTES)
             .writeTimeout(5, TimeUnit.MINUTES)
-            .callTimeout(10, TimeUnit.MINUTES)
+            .callTimeout(RestoreDownloadRetry.R2_CALL_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        if (RestoreDownloadRetry.R2_HTTP1_ONLY) {
+            builder.protocols(listOf(Protocol.HTTP_1_1))
+        }
+        return builder
             .addInterceptor(r2CostGuard)
             .addInterceptor(logging)
             .build()
@@ -127,7 +181,9 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit {
+    fun provideRetrofit(client: OkHttpClient, moshi: Moshi): Retrofit = retrofit(client, moshi)
+
+    private fun retrofit(client: OkHttpClient, moshi: Moshi): Retrofit {
         val base = BuildConfig.API_BASE_URL.trimEnd('/') + "/"
         return Retrofit.Builder()
             .baseUrl(base)

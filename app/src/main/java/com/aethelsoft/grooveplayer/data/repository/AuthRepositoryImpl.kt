@@ -9,10 +9,13 @@ import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.dto.GoogleAuthRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.LogoutRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.RefreshRequestDto
+import com.aethelsoft.grooveplayer.domain.auth.AuthStatusException
+import com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,11 +24,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.HttpException
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
-import java.net.UnknownHostException
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -38,6 +39,8 @@ class AuthRepositoryImpl @Inject constructor(
 ) : AuthRepository {
 
     private val mutex = Mutex()
+    /** Bumped when the session is cleared so an in-flight startup refresh cannot restore it. */
+    private val sessionGeneration = AtomicInteger(0)
     private val _authUser = MutableStateFlow<AuthUser?>(null)
     private val _serverSyncError = MutableStateFlow<String?>(null)
 
@@ -116,6 +119,7 @@ class AuthRepositoryImpl @Inject constructor(
      * privilege on Premium. Caller must hold [mutex].
      */
     private suspend fun clearLocalSession() {
+        sessionGeneration.incrementAndGet()
         try {
             tokenStore.clear()
         } catch (e: Exception) {
@@ -185,14 +189,17 @@ class AuthRepositoryImpl @Inject constructor(
             Log.e(TAG, "Refresh failed", e)
             _serverSyncError.value = humanizeNetworkError(e)
             if (e is HttpException && e.code() == 401) {
+                sessionGeneration.incrementAndGet()
                 tokenStore.clear()
                 _authUser.value = null
             }
         }
     }
 
-    override suspend fun restoreSession(): Result<AuthUser?> = mutex.withLock {
-        runCatching {
+    override suspend fun restoreSession(): Result<AuthUser?> {
+        // Network runs outside the mutex. Holding it across /v1/me deadlocks
+        // the first frame if the UI thread waits on the same lock.
+        val generation = mutex.withLock {
             if (!tokenStore.hasSession()) {
                 // No tokens: signed-out Free. Drop a leftover Room profile so a later
                 // process start cannot rebuild Premium from cached /v1/me.
@@ -201,63 +208,157 @@ class AuthRepositoryImpl @Inject constructor(
                 if (userRepository.getUserProfile() != null) {
                     userRepository.deleteUserProfile()
                 }
-                return@runCatching null
+                return@withLock null
             }
-            val access = tokenStore.getAccessToken()
-            if (!access.isNullOrBlank()) {
-                try {
-                    val me = authApi.me("Bearer $access")
-                    val user = AuthMapper.toDomainUser(me)
-                    persistLocalProfile(user)
-                    _authUser.value = user
-                    _serverSyncError.value = null
-                    return@runCatching user
-                } catch (e: Exception) {
-                    Log.w(TAG, "/v1/me failed, trying refresh", e)
-                    if (isUnreachable(e)) {
-                        _serverSyncError.value = humanizeNetworkError(e)
-                        throw e
-                    }
-                }
-            }
-            val refresh = tokenStore.getRefreshToken() ?: return@runCatching null
-            val response = authApi.refresh(
-                RefreshRequestDto(refreshToken = refresh, platform = "android")
-            )
-            val tokens = AuthMapper.toTokens(response)
-            tokenStore.saveTokens(tokens.accessToken, tokens.refreshToken, tokens.tokenType)
-            val user = AuthMapper.toDomainUser(response.user)
-            persistLocalProfile(user)
-            _authUser.value = user
-            _serverSyncError.value = null
-            user
-        }.recoverCatching { e ->
-            Log.e(TAG, "restoreSession failed", e)
-            _serverSyncError.value = humanizeNetworkError(e)
-            // Offline only: seed identity from Room when we have tokens.
-            // Do NOT invent storage here — Room has no used/quota. Prefer the
-            // in-memory user (may still be stale) over a storage-less rewrite
-            // that would flash empty usage then stick Premium from disk.
-            val current = _authUser.value
-            if (current != null && tokenStore.hasSession()) {
-                return@recoverCatching current
-            }
-            val local = userRepository.getUserProfile()
-            if (local != null && tokenStore.hasSession()) {
-                val user = AuthUser(
-                    id = local.id,
-                    email = local.email.ifBlank { null },
-                    displayName = local.username,
-                    avatarUrl = local.profilePictureUrl,
-                    privilegeTier = local.privilegeTier,
-                    storage = null,
+            sessionGeneration.get()
+        }
+        if (generation == null) return Result.success(null)
+
+        val outcome = try {
+            withTimeoutOrNull(StartupSessionRecovery.NETWORK_TIMEOUT_MS) {
+                StartupSessionRecovery.restore(
+                    accessToken = tokenStore.getAccessToken(),
+                    refreshToken = { tokenStore.getRefreshToken() },
+                    me = { token -> fetchMe(token) },
+                    refresh = { token -> refreshForStartup(token, generation) },
+                    localUser = { localAuthUser() },
                 )
-                _authUser.value = user
-                user
+            } ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
+        } catch (e: CancellationException) {
+            throw e
+        }
+
+        return mutex.withLock {
+            if (sessionGeneration.get() != generation || !tokenStore.hasSession()) {
+                Result.success(_authUser.value)
             } else {
-                null
+                applyStartupOutcome(outcome)
             }
         }
+    }
+
+    private suspend fun fetchMe(accessToken: String): AuthUser {
+        try {
+            return AuthMapper.toDomainUser(authApi.me("Bearer $accessToken"))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "/v1/me failed", e)
+            throw asAuthStatus(e)
+        }
+    }
+
+    private suspend fun refreshForStartup(
+        refreshToken: String,
+        generation: Int,
+    ): StartupSessionRecovery.RefreshedSession {
+        Log.i(TAG, "Refreshing access token after /v1/me failure")
+        try {
+            val response = authApi.refresh(
+                RefreshRequestDto(refreshToken = refreshToken, platform = "android"),
+            )
+            val tokens = AuthMapper.toTokens(response)
+            val user = AuthMapper.toDomainUser(response.user)
+            val saved = mutex.withLock {
+                if (sessionGeneration.get() != generation || !tokenStore.hasSession()) {
+                    false
+                } else {
+                    tokenStore.saveTokens(tokens.accessToken, tokens.refreshToken, tokens.tokenType)
+                    true
+                }
+            }
+            if (!saved) throw CancellationException("session cleared during refresh")
+            return StartupSessionRecovery.RefreshedSession(
+                accessToken = tokens.accessToken,
+                refreshToken = tokens.refreshToken,
+                user = user,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Startup token refresh failed", e)
+            throw asAuthStatus(e)
+        }
+    }
+
+    private suspend fun applyStartupOutcome(
+        outcome: StartupSessionRecovery.Outcome,
+    ): Result<AuthUser?> {
+        return when (outcome) {
+            is StartupSessionRecovery.Outcome.Remote -> {
+                persistLocalProfile(outcome.user)
+                _authUser.value = outcome.user
+                _serverSyncError.value = null
+                Result.success(outcome.user)
+            }
+            is StartupSessionRecovery.Outcome.LocalFallback -> {
+                _serverSyncError.value =
+                    "Can't reach server. Check Wi‑Fi or API URL, then retry."
+                val user = outcome.user ?: _authUser.value
+                if (user != null) {
+                    _authUser.value = user
+                }
+                Result.success(user)
+            }
+            StartupSessionRecovery.Outcome.RefreshRejected -> {
+                Log.w(TAG, "Refresh token rejected — signing out locally")
+                dropRejectedSession()
+                Result.success(null)
+            }
+        }
+    }
+
+    /**
+     * Refresh token was rejected. Drop tokens and the cached profile so Home
+     * stays usable and Premium is not kept from a dead session. Does not call
+     * Credential Manager — that can block startup on a binder call.
+     */
+    private suspend fun dropRejectedSession() {
+        sessionGeneration.incrementAndGet()
+        try {
+            tokenStore.clear()
+        } catch (e: Exception) {
+            Log.w(TAG, "token clear failed", e)
+        }
+        try {
+            userRepository.deleteUserProfile()
+        } catch (e: Exception) {
+            Log.w(TAG, "profile delete failed", e)
+        }
+        _authUser.value = null
+        _serverSyncError.value = null
+    }
+
+    private suspend fun localAuthUser(): AuthUser? {
+        val current = _authUser.value
+        if (current != null && tokenStore.hasSession()) return current
+        val local = userRepository.getUserProfile() ?: return null
+        if (!tokenStore.hasSession()) return null
+        return AuthUser(
+            id = local.id,
+            email = local.email.ifBlank { null },
+            displayName = local.username,
+            avatarUrl = local.profilePictureUrl,
+            privilegeTier = local.privilegeTier,
+            storage = null,
+        )
+    }
+
+    private fun asAuthStatus(error: Throwable): AuthStatusException {
+        if (error is AuthStatusException) return error
+        return AuthStatusException(httpStatus(error), error)
+    }
+
+    private fun httpStatus(error: Throwable): Int? {
+        var cur: Throwable? = error
+        while (cur != null) {
+            when (cur) {
+                is HttpException -> return cur.code()
+                is AuthStatusException -> if (cur.statusCode != null) return cur.statusCode
+            }
+            cur = cur.cause
+        }
+        return null
     }
 
     private suspend fun persistLocalProfile(user: AuthUser) {
@@ -287,25 +388,22 @@ class AuthRepositoryImpl @Inject constructor(
         private const val TAG = "AuthRepository"
 
         fun isUnreachable(e: Throwable): Boolean {
-            var cur: Throwable? = e
+            // An HTTP status means the server answered. 401 used to be treated as
+            // offline when it was wrapped in IOException, so startup never refreshed.
+            if (httpStatusOf(e) != null) return false
+            return StartupSessionRecovery.isConnectivityFailure(e)
+        }
+
+        private fun httpStatusOf(error: Throwable): Int? {
+            var cur: Throwable? = error
             while (cur != null) {
                 when (cur) {
-                    is UnknownHostException,
-                    is ConnectException,
-                    is SocketTimeoutException,
-                    is IOException -> {
-                        val msg = cur.message.orEmpty()
-                        if (cur is IOException && "cleartext" in msg.lowercase()) return true
-                        if (cur is IOException || cur is UnknownHostException ||
-                            cur is ConnectException || cur is SocketTimeoutException
-                        ) {
-                            return true
-                        }
-                    }
+                    is HttpException -> return cur.code()
+                    is AuthStatusException -> if (cur.statusCode != null) return cur.statusCode
                 }
                 cur = cur.cause
             }
-            return e.message?.contains("failed to connect", ignoreCase = true) == true
+            return null
         }
 
         fun humanizeNetworkError(e: Throwable): String {

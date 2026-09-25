@@ -5,6 +5,7 @@ import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
 import com.aethelsoft.grooveplayer.domain.backup.RestoreApplyRecovery
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
+import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -24,6 +25,7 @@ class LibraryRestoreSession @Inject constructor(
 
     fun beginDownload() {
         deleteStagingFiles()
+        clearLibraryIdentity()
         setPhase(RestorePhase.DOWNLOADING)
     }
 
@@ -39,8 +41,54 @@ class LibraryRestoreSession @Inject constructor(
 
     fun discard() {
         deleteStagingFiles()
+        clearLibraryIdentity()
         setPhase(RestorePhase.IDLE)
         clearLegacyRestartFlag()
+    }
+
+    /** Cloud library identity for the snapshot this restore is applying. */
+    fun rememberLibraryIdentity(snapshot: CloudLibrarySnapshot) {
+        prefs.edit()
+            .putBoolean(KEY_LIB_SAVED, true)
+            .putString(KEY_LIB_ID, snapshot.objectId)
+            .putString(KEY_LIB_HASH, snapshot.contentHash)
+            .putLong(KEY_LIB_SIZE, snapshot.sizeBytes)
+            .putString(KEY_LIB_CREATED, snapshot.createdAtIso)
+            .putString(KEY_LIB_R2, snapshot.r2Key)
+            .putString(KEY_LIB_PATH, snapshot.logicalPath)
+            .putInt(KEY_LIB_SCHEMA, snapshot.schemaVersion ?: -1)
+            .putString(KEY_LIB_APP, snapshot.appVersion)
+            .commit()
+    }
+
+    fun libraryIdentity(): CloudLibrarySnapshot? {
+        if (!prefs.getBoolean(KEY_LIB_SAVED, false)) return null
+        val schema = prefs.getInt(KEY_LIB_SCHEMA, -1)
+        return CloudLibrarySnapshot(
+            objectId = prefs.getString(KEY_LIB_ID, null),
+            contentHash = prefs.getString(KEY_LIB_HASH, null),
+            sizeBytes = prefs.getLong(KEY_LIB_SIZE, 0L),
+            r2Key = prefs.getString(KEY_LIB_R2, null),
+            logicalPath = prefs.getString(KEY_LIB_PATH, null),
+            schemaVersion = schema.takeIf { it >= 0 },
+            appVersion = prefs.getString(KEY_LIB_APP, null),
+            createdAtIso = prefs.getString(KEY_LIB_CREATED, null),
+            dryRun = false,
+        )
+    }
+
+    fun clearLibraryIdentity() {
+        prefs.edit()
+            .remove(KEY_LIB_SAVED)
+            .remove(KEY_LIB_ID)
+            .remove(KEY_LIB_HASH)
+            .remove(KEY_LIB_SIZE)
+            .remove(KEY_LIB_CREATED)
+            .remove(KEY_LIB_R2)
+            .remove(KEY_LIB_PATH)
+            .remove(KEY_LIB_SCHEMA)
+            .remove(KEY_LIB_APP)
+            .commit()
     }
 
     fun clearLegacyRestartFlag() {
@@ -88,5 +136,14 @@ class LibraryRestoreSession @Inject constructor(
         const val KEY_PHASE = "library_restore_phase"
         const val KEY_LAST_ERROR = "last_error"
         const val KEY_NEEDS_RESTART_AFTER_RESTORE = "needs_restart_after_library_restore"
+        private const val KEY_LIB_SAVED = "restore_library_saved"
+        private const val KEY_LIB_ID = "restore_library_object_id"
+        private const val KEY_LIB_HASH = "restore_library_content_hash"
+        private const val KEY_LIB_SIZE = "restore_library_size_bytes"
+        private const val KEY_LIB_CREATED = "restore_library_created_at"
+        private const val KEY_LIB_R2 = "restore_library_r2_key"
+        private const val KEY_LIB_PATH = "restore_library_logical_path"
+        private const val KEY_LIB_SCHEMA = "restore_library_schema"
+        private const val KEY_LIB_APP = "restore_library_app_version"
     }
 }

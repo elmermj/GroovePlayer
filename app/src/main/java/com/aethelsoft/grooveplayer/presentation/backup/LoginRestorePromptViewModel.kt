@@ -171,6 +171,7 @@ class LoginRestorePromptViewModel @Inject constructor(
                 onBackupOrRestoreScreen = signals.onBackupOrRestoreScreen,
                 persistedDeclinedKey = memory.declinedKey(),
                 sessionHandledKey = sessionHandledKey,
+                persistedRestoredKey = memory.restoredKey(),
             ),
         )
         pendingKey = offer
