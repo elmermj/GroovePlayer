@@ -273,6 +273,67 @@ class LibraryImportPolicyTest {
     }
 
     @Test
+    fun mediaStoreMatchRequiresThePickedFolder() {
+        val picked = "primary:Download/gp_qa_a1"
+        val rows = listOf(
+            MediaStoreAudioRow(id = 1, relativePath = "Download/other/"),
+            MediaStoreAudioRow(id = 2, relativePath = "Music/gp_qa_a1/"),
+        )
+        assertNull(MediaStoreOriginalMatch.uniqueId(rows, picked, importedSha256 = "abc"))
+        val exact = listOf(
+            MediaStoreAudioRow(id = 7, relativePath = "Download/gp_qa_a1/", contentHash = "abc"),
+            MediaStoreAudioRow(id = 8, relativePath = "Download/other/", contentHash = "abc"),
+        )
+        assertEquals(7L, MediaStoreOriginalMatch.uniqueId(exact, picked, "ABC"))
+    }
+
+    @Test
+    fun mediaStoreMatchRejectsADifferentHashAndDuplicateFolders() {
+        val picked = "primary:Download/gp_qa_a1"
+        val wrongHash = listOf(
+            MediaStoreAudioRow(id = 3, relativePath = "Download/gp_qa_a1/", contentHash = "other"),
+        )
+        assertNull(MediaStoreOriginalMatch.uniqueId(wrongHash, picked, "abc"))
+        val twins = listOf(
+            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/"),
+            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/"),
+        )
+        assertNull(MediaStoreOriginalMatch.uniqueId(twins, picked, importedSha256 = null))
+        val hashed = listOf(
+            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/", contentHash = "nope"),
+            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/", contentHash = "abc"),
+        )
+        assertEquals(5L, MediaStoreOriginalMatch.uniqueId(hashed, picked, "abc"))
+        assertNull(MediaStoreOriginalMatch.uniqueId(hashed, "", "abc"))
+    }
+
+    @Test
+    fun failedPlacementDoesNotDeleteAPreExistingFile() {
+        val root = tempDir()
+        val existing = File(root, "song.mp3")
+        existing.writeBytes(ByteArray(100) { 9 })
+        val partial = File(root, "song.mp3.partial")
+        partial.writeBytes(ByteArray(20) { 1 })
+        assertFalse(LibraryFilePlacement.placeVerified(partial, existing, partial.length()))
+        assertTrue(existing.isFile)
+        assertEquals(100, existing.length())
+        assertTrue(partial.isFile)
+    }
+
+    @Test
+    fun placementKeepsANewVerifiedFile() {
+        val root = tempDir()
+        val dest = File(root, "song.mp3")
+        val partial = File(root, "incoming.partial")
+        val bytes = ByteArray(24) { 3 }
+        partial.writeBytes(bytes)
+        assertTrue(LibraryFilePlacement.placeVerified(partial, dest, bytes.size.toLong()))
+        assertTrue(dest.isFile)
+        assertEquals(bytes.size.toLong(), dest.length())
+        assertFalse(partial.exists())
+    }
+
+    @Test
     fun unavailableTrackOffersRestoreOnlyWhenACloudCopyExists() {
         assertEquals(TrackPresence(playable = true, canRestore = false), trackPresence(true, true))
         assertEquals(TrackPresence(playable = false, canRestore = true), trackPresence(false, true))

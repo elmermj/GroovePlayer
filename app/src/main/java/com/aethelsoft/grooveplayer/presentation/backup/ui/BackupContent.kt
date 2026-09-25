@@ -3,8 +3,6 @@ package com.aethelsoft.grooveplayer.presentation.backup.ui
 import android.app.Activity
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +23,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,9 +70,6 @@ fun BackupContent(
     tier: PrivilegeTier,
     backupState: CloudBackupState,
     onStartBackup: () -> Unit,
-    /** Directory paths included in backup (from Backup settings / exclusions). Paths only — not file lists. */
-    includedFolders: List<String> = emptyList(),
-    onRefreshIncludedFolders: () -> Unit = {},
     objects: List<BackupObject>,
     objectsLoading: Boolean,
     objectsError: String?,
@@ -114,9 +108,6 @@ fun BackupContent(
     var pendingCancelAddon by remember { mutableStateOf<StorageAddon?>(null) }
     var pendingDelete by remember { mutableStateOf<BackupObject?>(null) }
     var showConfirmBackup by remember { mutableStateOf(false) }
-    LaunchedEffect(showConfirmBackup) {
-        if (showConfirmBackup) onRefreshIncludedFolders()
-    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -253,7 +244,6 @@ fun BackupContent(
 
     if (showConfirmBackup) {
         ConfirmBackupDialog(
-            includedFolders = includedFolders,
             onDismiss = { showConfirmBackup = false },
             onConfirm = {
                 showConfirmBackup = false
@@ -672,11 +662,9 @@ private fun CloudDeleteConfirmDialog(
 
 @Composable
 private fun ConfirmBackupDialog(
-    includedFolders: List<String>,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val scroll = rememberScrollState()
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GrooveTheme.colors.surface,
@@ -697,35 +685,6 @@ private fun ConfirmBackupDialog(
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                     color = SoftWhite.copy(alpha = 0.85f),
                 )
-                Text(
-                    text = "Included directories",
-                    style = GrooveTheme.typography.sectionItemTitle.toTextStyle(),
-                    color = GrooveTheme.colors.onSurface,
-                )
-                if (includedFolders.isEmpty()) {
-                    Text(
-                        text = "No library folder yet.",
-                        style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                        color = SoftWhite.copy(alpha = 0.7f),
-                    )
-                } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(scroll),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        includedFolders.forEach { path ->
-                            Text(
-                                text = path,
-                                style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                                color = SoftWhite.copy(alpha = 0.9f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
             }
         },
         confirmButton = {

@@ -7,7 +7,10 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.aethelsoft.grooveplayer.domain.library.ImportByteSource
 import com.aethelsoft.grooveplayer.domain.library.LibraryAudioKinds
+import com.aethelsoft.grooveplayer.domain.library.MediaStoreAudioRow
+import com.aethelsoft.grooveplayer.domain.library.MediaStoreOriginalMatch
 import java.io.InputStream
+import java.security.MessageDigest
 
 data class ListedAudioDocument(
     val uri: Uri,
@@ -74,11 +77,25 @@ object SafAudioTree {
         }
     }
 
-    fun resolveMediaStoreAudio(resolver: ContentResolver, displayName: String, sizeBytes: Long): Uri? {
+    /**
+     * MediaStore row for an imported original. Name and size are not enough: the row's folder
+     * must be the picked tree, and a known hash must match. Anything else returns null so the
+     * caller deletes through the granted SAF tree.
+     */
+    fun resolveMediaStoreAudio(
+        resolver: ContentResolver,
+        displayName: String,
+        sizeBytes: Long,
+        pickedTreeDocumentId: String,
+        importedSha256: String?,
+    ): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
-        if (displayName.isBlank() || sizeBytes <= 0L) return null
-        val projection = arrayOf(MediaStore.Audio.Media._ID)
-        return runCatching {
+        if (displayName.isBlank() || sizeBytes <= 0L || pickedTreeDocumentId.isBlank()) return null
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.RELATIVE_PATH,
+        )
+        val rows = runCatching {
             resolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
@@ -86,10 +103,43 @@ object SafAudioTree {
                 arrayOf(displayName, sizeBytes.toString()),
                 null,
             )?.use { cursor ->
-                if (cursor.count != 1 || !cursor.moveToFirst()) return@use null
-                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID))
-                android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+                val pathCol = cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                buildList {
+                    while (cursor.moveToNext()) {
+                        val id = cursor.getLong(idCol)
+                        val relative = if (pathCol >= 0 && !cursor.isNull(pathCol)) cursor.getString(pathCol) else null
+                        add(MediaStoreAudioRow(id = id, relativePath = relative))
+                    }
+                }
             }
+        }.getOrNull() ?: return null
+        val confirmed = rows.map { row ->
+            if (importedSha256.isNullOrBlank()) return@map row
+            if (!MediaStoreOriginalMatch.folderMatches(row.relativePath, pickedTreeDocumentId)) return@map row
+            val uri = android.content.ContentUris.withAppendedId(
+                MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                row.id,
+            )
+            row.copy(contentHash = sha256(resolver, uri))
+        }
+        val id = MediaStoreOriginalMatch.uniqueId(confirmed, pickedTreeDocumentId, importedSha256)
+            ?: return null
+        return android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+    }
+
+    private fun sha256(resolver: ContentResolver, uri: Uri): String? {
+        return runCatching {
+            val digest = MessageDigest.getInstance("SHA-256")
+            resolver.openInputStream(uri)?.use { input ->
+                val buf = ByteArray(8 * 1024)
+                while (true) {
+                    val read = input.read(buf)
+                    if (read < 0) break
+                    digest.update(buf, 0, read)
+                }
+            } ?: return null
+            digest.digest().joinToString("") { b -> "%02x".format(b) }
         }.getOrNull()
     }
 }

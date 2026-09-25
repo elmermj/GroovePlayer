@@ -14,7 +14,6 @@ import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.usecase.auth_category.RestoreAuthSessionUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.DeleteBackupObjectUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.FetchCloudLibraryUseCase
-import com.aethelsoft.grooveplayer.domain.usecase.backup_category.GetIncludedBackupFoldersUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ListBackupObjectsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.ObserveCloudBackupStateUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.backup_category.RefreshBackupLeaseUseCase
@@ -38,7 +37,6 @@ class BackupViewModel @Inject constructor(
     observeCloudBackupStateUseCase: ObserveCloudBackupStateUseCase,
     private val startCloudBackupUseCase: StartCloudBackupUseCase,
     private val refreshBackupLeaseUseCase: RefreshBackupLeaseUseCase,
-    private val getIncludedBackupFoldersUseCase: GetIncludedBackupFoldersUseCase,
     private val listBackupObjectsUseCase: ListBackupObjectsUseCase,
     private val deleteBackupObjectUseCase: DeleteBackupObjectUseCase,
     private val trimCloudBackupUseCase: TrimCloudBackupUseCase,
@@ -58,9 +56,6 @@ class BackupViewModel @Inject constructor(
     val privilegeTier: StateFlow<PrivilegeTier> =
         authRepository.observePrivilegeTier()
             .stateIn(viewModelScope, SharingStarted.Eagerly, PrivilegeTier.FREE)
-
-    private val _includedFolders = MutableStateFlow<List<String>>(emptyList())
-    val includedFolders: StateFlow<List<String>> = _includedFolders.asStateFlow()
 
     private val _rawObjects = MutableStateFlow<List<BackupObject>>(emptyList())
     private val _objectsFilter = MutableStateFlow(BackupObjectsFilter.ALL)
@@ -124,14 +119,9 @@ class BackupViewModel @Inject constructor(
         refreshEntitlements()
     }
 
-    fun refreshIncludedFolders() = viewModelScope.launch {
-        _includedFolders.value = getIncludedBackupFoldersUseCase()
-    }
-
     fun startBackup() = viewModelScope.launch {
         refreshBackupLeaseUseCase()
         startCloudBackupUseCase()
-        _includedFolders.value = getIncludedBackupFoldersUseCase()
         loadObjects()
         loadLibrarySnapshot()
     }
@@ -152,7 +142,6 @@ class BackupViewModel @Inject constructor(
                     ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
             }
             refreshBackupLeaseUseCase()
-            _includedFolders.value = getIncludedBackupFoldersUseCase()
             loadObjectsInternal()
             loadLibrarySnapshotInternal()
         } finally {
