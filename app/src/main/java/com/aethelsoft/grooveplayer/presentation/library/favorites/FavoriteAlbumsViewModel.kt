@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.presentation.library.favorites
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.domain.library.SongLikeIndex
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteAlbumsUseCase
 import com.aethelsoft.grooveplayer.utils.TimeframeUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -19,7 +20,7 @@ class FavoriteAlbumsViewModel @Inject constructor(
 //    val favoriteAlbums: StateFlow<List<FavoriteAlbum>> = _favoriteAlbums.asStateFlow()
 
     val favoriteAlbums by lazy {
-        getFavoriteAlbumsUseCase(TimeframeUtils.getAllTimeTimestamp(), 50)
+        getFavoriteAlbumsUseCase(TimeframeUtils.getAllTimeTimestamp(), SongLikeIndex.ALL)
     }
 
     init {

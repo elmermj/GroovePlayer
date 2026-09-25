@@ -1,0 +1,109 @@
+package com.aethelsoft.grooveplayer.presentation.backup
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.data.backup.LibraryRestoreGate
+import com.aethelsoft.grooveplayer.domain.backup.ColdStartAction
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressLabel
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
+import com.aethelsoft.grooveplayer.domain.usecase.backup_category.RestoreCloudLibraryUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
+import javax.inject.Inject
+
+data class RestoreApplyUiState(
+    val status: String = "Applying restored data…",
+    val retry: String? = null,
+    val detail: String? = null,
+    /** Determinate 0f..1f once download work is known. Null shows an indeterminate spinner. */
+    val fraction: Float? = null,
+    val busy: Boolean = true,
+    val error: String? = null,
+    val finished: Boolean = false,
+)
+
+@HiltViewModel
+class RestoreLaunchViewModel @Inject constructor(
+    gate: LibraryRestoreGate,
+) : ViewModel() {
+    val launchAction: ColdStartAction = gate.launchAction
+    val startOnApplyScreen: Boolean =
+        launchAction == ColdStartAction.RESUME_APPLY ||
+            launchAction == ColdStartAction.RESUME_DOWNLOAD
+    val resumeDownload: Boolean = launchAction == ColdStartAction.RESUME_DOWNLOAD
+}
+
+@HiltViewModel
+class RestoreApplyViewModel @Inject constructor(
+    private val restoreCloudLibraryUseCase: RestoreCloudLibraryUseCase,
+) : ViewModel() {
+
+    private val _ui = MutableStateFlow(RestoreApplyUiState())
+    val ui: StateFlow<RestoreApplyUiState> = _ui.asStateFlow()
+
+    private val started = AtomicBoolean(false)
+
+    fun run(startDownload: Boolean) {
+        if (!started.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            if (startDownload) {
+                _ui.value = RestoreApplyUiState(
+                    status = RestoreProgressLabel.DOWNLOADING_LIBRARY,
+                    fraction = null,
+                )
+                val collect = launch {
+                    restoreCloudLibraryUseCase.observeProgress().collect { snap ->
+                        _ui.value = snap.toUi()
+                    }
+                }
+                val staged = restoreCloudLibraryUseCase.stage()
+                collect.cancelAndJoin()
+                if (staged.isFailure) {
+                    _ui.value = failed(staged.exceptionOrNull())
+                    return@launch
+                }
+            }
+            _ui.value = RestoreApplyUiState(
+                status = RestoreProgressLabel.APPLYING,
+                fraction = 1f,
+            )
+            delay(RestoreProgressLabel.MIN_APPLYING_VISIBLE_MS)
+            val applied = restoreCloudLibraryUseCase.apply()
+            if (applied.isFailure) {
+                _ui.value = failed(applied.exceptionOrNull())
+                return@launch
+            }
+            _ui.value = RestoreApplyUiState(
+                status = RestoreProgressLabel.APPLYING,
+                fraction = 1f,
+                busy = false,
+                finished = true,
+            )
+        }
+    }
+
+    private fun RestoreProgressSnapshot.toUi(): RestoreApplyUiState {
+        return RestoreApplyUiState(
+            status = status,
+            retry = retry,
+            detail = detail,
+            fraction = fraction,
+            busy = true,
+        )
+    }
+
+    private fun failed(error: Throwable?): RestoreApplyUiState {
+        return RestoreApplyUiState(
+            status = "Couldn't apply the restored library",
+            busy = false,
+            error = error?.message?.takeIf { it.isNotBlank() }
+                ?: "Your downloaded songs were not changed.",
+        )
+    }
+}

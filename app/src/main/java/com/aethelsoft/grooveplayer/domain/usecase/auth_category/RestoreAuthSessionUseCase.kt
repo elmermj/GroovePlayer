@@ -7,5 +7,6 @@ import javax.inject.Inject
 class RestoreAuthSessionUseCase @Inject constructor(
     private val authRepository: AuthRepository,
 ) {
-    suspend operator fun invoke(): Result<AuthUser?> = authRepository.restoreSession()
+    suspend operator fun invoke(boundByStartupTimeout: Boolean = true): Result<AuthUser?> =
+        authRepository.restoreSession(boundByStartupTimeout)
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.domain.model.likedTrackLabel
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveSurfaceCard
@@ -46,7 +47,7 @@ fun FavoriteArtistsScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("No favorite artists yet")
+                GrooveMutedText("Like a song to see its artist here")
             }
         } else {
             LazyColumn(
@@ -75,7 +76,7 @@ fun FavoriteArtistsScreen(
                             )
                             GrooveTinySpacer()
                             GrooveMutedText(
-                                text = "${artist.playCount} plays",
+                                text = likedTrackLabel(artist.playCount),
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }

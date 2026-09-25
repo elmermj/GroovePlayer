@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.presentation.library.favorites
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.domain.library.SongLikeIndex
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.GetFavoriteTracksUseCase
 import com.aethelsoft.grooveplayer.utils.TimeframeUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +17,7 @@ class FavoriteTracksViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
 
     val favoriteTracks by lazy {
-        getFavoriteTracksUseCase(TimeframeUtils.getAllTimeTimestamp(), 50)
+        getFavoriteTracksUseCase(TimeframeUtils.getAllTimeTimestamp(), SongLikeIndex.ALL)
     }
     
     init {

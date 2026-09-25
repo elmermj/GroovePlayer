@@ -22,6 +22,7 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCa
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.presentation.player.layouts.GlowEffectConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -88,6 +89,12 @@ class PlayerViewModel @Inject constructor(
     val songDetailsSheetState: StateFlow<PlayerSongDetailsSheetState> =
         _songDetailsSheetState.asStateFlow()
 
+    /** Cloud audio exists, but this user is not Premium. Catalog was not purged. */
+    val premiumStreamRequired: Flow<Unit> = observePlayerStateUseCase.observePremiumStreamRequired()
+
+    /** Signed stream URL refresh did not restore playback. Queue stays. */
+    val streamRefreshFailure: Flow<String> = observePlayerStateUseCase.observeStreamRefreshFailure()
+
     fun setSongDetailsSheetState(state: PlayerSongDetailsSheetState) {
         _songDetailsSheetState.value = state
     }
@@ -101,7 +108,13 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun setQueue(songs: List<Song>, startIndex: Int = 0, isEndlessQueue: Boolean = false, autoPlay: Boolean = true) = viewModelScope.launch {
-        queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
+        try {
+            queueUseCase(songs, startIndex, isEndlessQueue, autoPlay)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerViewModel", "setQueue failed", e)
+        }
     }
 
     fun skipToQueueItem(index: Int) = viewModelScope.launch { editQueueUseCase.skipTo(index) }

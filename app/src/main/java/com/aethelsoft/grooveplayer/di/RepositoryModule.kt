@@ -6,6 +6,7 @@ import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
 import com.aethelsoft.grooveplayer.data.repository.AudioTagRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.EqualizerRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.PlaybackHistoryRepositoryImpl
+import com.aethelsoft.grooveplayer.data.repository.SongLikeRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.ShareRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.TransferRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.SongMetadataRepositoryImpl
@@ -13,6 +14,20 @@ import com.aethelsoft.grooveplayer.data.repository.UserRepositoryImpl
 import com.aethelsoft.grooveplayer.data.repository.AuthRepositoryImpl
 import com.aethelsoft.grooveplayer.data.billing.BillingRepositoryImpl
 import com.aethelsoft.grooveplayer.data.backup.BackupRepositoryImpl
+import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
+import com.aethelsoft.grooveplayer.data.playback.CloudAudioLookupImpl
+import com.aethelsoft.grooveplayer.data.playback.CloudPlaybackCacheStore
+import com.aethelsoft.grooveplayer.data.playback.LocalAudioProbe
+import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
+import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
+import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
+import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
+import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
+import com.aethelsoft.grooveplayer.domain.playback.CloudPlaybackCache
+import com.aethelsoft.grooveplayer.domain.playback.CloudStreamEntitlement
+import com.aethelsoft.grooveplayer.domain.playback.LocalAudioAvailability
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackStreamTickets
+import com.aethelsoft.grooveplayer.domain.playback.SongCatalog
 import com.aethelsoft.grooveplayer.data.ads.StartupAdQuotaStore
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.BillingRepository
@@ -23,6 +38,7 @@ import com.aethelsoft.grooveplayer.domain.repository.BluetoothRepository
 import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.repository.SongLikeRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
@@ -32,6 +48,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
 /**
  * Dagger Hilt module for binding repository interfaces to their implementations.
@@ -56,6 +73,11 @@ abstract class RepositoryModule {
     abstract fun bindPlaybackHistoryRepository(
         impl: PlaybackHistoryRepositoryImpl
     ): PlaybackHistoryRepository
+
+    @Binds
+    abstract fun bindSongLikeRepository(
+        impl: SongLikeRepositoryImpl
+    ): SongLikeRepository
     
     @Binds
     abstract fun bindAudioTagRepository(
@@ -116,4 +138,40 @@ abstract class RepositoryModule {
     abstract fun bindTransferRepository(
         impl: TransferRepositoryImpl
     ): TransferRepository
+
+    @Binds
+    abstract fun bindLocalAudioAvailability(
+        impl: LocalAudioProbe
+    ): LocalAudioAvailability
+
+    @Binds
+    abstract fun bindCloudPlaybackCache(
+        impl: CloudPlaybackCacheStore
+    ): CloudPlaybackCache
+
+    @Binds
+    abstract fun bindSongCatalog(
+        impl: SongCatalogStore
+    ): SongCatalog
+
+    @Binds
+    abstract fun bindCloudAudioLookup(
+        impl: CloudAudioLookupImpl
+    ): CloudAudioLookup
+
+    @Binds
+    abstract fun bindCloudStreamEntitlement(
+        impl: PremiumCloudEntitlement
+    ): CloudStreamEntitlement
+
+    @Binds
+    @Singleton
+    abstract fun bindAppLibraryPaths(
+        impl: GrooveDownloadsLocator,
+    ): AppLibraryPaths
+
+    @Binds
+    abstract fun bindPlaybackStreamTickets(
+        impl: PlaybackStreamTicketStore
+    ): PlaybackStreamTickets
 }

@@ -25,6 +25,7 @@ interface PlaybackHistoryDao {
     """)
     fun getRecentlyPlayed(limit: Int = 50): Flow<List<PlaybackHistoryEntity>>
     
+    /** Play-count aggregate. Favorite screens read song_likes instead. */
     @Query("""
         SELECT 
             songId, 
@@ -101,6 +102,9 @@ interface PlaybackHistoryDao {
 
     @Query("DELETE FROM playback_history WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
+
+    @Query("DELETE FROM playback_history")
+    suspend fun deleteAll()
     
     @Query("""
         SELECT 

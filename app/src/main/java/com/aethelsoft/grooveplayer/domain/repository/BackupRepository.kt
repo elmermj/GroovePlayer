@@ -1,25 +1,40 @@
 package com.aethelsoft.grooveplayer.domain.repository
 
+import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
 import com.aethelsoft.grooveplayer.domain.model.StorageEntitlement
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupRequest
 import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupResult
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
 import kotlinx.coroutines.flow.Flow
 import java.io.File
 
 interface BackupRepository {
     fun observeBackupState(): Flow<CloudBackupState>
 
+    /** Latest restore-apply progress. Idle until [stageLibraryRestore] publishes work. */
+    fun observeRestoreProgress(): Flow<RestoreProgressSnapshot>
+
+    /** Persisted library-restore phase. [RestorePhase.IDLE] when nothing is in progress. */
+    fun restorePhase(): RestorePhase
+
     /** Folders that would be included in a backup (music folders minus exclusions). */
     suspend fun resolveIncludedFolders(): List<String>
 
     /**
      * Manual backup. Gates on Premium + quota + grace + over_quota.
-     * Flow: room_db snapshot then songs — upload-url → PUT → complete.
+     * Copies approved audio into the app library, uploads those files, then the Room snapshot.
      */
     suspend fun startBackup(entitlement: StorageEntitlement?, isPremium: Boolean): Result<Unit>
+
+    /**
+     * GET /v1/backup/lease.
+     * Sets [com.aethelsoft.grooveplayer.domain.model.CloudBackupState.otherDeviceHoldingLease]
+     * when a different install holds a non-expired lease.
+     */
+    suspend fun refreshBackupLease()
 
     suspend fun refreshLocalState()
 
@@ -44,13 +59,19 @@ interface BackupRepository {
      */
     suspend fun trimCloudBackup(request: TrimCloudBackupRequest): Result<TrimCloudBackupResult>
 
-    /**
-     * GET /v1/backup/library → download gzip → gunzip → replace local Room DB after close.
-     * Validates schema_version. Room singleton is closed — restart app before further DB use.
-     */
     /** GET /v1/backup/library — null when no room_db snapshot yet. */
     suspend fun fetchCloudLibraryMetadata(): Result<CloudLibrarySnapshot?>
 
-    suspend fun restoreLibraryFromCloud(): Result<Unit>
+    /**
+     * Download the cloud Room snapshot into a staging file.
+     * Does not close Room and does not replace the live database.
+     */
+    suspend fun stageLibraryRestore(): Result<Unit>
+
+    /**
+     * Copy settings, history, and metadata from the staged snapshot into the open database,
+     * then clear the staging file.
+     */
+    suspend fun applyStagedLibraryRestore(): Result<Unit>
 }
 

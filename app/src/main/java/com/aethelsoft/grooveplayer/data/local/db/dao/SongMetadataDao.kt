@@ -21,5 +21,11 @@ interface SongMetadataDao {
     
     @Query("SELECT * FROM song_metadata")
     fun getAllMetadata(): Flow<List<SongMetadataEntity>>
+
+    @Query("DELETE FROM song_metadata WHERE songId IN (:songIds)")
+    suspend fun deleteBySongIds(songIds: List<String>)
+
+    @Query("DELETE FROM song_metadata")
+    suspend fun deleteAll()
 }
 
