@@ -37,22 +37,26 @@ object PrivateLibrarySongs {
         durationMs: Long = 0L,
         title: String = displayName.substringBeforeLast('.', displayName),
         artist: String = ARTIST,
+        albumName: String = ALBUM,
+        genre: String = "",
+        artworkUrl: String? = null,
     ): Song {
         val file = File(absolutePath)
         val albumArtist = artist.ifBlank { ARTIST }
-        val albumName = ALBUM
+        val albumTitle = albumName.ifBlank { ALBUM }
         return Song(
             id = songId(absolutePath),
             title = title.ifBlank { displayName },
             artist = albumArtist,
             uri = file.toURI().toString(),
-            genre = "",
+            genre = genre,
             durationMs = durationMs.coerceAtLeast(0L),
+            artworkUrl = artworkUrl,
             album = Album(
-                id = makeAlbumId(albumArtist, albumName),
-                name = albumName,
+                id = makeAlbumId(albumArtist, albumTitle),
+                name = albumTitle,
                 artist = albumArtist,
-                artworkUrl = null,
+                artworkUrl = artworkUrl,
                 songs = emptyList(),
             ),
             filePath = absolutePath,

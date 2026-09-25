@@ -26,6 +26,12 @@ interface SearchHistoryDao {
 
     @Query("DELETE FROM search_history WHERE type = 'SONG' AND itemId IN (:songIds)")
     suspend fun deleteSongEntries(songIds: List<String>)
+
+    @Query("SELECT itemId FROM search_history WHERE type = 'SONG' AND itemId IS NOT NULL")
+    suspend fun songItemIds(): List<String>
+
+    @Query("UPDATE search_history SET itemId = :toId WHERE type = 'SONG' AND itemId = :fromId")
+    suspend fun retargetSong(fromId: String, toId: String)
     
     @Query("SELECT * FROM search_history WHERE type = 'QUERY' AND query LIKE :query || '%' ORDER BY timestamp DESC LIMIT :limit")
     suspend fun searchQueries(query: String, limit: Int = 5): List<SearchHistoryEntity>

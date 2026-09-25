@@ -1,39 +1,25 @@
 package com.aethelsoft.grooveplayer.data.local.mediastore
 
-import android.content.ContentUris
-import android.content.Context
-import android.os.Build
-import android.provider.MediaStore
-import androidx.annotation.RequiresApi
 import com.aethelsoft.grooveplayer.data.library.PrivateLibraryCatalog
-import com.aethelsoft.grooveplayer.data.local.mediastore.model.MediaStoreSongData
-import com.aethelsoft.grooveplayer.data.mapper.SongMapper
-import com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySongs
 import com.aethelsoft.grooveplayer.domain.model.FolderSizeEntry
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.model.StorageUsageData
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
-import com.aethelsoft.grooveplayer.domain.repository.UserRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * MediaStore implementation of MusicRepository.
- * This is the data layer that retrieves songs from Android's MediaStore
- * and maps them to domain models.
+ * Library catalog. Only audio files in the app-private groove-library are listed.
+ * MediaStore is not queried and device folders are not scanned.
  */
 @Singleton
 class MediaStoreRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val userRepository: UserRepository,
     private val privateLibrary: PrivateLibraryCatalog,
 ) : MusicRepository {
 
@@ -44,311 +30,50 @@ class MediaStoreRepository @Inject constructor(
         _catalogGeneration.update { it + 1 }
     }
 
-    override suspend fun getMusicFolderPaths(): List<String> = withContext(Dispatchers.IO) {
-        fetchMusicFolderPaths()
-    }
+    override suspend fun getMusicFolderPaths(): List<String> = emptyList()
 
     override suspend fun getStorageUsage(): StorageUsageData = withContext(Dispatchers.IO) {
-        fetchStorageUsage()
-    }
-    
-    override suspend fun getAllSongs(): List<Song> = withContext(Dispatchers.IO) {
-        PrivateLibrarySongs.merge(
-            SongMapper.mediaStoreToDomainList(fetchSongsFromMediaStore()),
-            privateLibrary.songs(),
-        )
+        privateLibrary.storageUsage()
     }
 
-    override suspend fun getSongsPage(offset: Int, limit: Int): List<Song> = withContext(Dispatchers.IO) {
-        pageWithPrivate(offset, limit, privateLibrary.songs()) { mediaOffset, mediaLimit ->
-            SongMapper.mediaStoreToDomainList(
-                fetchSongsFromMediaStore(offset = mediaOffset, limit = mediaLimit),
-            )
-        }
-    }
+    override suspend fun getAllSongs(): List<Song> = privateLibrary.songs()
 
-    override suspend fun getSongsByArtist(artist: String): List<Song> = withContext(Dispatchers.IO) {
-        PrivateLibrarySongs.merge(
-            SongMapper.mediaStoreToDomainList(
-                fetchSongsFromMediaStore(
-                    selection = "${MediaStore.Audio.Media.ARTIST}=?",
-                    selectionArgs = arrayOf(artist),
-                ),
-            ),
-            privateLibrary.songs().filter { it.artist.equals(artist, ignoreCase = true) },
-        )
-    }
+    override suspend fun getSongsPage(offset: Int, limit: Int): List<Song> =
+        page(privateLibrary.songs(), offset, limit)
+
+    override suspend fun getSongsByArtist(artist: String): List<Song> =
+        privateLibrary.songs().filter { it.artist.equals(artist, ignoreCase = true) }
 
     override suspend fun getSongsByArtistPage(artist: String, offset: Int, limit: Int): List<Song> =
-        withContext(Dispatchers.IO) {
-            pageWithPrivate(
-                offset,
-                limit,
-                privateLibrary.songs().filter { it.artist.equals(artist, ignoreCase = true) },
-            ) { mediaOffset, mediaLimit ->
-                SongMapper.mediaStoreToDomainList(
-                    fetchSongsFromMediaStore(
-                        selection = "${MediaStore.Audio.Media.ARTIST}=?",
-                        selectionArgs = arrayOf(artist),
-                        offset = mediaOffset,
-                        limit = mediaLimit,
-                    ),
-                )
-            }
-        }
+        page(getSongsByArtist(artist), offset, limit)
 
-    override suspend fun getSongsByAlbum(album: String): List<Song> = withContext(Dispatchers.IO) {
-        PrivateLibrarySongs.merge(
-            SongMapper.mediaStoreToDomainList(
-                fetchSongsFromMediaStore(
-                    selection = "${MediaStore.Audio.Media.ALBUM}=?",
-                    selectionArgs = arrayOf(album),
-                ),
-            ),
-            privateLibrary.songs().filter { it.album?.name.equals(album, ignoreCase = true) },
-        )
-    }
+    override suspend fun getSongsByAlbum(album: String): List<Song> =
+        privateLibrary.songs().filter { it.album?.name.equals(album, ignoreCase = true) }
 
     override suspend fun getSongsByAlbumPage(album: String, offset: Int, limit: Int): List<Song> =
-        withContext(Dispatchers.IO) {
-            pageWithPrivate(
-                offset,
-                limit,
-                privateLibrary.songs().filter { it.album?.name.equals(album, ignoreCase = true) },
-            ) { mediaOffset, mediaLimit ->
-                SongMapper.mediaStoreToDomainList(
-                    fetchSongsFromMediaStore(
-                        selection = "${MediaStore.Audio.Media.ALBUM}=?",
-                        selectionArgs = arrayOf(album),
-                        offset = mediaOffset,
-                        limit = mediaLimit,
-                    ),
-                )
-            }
+        page(getSongsByAlbum(album), offset, limit)
+
+    override suspend fun searchSongs(query: String): List<Song> {
+        val lower = query.lowercase()
+        return privateLibrary.songs().filter { song ->
+            song.title.lowercase().contains(lower) ||
+                song.artist.lowercase().contains(lower) ||
+                song.album?.name?.lowercase()?.contains(lower) == true
         }
-    
-    override suspend fun searchSongs(query: String): List<Song> = withContext(Dispatchers.IO) {
-        val songsData = fetchSongsFromMediaStore()
-        val lowerQuery = query.lowercase()
-        val media = SongMapper.mediaStoreToDomainList(
-            songsData.filter { 
-                it.title.lowercase().contains(lowerQuery) ||
-                it.artist.lowercase().contains(lowerQuery) ||
-                it.album?.lowercase()?.contains(lowerQuery) == true
-            }
-        )
-        val privateHits = privateLibrary.songs().filter { song ->
-            song.title.lowercase().contains(lowerQuery) ||
-                song.artist.lowercase().contains(lowerQuery) ||
-                song.album?.name?.lowercase()?.contains(lowerQuery) == true
-        }
-        PrivateLibrarySongs.merge(media, privateHits)
     }
 
-    private suspend fun pageWithPrivate(
-        offset: Int,
-        limit: Int,
-        privateSongs: List<Song>,
-        mediaPage: suspend (offset: Int, limit: Int) -> List<Song>,
-    ): List<Song> {
-        val request = PrivateLibrarySongs.pageRequest(privateSongs.size, offset, limit)
-        val head = privateSongs.drop(request.privateOffset).take(request.privateLimit)
-        if (request.mediaLimit <= 0) return head
-        val known = head.mapNotNull { it.filePath }.toSet()
-        val tail = mediaPage(request.mediaOffset, request.mediaLimit)
-            .filter { it.filePath == null || it.filePath !in known }
-        return head + tail
-    }
-    
-    /**
-     * Internal method to fetch songs from MediaStore.
-     * @param selection optional WHERE clause (without "AND"); base selection is IS_MUSIC != 0
-     * @param selectionArgs optional args for selection
-     * @param offset number of rows to skip (0 for none)
-     * @param limit max rows to return (Int.MAX_VALUE for all)
-     */
-    @RequiresApi(Build.VERSION_CODES.R)
-    private suspend fun fetchSongsFromMediaStore(
-        selection: String? = null,
-        selectionArgs: Array<String>? = null,
-        offset: Int = 0,
-        limit: Int = Int.MAX_VALUE
-    ): List<MediaStoreSongData> {
-        val excludedSet = userRepository.getUserSettings().excludedFolders
-            .map { normalizePath(it) }.toSet()
-        val songs = mutableListOf<MediaStoreSongData>()
-        val projection = arrayOf(
-            MediaStore.Audio.Media._ID,
-            MediaStore.Audio.Media.TITLE,
-            MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.DURATION,
-            MediaStore.Audio.Media.DATA,
-            MediaStore.Audio.Media.ALBUM,
-            MediaStore.Audio.Media.ALBUM_ID,
-            MediaStore.Audio.Media.GENRE,
-            MediaStore.Audio.Media.SIZE,
-        )
-
-        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        val fullSelection = if (selection != null) "$baseSelection AND $selection" else baseSelection
-        val sortOrder = "${MediaStore.Audio.Media.TITLE} ASC"
-
-        context.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            fullSelection,
-            selectionArgs,
-            sortOrder
-        )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
-            val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-            val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-            val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
-            val genreColumn = cursor.getColumnIndex(MediaStore.Audio.Media.GENRE)
-            val sizeColumn = cursor.getColumnIndex(MediaStore.Audio.Media.SIZE)
-
-            var index = 0
-            while (cursor.moveToNext()) {
-                if (index < offset) {
-                    index++
-                    continue
-                }
-                if (songs.size >= limit) break
-                val dataPath = cursor.getString(dataColumn) ?: ""
-                val parentPath = if (dataPath.isNotEmpty()) {
-                    File(dataPath).parent?.let { normalizePath(it) } ?: ""
-                } else ""
-                if (parentPath.isNotEmpty() && excludedSet.contains(parentPath)) {
-                    index++
-                    continue
-                }
-                val id = cursor.getLong(idColumn)
-                val title = cursor.getString(titleColumn) ?: "Unknown"
-                val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
-                val duration = cursor.getLong(durationColumn)
-                val album = cursor.getString(albumColumn) ?: "Unknown Album"
-                val albumId = cursor.getLong(albumIdColumn)
-                val genre = if (genreColumn >= 0) {
-                    cursor.getString(genreColumn) ?: ""
-                } else {
-                    ""
-                }
-                val sizeBytes = if (sizeColumn >= 0 && !cursor.isNull(sizeColumn)) {
-                    cursor.getLong(sizeColumn).takeIf { it > 0L }
-                } else {
-                    null
-                }
-
-                val uri = ContentUris.withAppendedId(
-                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                    id
-                ).toString()
-
-                // Get album art URI
-                val artworkUri = try {
-                    val albumArtUri = android.net.Uri.parse("content://media/external/audio/albumart")
-                    ContentUris.withAppendedId(albumArtUri, albumId).toString()
-                } catch (e: Exception) {
-                    null
-                }
-
-                songs.add(
-                    MediaStoreSongData(
-                        id = id.toString(),
-                        title = title,
-                        artist = artist,
-                        uri = uri,
-                        genre = genre,
-                        durationMs = duration,
-                        artworkUrl = artworkUri,
-                        album = album,
-                        filePath = dataPath.takeIf { it.isNotBlank() },
-                        fileSizeBytes = sizeBytes,
-                    )
-                )
-                index++
-            }
-        }
-
-        return songs
-    }
-
-    /** Returns distinct folder paths that contain music (parent of MediaStore DATA paths). */
-    @RequiresApi(Build.VERSION_CODES.R)
-    private fun fetchMusicFolderPaths(): List<String> {
-        val folders = mutableSetOf<String>()
-        val projection = arrayOf(MediaStore.Audio.Media.DATA)
-        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        context.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            baseSelection,
-            null,
-            null
-        )?.use { cursor ->
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            while (cursor.moveToNext()) {
-                val path = cursor.getString(dataColumn) ?: continue
-                if (path.isEmpty()) continue
-                File(path).parent?.let { parent ->
-                    folders.add(normalizePath(parent))
-                }
-            }
-        }
-        return folders.toList().sorted()
-    }
-
-    private fun normalizePath(path: String): String =
-        path.trim().trimEnd('/', '\\')
-
-    @RequiresApi(Build.VERSION_CODES.R)
-    private suspend fun fetchStorageUsage(): StorageUsageData {
-        val excludedSet = userRepository.getUserSettings().excludedFolders
-            .map { normalizePath(it) }.toSet()
-        val folderSizes = mutableMapOf<String, Long>()
-        val projection = arrayOf(MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.SIZE)
-        val baseSelection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
-        context.contentResolver.query(
-            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-            projection,
-            baseSelection,
-            null,
-            null
-        )?.use { cursor ->
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
-            while (cursor.moveToNext()) {
-                val path = cursor.getString(dataColumn) ?: continue
-                val size = cursor.getLong(sizeColumn).coerceAtLeast(0L)
-                if (path.isEmpty()) continue
-                val parentPath = File(path).parent?.let { normalizePath(it) } ?: continue
-                folderSizes[parentPath] = (folderSizes[parentPath] ?: 0L) + size
-            }
-        }
-        var includedBytes = 0L
-        var excludedBytes = 0L
-        val includedDetails = mutableListOf<FolderSizeEntry>()
-        val excludedDetails = mutableListOf<FolderSizeEntry>()
-        folderSizes.forEach { (path, bytes) ->
-            if (path in excludedSet) {
-                excludedBytes += bytes
-                excludedDetails.add(FolderSizeEntry(path, bytes))
-            } else {
-                includedBytes += bytes
-                includedDetails.add(FolderSizeEntry(path, bytes))
-            }
-        }
-        val totalBytes = includedBytes + excludedBytes
-        return StorageUsageData(
-            totalBytes = totalBytes,
-            includedBytes = includedBytes,
-            excludedBytes = excludedBytes,
-            includedFolderDetails = includedDetails.sortedByDescending { it.bytes },
-            excludedFolderDetails = excludedDetails.sortedByDescending { it.bytes }
-        )
+    private fun page(songs: List<Song>, offset: Int, limit: Int): List<Song> {
+        if (limit <= 0 || offset < 0 || offset >= songs.size) return emptyList()
+        return songs.drop(offset).take(limit)
     }
 }
 
+fun storageUsageFor(path: String, bytes: Long): StorageUsageData {
+    return StorageUsageData(
+        totalBytes = bytes,
+        includedBytes = bytes,
+        excludedBytes = 0L,
+        includedFolderDetails = listOf(FolderSizeEntry(path, bytes)),
+        excludedFolderDetails = emptyList(),
+    )
+}
