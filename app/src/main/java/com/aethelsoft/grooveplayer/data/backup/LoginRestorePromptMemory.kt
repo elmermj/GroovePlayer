@@ -6,8 +6,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Remembers "No, I will use current data for now" for one backup revision.
- * Survives process death so the prompt does not return on every cold start.
+ * Remembers "No, I will use current data for now" for one backup revision,
+ * and the revision that a successful restore just applied.
+ * Both survive process death so the prompt does not return for that backup.
  */
 @Singleton
 class LoginRestorePromptMemory @Inject constructor(
@@ -25,8 +26,16 @@ class LoginRestorePromptMemory @Inject constructor(
         prefs.edit().remove(KEY_DECLINED).commit()
     }
 
+    /** Revision key of the backup the last successful restore applied. */
+    fun restoredKey(): String? = prefs.getString(KEY_RESTORED, null)?.takeIf { it.isNotBlank() }
+
+    fun markRestored(memoryKey: String) {
+        prefs.edit().putString(KEY_RESTORED, memoryKey).commit()
+    }
+
     companion object {
         const val PREFS = "groove_login_restore_prompt"
         const val KEY_DECLINED = "declined_revision"
+        const val KEY_RESTORED = "restored_revision"
     }
 }

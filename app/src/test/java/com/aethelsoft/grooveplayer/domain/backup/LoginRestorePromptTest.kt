@@ -62,6 +62,32 @@ class LoginRestorePromptTest {
         )
     }
 
+    @Test
+    fun skipsTheBackupThatWasJustRestored() {
+        val restored = LoginRestorePrompt.shouldOffer(ready())
+        assertNull(LoginRestorePrompt.shouldOffer(ready(persistedRestoredKey = restored)))
+    }
+
+    @Test
+    fun offersADifferentBackupAfterRestoreAndAFreshSignIn() {
+        val restored = LoginRestorePrompt.shouldOffer(ready())
+        assertNull(LoginRestorePrompt.shouldOffer(ready(persistedRestoredKey = restored)))
+        val changed = LoginRestorePrompt.shouldOffer(
+            ready(
+                snapshot = sample(contentHash = "hash-b"),
+                persistedRestoredKey = restored,
+            ),
+        )
+        assertEquals(
+            "user-1|obj-1|hash-b|2026-09-01T00:00:00Z|128",
+            changed,
+        )
+        assertEquals(
+            "user-1|obj-1|hash-a|2026-09-01T00:00:00Z|128",
+            LoginRestorePrompt.shouldOffer(ready(persistedRestoredKey = null)),
+        )
+    }
+
     private fun ready(
         signedIn: Boolean = true,
         premium: Boolean = true,
@@ -72,6 +98,7 @@ class LoginRestorePromptTest {
         onBackupOrRestoreScreen: Boolean = false,
         persistedDeclinedKey: String? = null,
         sessionHandledKey: String? = null,
+        persistedRestoredKey: String? = null,
     ) = LoginRestorePromptInput(
         signedIn = signedIn,
         premium = premium,
@@ -82,6 +109,7 @@ class LoginRestorePromptTest {
         onBackupOrRestoreScreen = onBackupOrRestoreScreen,
         persistedDeclinedKey = persistedDeclinedKey,
         sessionHandledKey = sessionHandledKey,
+        persistedRestoredKey = persistedRestoredKey,
     )
 
     private fun sample(

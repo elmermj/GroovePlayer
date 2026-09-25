@@ -8,6 +8,7 @@ import com.aethelsoft.grooveplayer.data.local.db.RoomDbSwapFiles
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupObjectDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupMatchRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupTrimRequestDto
@@ -27,8 +28,11 @@ import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
 import com.aethelsoft.grooveplayer.domain.backup.LegacyLibraryAdoption
 import com.aethelsoft.grooveplayer.domain.backup.PlacedCloudSong
 import com.aethelsoft.grooveplayer.domain.backup.R2GetException
+import com.aethelsoft.grooveplayer.domain.backup.LoginRestorePrompt
 import com.aethelsoft.grooveplayer.domain.backup.RestoreDownloadRetry
 import com.aethelsoft.grooveplayer.domain.backup.RestorePhase
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgress
+import com.aethelsoft.grooveplayer.domain.backup.RestoreProgressSnapshot
 import com.aethelsoft.grooveplayer.domain.backup.StagingVerdict
 import com.aethelsoft.grooveplayer.domain.model.BackupJobStep
 import com.aethelsoft.grooveplayer.domain.model.BackupKinds
@@ -51,6 +55,7 @@ import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -92,6 +97,7 @@ class BackupRepositoryImpl @Inject constructor(
     private val musicRepository: MusicRepository,
     private val userRepository: UserRepository,
     private val authRepository: AuthRepository,
+    private val loginRestorePromptMemory: LoginRestorePromptMemory,
     private val backupApi: BackupApi,
     @Named(NetworkModule.R2_HTTP_CLIENT) private val r2HttpClient: OkHttpClient,
 ) : BackupRepository {
@@ -109,10 +115,19 @@ class BackupRepositoryImpl @Inject constructor(
     private var gateEntitlement: StorageEntitlement? = null
 
     private val _state = MutableStateFlow(restoredBackupState())
+    private val restoreProgress = RestoreProgress()
+    private val _restoreProgress = MutableStateFlow(restoreProgress.snapshot())
 
     override fun observeBackupState() = _state.asStateFlow()
 
+    override fun observeRestoreProgress(): Flow<RestoreProgressSnapshot> =
+        _restoreProgress.asStateFlow()
+
     override fun restorePhase(): RestorePhase = restoreSession.phase()
+
+    private fun publishRestore() {
+        _restoreProgress.value = restoreProgress.snapshot()
+    }
 
     override suspend fun refreshLocalState() {
         val folders = resolveIncludedFolders()
@@ -663,7 +678,11 @@ class BackupRepositoryImpl @Inject constructor(
      * Body streamed to disk (still a single Class B request).
      * A dropped socket or rejected signature throws [R2GetException] so the caller can remint.
      */
-    private fun getFromR2(downloadUrl: String, destFile: File) {
+    private fun getFromR2(
+        downloadUrl: String,
+        destFile: File,
+        onBytes: ((bytesRead: Long, totalBytes: Long) -> Unit)? = null,
+    ) {
         val request = Request.Builder()
             .url(downloadUrl)
             .get()
@@ -686,7 +705,9 @@ class BackupRepositoryImpl @Inject constructor(
                 )
                 destFile.parentFile?.mkdirs()
                 FileOutputStream(destFile).use { out ->
-                    body.byteStream().use { input -> input.copyTo(out) }
+                    body.byteStream().use { input ->
+                        copyDownload(input, out, body.contentLength(), onBytes)
+                    }
                 }
             }
         } catch (e: R2GetException) {
@@ -702,6 +723,39 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun copyDownload(
+        input: java.io.InputStream,
+        out: FileOutputStream,
+        contentLength: Long,
+        onBytes: ((bytesRead: Long, totalBytes: Long) -> Unit)?,
+    ) {
+        var readTotal = 0L
+        var sinceEmit = 0L
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            out.write(buffer, 0, read)
+            readTotal += read
+            sinceEmit += read
+            if (onBytes != null && sinceEmit >= ContentHash.PROGRESS_STEP_BYTES) {
+                emitDownloadBytes(onBytes, readTotal, contentLength)
+                sinceEmit = 0L
+            }
+        }
+        if (onBytes != null && (sinceEmit > 0L || readTotal == 0L)) {
+            emitDownloadBytes(onBytes, readTotal, contentLength)
+        }
+    }
+
+    private fun emitDownloadBytes(
+        onBytes: (bytesRead: Long, totalBytes: Long) -> Unit,
+        read: Long,
+        total: Long,
+    ) {
+        runCatching { onBytes(read, total) }
+    }
+
     /**
      * Mint (or reuse) a signed URL, then GET the whole object.
      * A dropped connection or rejected signature retries that one object.
@@ -712,6 +766,8 @@ class BackupRepositoryImpl @Inject constructor(
         r2Key: String?,
         destFile: File,
         seededUrl: String?,
+        onBytes: ((bytesRead: Long, totalBytes: Long) -> Unit)? = null,
+        onRetry: ((retryNumber: Int, maxAttempts: Int) -> Unit)? = null,
     ) {
         var lastError: Exception? = null
         for (attempt in 1..RestoreDownloadRetry.MAX_ATTEMPTS) {
@@ -733,7 +789,7 @@ class BackupRepositoryImpl @Inject constructor(
                     }
                     resolved.url ?: error("download-url missing download_url")
                 }
-                getFromR2(url, destFile)
+                getFromR2(url, destFile, onBytes)
                 return
             } catch (e: CancellationException) {
                 destFile.delete()
@@ -751,6 +807,7 @@ class BackupRepositoryImpl @Inject constructor(
                         else -> false
                     }
                 if (!retry) throw e
+                runCatching { onRetry?.invoke(attempt, RestoreDownloadRetry.MAX_ATTEMPTS) }
                 Log.w(
                     TAG,
                     "restore GET retry $attempt/${RestoreDownloadRetry.MAX_ATTEMPTS} " +
@@ -1118,6 +1175,8 @@ class BackupRepositoryImpl @Inject constructor(
         // must still be allowed to continue the persisted SCRUM-67 phase.
         var holdForApply = alreadyHeld
         try {
+            restoreProgress.reset()
+            publishRestore()
             // Same refresh backup does before upload. Without it, a token older than
             // 15 minutes makes the first library call return "unauthorized".
             val refreshed = authRepository.refreshSession()
@@ -1192,6 +1251,7 @@ class BackupRepositoryImpl @Inject constructor(
             swap.commit()
             restoreSession.markCommitted()
             Log.i(TAG, "library database swapped; restarting onto the restored file")
+            suppressLoginPromptForRestoredBackup()
             ProcessRestarter.restart(context)
         } catch (e: CancellationException) {
             throw e
@@ -1199,6 +1259,7 @@ class BackupRepositoryImpl @Inject constructor(
             val swap = RoomDbSwapFiles.forContext(context)
             if (swap.step() == DbSwapStep.COMMITTED) {
                 restoreSession.markCommitted()
+                suppressLoginPromptForRestoredBackup()
                 ProcessRestarter.restart(context)
             }
             runCatching { swap.rollback() }
@@ -1233,6 +1294,22 @@ class BackupRepositoryImpl @Inject constructor(
             error("Cloud restore is dry-run only until R2 is live.")
         }
         val url = lib.downloadUrl ?: error("library missing download_url")
+        restoreSession.rememberLibraryIdentity(
+            CloudLibrarySnapshot(
+                objectId = lib.objectId,
+                contentHash = lib.contentHash,
+                sizeBytes = lib.sizeBytes,
+                r2Key = lib.r2Key,
+                logicalPath = lib.logicalPath,
+                schemaVersion = remoteSchema,
+                appVersion = lib.appVersion,
+                createdAtIso = lib.createdAt,
+                dryRun = false,
+            ),
+        )
+        val snapshotBytes = lib.sizeBytes
+        restoreProgress.onLibrarySnapshot(0L, snapshotBytes)
+        publishRestore()
         val expiresInSec = (lib.expiresInSec ?: DEFAULT_DOWNLOAD_EXPIRES_SEC).coerceAtLeast(1)
         rememberDownloadUrl(
             CachedSignedDownload(
@@ -1249,6 +1326,15 @@ class BackupRepositoryImpl @Inject constructor(
             r2Key = lib.r2Key,
             destFile = gz,
             seededUrl = url,
+            onBytes = { read, length ->
+                val total = if (snapshotBytes > 0L) snapshotBytes else length
+                restoreProgress.onLibrarySnapshot(read, total)
+                publishRestore()
+            },
+            onRetry = { retryNumber, maxAttempts ->
+                restoreProgress.onSnapshotRetry(retryNumber, maxAttempts)
+                publishRestore()
+            },
         )
         gunzipFile(gz, raw)
         val staged = restoreSession.stagingDatabase()
@@ -1475,7 +1561,11 @@ class BackupRepositoryImpl @Inject constructor(
         val downloadsDir = grooveDownloads.directory()
         adoptLegacyLibraryFiles(downloadsDir)
         val existing = indexDownloads(downloadsDir).toMutableList()
+        val plannedSizes = plannedDownloadSizes(songs, downloadsDir, existing)
+        restoreProgress.planDownloads(plannedSizes)
+        publishRestore()
         val placements = mutableListOf<PlacedCloudSong>()
+        var downloadIndex = 0
         for (obj in songs) {
             val hash = obj.contentHash
             val size = obj.sizeBytes
@@ -1490,14 +1580,43 @@ class BackupRepositoryImpl @Inject constructor(
             )
             val dest = File(placement.destinationPath)
             if (!placement.reusedExisting) {
+                val index = downloadIndex
+                val tracked = index < plannedSizes.size
+                if (tracked) {
+                    restoreProgress.beginFile(index)
+                    publishRestore()
+                }
                 val partial = File(stagedDb.parentFile, "$hash.partial")
-                val downloaded = downloadObject(contentHash = hash, r2Key = obj.r2Key, destFile = partial)
-                downloaded.getOrThrow()
+                transferWholeObject(
+                    contentHash = hash,
+                    r2Key = obj.r2Key,
+                    destFile = partial,
+                    seededUrl = null,
+                    onBytes = { read, length ->
+                        if (!tracked) return@transferWholeObject
+                        val total = if (size > 0L) size else length
+                        restoreProgress.onFileBytes(index, read, total)
+                        publishRestore()
+                    },
+                    onRetry = { retryNumber, maxAttempts ->
+                        if (!tracked) return@transferWholeObject
+                        restoreProgress.onRetry(index, retryNumber, maxAttempts)
+                        publishRestore()
+                    },
+                )
                 if (size > 0L && partial.length() != size) {
                     partial.delete()
                     error("Downloaded song size does not match the cloud catalog")
                 }
-                val got = sha256Hex(partial)
+                if (tracked) {
+                    restoreProgress.beginVerify(index)
+                    publishRestore()
+                }
+                val got = sha256Hex(partial) { read, total ->
+                    if (!tracked) return@sha256Hex
+                    restoreProgress.onVerifyBytes(index, read, total)
+                    publishRestore()
+                }
                 if (!got.equals(hash, ignoreCase = true)) {
                     partial.delete()
                     error("Downloaded song hash does not match the cloud catalog")
@@ -1505,6 +1624,11 @@ class BackupRepositoryImpl @Inject constructor(
                 RoomDbSwapFiles.copyDurable(partial, dest)
                 partial.delete()
                 existing += HashedAudio(dest.absolutePath, hash, dest.length())
+                if (tracked) {
+                    restoreProgress.finishFile(index)
+                    publishRestore()
+                    downloadIndex++
+                }
             } else if (size > 0L && dest.length() != size) {
                 error("The app library already has different bytes for this song")
             }
@@ -1515,6 +1639,8 @@ class BackupRepositoryImpl @Inject constructor(
                 localPath = dest.absolutePath,
             )
         }
+        restoreProgress.onCatalogVerify()
+        publishRestore()
         StagedCatalogRewriter.rewrite(stagedDb, placements)
         val missing = BackupCatalogPaths.missingLocalBytes(placements) { path ->
             val file = File(path)
@@ -1525,6 +1651,54 @@ class BackupRepositoryImpl @Inject constructor(
                 "Restore is missing ${missing.size} song file(s) in the app library. " +
                     "The library database was not replaced.",
             )
+        }
+    }
+
+    /**
+     * Files this restore will download, in loop order. Same placement rules as the
+     * download loop, so the count matches real work and reused files stay out of it.
+     */
+    private fun plannedDownloadSizes(
+        songs: List<BackupObjectDto>,
+        downloadsDir: File,
+        existing: List<HashedAudio>,
+    ): List<Long?> {
+        val sim = existing.toMutableList()
+        val sizes = mutableListOf<Long?>()
+        for (obj in songs) {
+            val hash = obj.contentHash
+            val size = obj.sizeBytes
+            val cosmetic = obj.logicalPath?.takeIf { it.isNotBlank() }
+                ?.let(GrooveDownloadPlacement::fileName)
+                ?: GrooveDownloadPlacement.hashedFileName("audio.bin", hash)
+            val placement = GrooveDownloadPlacement.place(
+                downloadsDir = downloadsDir.absolutePath,
+                cosmeticFileName = cosmetic,
+                contentHash = hash,
+                sizeBytes = size,
+                existing = sim,
+            )
+            if (!placement.reusedExisting) {
+                sizes += size.takeIf { it > 0L }
+                sim += HashedAudio(placement.destinationPath, hash, size)
+            }
+        }
+        return sizes
+    }
+
+    /**
+     * After a committed swap, remember this cloud backup so the login restore
+     * prompt does not ask again for the revision that was just applied.
+     */
+    private suspend fun suppressLoginPromptForRestoredBackup() {
+        val snap = restoreSession.libraryIdentity()
+            ?: fetchCloudLibraryMetadata().getOrNull()
+            ?: return
+        val revision = LoginRestorePrompt.revisionOf(snap) ?: return
+        val userId = authRepository.getAuthUser()?.id?.trim().orEmpty()
+        if (userId.isEmpty()) return
+        runCatching {
+            loginRestorePromptMemory.markRestored(LoginRestorePrompt.memoryKey(userId, revision))
         }
     }
 
