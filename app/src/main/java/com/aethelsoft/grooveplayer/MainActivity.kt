@@ -189,11 +189,12 @@ fun GroovePlayerAppMain() {
     val activity = LocalActivity.current
     LaunchedEffect(Unit) {
         // Delay so first frame / permissions settle; never blocks Sign-In.
+        // Then wait until privilege is confirmed. The post-restore restart used to
+        // fire this while /v1/me was still in flight and the missing user looked Free.
         delay(1800)
-        val act = activity as? android.app.Activity
-        if (act != null) {
-            StartupInterstitialHelper.maybeShow(act, adsViewModel)
-        }
+        val act = activity ?: return@LaunchedEffect
+        if (!adsViewModel.awaitCanShowStartupAd()) return@LaunchedEffect
+        StartupInterstitialHelper.maybeShow(act, adsViewModel)
     }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
