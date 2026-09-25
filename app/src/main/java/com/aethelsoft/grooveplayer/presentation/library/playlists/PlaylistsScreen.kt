@@ -212,6 +212,7 @@ fun PlaylistsScreen(
     }
     importResult?.let { result ->
         val success = result as? M3uImportResult.Success
+        val importFolder = LocalLibraryImport.current.pickFolder
         AlertDialog(
             onDismissRequest = viewModel::dismissImportResult,
             containerColor = GrooveTheme.colors.surface,
@@ -225,7 +226,7 @@ fun PlaylistsScreen(
                         TextButton(
                             onClick = {
                                 viewModel.dismissImportResult()
-                                LocalLibraryImport.current.pickFolder()
+                                importFolder()
                             },
                         ) {
                             Text("Import folder", color = SoftWhite)
