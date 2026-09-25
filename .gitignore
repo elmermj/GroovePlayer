@@ -13,6 +13,9 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Written for GROOVE_ENV=staging so devDebug can use the .staging package
+# before google-services.json has a real staging client. Never commit.
+app/src/dev/google-services.json
 /.idea/
 /.vscode/
 /.gradle/
