@@ -31,5 +31,6 @@ class ObservePlayerStateUseCase @Inject constructor(
     fun observeAudioAmplitude(): Flow<Float> = playerRepository.observeAudioAmplitude()
     fun observeAudioVisualization(): Flow<AudioVisualizationData> = playerRepository.observeAudioVisualization()
     fun observePremiumStreamRequired(): Flow<Unit> = playerRepository.observePremiumStreamRequired()
+    fun observeStreamRefreshFailure(): Flow<String> = playerRepository.observeStreamRefreshFailure()
 }
 

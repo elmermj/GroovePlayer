@@ -185,6 +185,14 @@ fun GroovePlayerAppMain() {
             }
         }
     }
+    LaunchedEffect(Unit) {
+        playerViewModel.streamRefreshFailure.collect { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
     val adsViewModel: AdsViewModel = hiltViewModel()
     val activity = LocalActivity.current
     LaunchedEffect(Unit) {

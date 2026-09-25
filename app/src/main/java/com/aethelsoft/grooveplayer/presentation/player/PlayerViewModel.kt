@@ -92,6 +92,9 @@ class PlayerViewModel @Inject constructor(
     /** Cloud audio exists, but this user is not Premium. Catalog was not purged. */
     val premiumStreamRequired: Flow<Unit> = observePlayerStateUseCase.observePremiumStreamRequired()
 
+    /** Signed stream URL refresh did not restore playback. Queue stays. */
+    val streamRefreshFailure: Flow<String> = observePlayerStateUseCase.observeStreamRefreshFailure()
+
     fun setSongDetailsSheetState(state: PlayerSongDetailsSheetState) {
         _songDetailsSheetState.value = state
     }
