@@ -352,17 +352,17 @@ GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The
 - Gradle 8.13.2+
 
 ### Building
-Product flavors: **`dev`** (default, LAN/test ads) and **`prod`** (release-oriented). Flavor, ads, auth, billing, and R2 notes stay on the maintainer machine and are not published in this repo.
+Product flavors: **`dev`** (default, LAN/test ads), **`staging`** (side-by-side App Tester package, suffix `.staging`, launcher name GroovePlayer Staging), and **`prod`** (Play Store). Flavor, ads, auth, billing, and R2 notes stay on the maintainer machine and are not published in this repo.
 
 ```bash
 # Preferred day-to-day
 ./gradlew :app:assembleDevDebug
 
+# App Tester staging package
+./gradlew :app:assembleStagingRelease
+
 # Production-shaped release APK (debug-signed until a Play keystore is configured)
 ./gradlew :app:assembleProdRelease
-
-# assembleDebug still works — builds both devDebug and prodDebug
-./gradlew :app:assembleDebug
 ```
 
 ### Running
@@ -372,7 +372,7 @@ Product flavors: **`dev`** (default, LAN/test ads) and **`prod`** (release-orien
 
 ### Test APK on a phone (no USB)
 
-After the one-time Firebase and GitHub secrets setup, a merge or push to `test` runs **Actions → Distribute APK** and publishes to Firebase App Tester. `main` is production and is not the OTA target. Mobi and others should land WIP and test builds on `test`. Firebase and distribute setup notes stay local and are not in this repository.
+After the one-time Firebase and GitHub secrets setup, a merge or push to `test` runs **Actions → Distribute APK** and publishes **GroovePlayer** to Firebase App Tester, talking to the backend test API. `staging-test` publishes **GroovePlayer Staging** (separate install) to the same tester group, talking to the staging API. `main` is the Play Store build and keeps the live production API. Mobi and others should land WIP and test builds on `test`. Firebase and distribute setup notes stay local and are not in this repository.
 
 ## 📝 License
 
