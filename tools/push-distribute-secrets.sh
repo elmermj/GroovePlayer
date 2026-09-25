@@ -29,15 +29,34 @@ gh secret set RELEASE_KEY_ALIAS --body "$RELEASE_KEY_ALIAS" -R elmermj/GroovePla
 gh secret set RELEASE_KEY_PASSWORD --body "$RELEASE_KEY_PASSWORD" -R elmermj/GroovePlayer
 echo "Signing secrets pushed."
 if [[ -f "$ROOT/app/google-services.json" ]]; then
-  APP_ID=$(python3 - <<'PY'
+  python3 - <<'PY'
 import json
+import subprocess
 from pathlib import Path
-j=json.loads(Path("app/google-services.json").read_text())
-print(j["client"][0]["client_info"]["mobilesdk_app_id"])
+
+config = json.loads(Path("app/google-services.json").read_text())
+wanted = {
+    "com.aethelsoft.grooveplayer": "FIREBASE_APP_ID",
+    "com.aethelsoft.grooveplayer.staging": "FIREBASE_APP_ID_STAGING",
+}
+found = {}
+for client in config.get("client", []):
+    info = client.get("client_info", {})
+    package = info.get("android_client_info", {}).get("package_name", "")
+    app_id = info.get("mobilesdk_app_id", "")
+    if package in wanted and app_id:
+        found[package] = app_id
+for package, secret in wanted.items():
+    app_id = found.get(package, "")
+    if not app_id:
+        print(f"Skip {secret} — no google-services client for {package}.")
+        continue
+    subprocess.run(
+        ["gh", "secret", "set", secret, "--body", app_id, "-R", "elmermj/GroovePlayer"],
+        check=True,
+    )
+    print(f"{secret} pushed from google-services.json ({package}).")
 PY
-)
-  gh secret set FIREBASE_APP_ID --body "$APP_ID" -R elmermj/GroovePlayer
-  echo "FIREBASE_APP_ID pushed from google-services.json"
 else
   echo "Skip FIREBASE_APP_ID — add app/google-services.json first, then re-run."
 fi

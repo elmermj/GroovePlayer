@@ -50,6 +50,8 @@ fun rawSecret(key: String): String {
 }
 
 val PROD_API_DEFAULT = "https://grooveplayer-backend.fly.dev"
+val STAGING_API_DEFAULT = "https://grooveplayer-backend-staging.fly.dev"
+val STAGING_APPLICATION_ID = "com.aethelsoft.grooveplayer.staging"
 
 val releaseStoreFile = rawSecret("RELEASE_STORE_FILE")
 val releaseStorePassword = rawSecret("RELEASE_STORE_PASSWORD")
@@ -98,7 +100,9 @@ android {
         vectorDrawables { useSupportLibrary = true }
 
         // Web client ID is required as serverClientId when requesting Google ID tokens.
-        // Shared across flavors (same applicationId / SHA-1 registration).
+        // Staging keeps this same web client: the ID token audience is what the backend
+        // verifies. Google matches the Android OAuth client by package + SHA-1, so the
+        // staging package needs its own Android client in that Cloud project.
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
@@ -117,7 +121,7 @@ android {
         )
     }
 
-    // environment: day-to-day `dev` vs store-oriented `prod`.
+    // environment: day-to-day `dev`, App Tester `staging`, store-oriented `prod`.
     flavorDimensions += "environment"
     productFlavors {
         create("dev") {
@@ -141,6 +145,27 @@ android {
             manifestPlaceholders["admobAppId"] = ADMOB_TEST_APP_ID
             buildConfigField("boolean", "ALLOW_CLEARTEXT", "true")
             resValue("string", "flavor_environment", "dev")
+        }
+        create("staging") {
+            dimension = "environment"
+            // Side-by-side with GroovePlayer. Launcher label is app/src/staging/.../strings.xml.
+            applicationIdSuffix = ".staging"
+
+            buildConfigField(
+                "String",
+                "API_BASE_URL",
+                "\"${localProp("STAGING_API_BASE_URL", STAGING_API_DEFAULT)}\""
+            )
+            // App Tester build, not Play. Same sample AdMob IDs as dev.
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$ADMOB_TEST_BANNER_UNIT_ID\"")
+            buildConfigField(
+                "String",
+                "ADMOB_INTERSTITIAL_UNIT_ID",
+                "\"$ADMOB_TEST_INTERSTITIAL_UNIT_ID\""
+            )
+            manifestPlaceholders["admobAppId"] = ADMOB_TEST_APP_ID
+            buildConfigField("boolean", "ALLOW_CLEARTEXT", "false")
+            resValue("string", "flavor_environment", "staging")
         }
         create("prod") {
             dimension = "environment"
@@ -334,6 +359,35 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 }
 
+
+fun googleServicesListsPackage(packageName: String): Boolean {
+    if (!googleServicesJson.exists()) return false
+    return Regex("\"package_name\"\\s*:\\s*\"" + Regex.escape(packageName) + "\"")
+        .containsMatchIn(googleServicesJson.readText())
+}
+
+// The google-services plugin rejects a variant whose applicationId is missing from
+// app/google-services.json. Fail here with the setup that unblocks GroovePlayer Staging.
+gradle.taskGraph.whenReady {
+    val shippingStaging = allTasks.any { task ->
+        val n = task.name
+        n.contains("Staging") && (
+            n.startsWith("assemble") ||
+                n.startsWith("bundle") ||
+                n.startsWith("install") ||
+                n.contains("GoogleServices")
+            )
+    }
+    if (!shippingStaging || googleServicesListsPackage(STAGING_APPLICATION_ID)) return@whenReady
+    throw GradleException(
+        "staging requires a Firebase Android app for $STAGING_APPLICATION_ID " +
+            "in app/google-services.json (project grooveplayer-69482). " +
+            "Create the app, add the upload and debug SHA-1 certificates, download " +
+            "google-services.json, and merge that client in. Then set GitHub secret " +
+            "FIREBASE_APP_ID_STAGING to the new mobilesdk_app_id. The google-services " +
+            "plugin fails this build until the client exists."
+    )
+}
 
 // Fail closed for Play-bound builds: no sample AdMob IDs, no debug-signed release.
 gradle.taskGraph.whenReady {

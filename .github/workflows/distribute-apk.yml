@@ -1,4 +1,7 @@
-# Build a signed dev-release APK and publish it to Firebase App Distribution.
+# Build a signed App Tester APK and publish it to Firebase App Distribution.
+#   test         → GroovePlayer (dev release) → https://grooveplayer-backend-test.fly.dev
+#   staging-test → GroovePlayer Staging       → https://grooveplayer-backend-staging.fly.dev
+# Play Store / main uses the prod flavor and is not this workflow.
 # Signing and Firebase credentials come from GitHub Actions secrets only.
 # Do not echo those values. Distribute setup notes stay local and are not in this repo.
 
@@ -25,6 +28,7 @@ on:
   push:
     branches:
       - test
+      - staging-test
     paths:
       - "app/**"
       - "gradle/**"
@@ -40,7 +44,10 @@ permissions:
   actions: write
 
 # Newer push to the same ref cancels an older in-flight run, so a merge batch
-# produces one App Tester release. A cancelled run skips its run_number.
+# produces one App Tester release. The group includes the ref, so a staging-test
+# run never cancels a test run, and the other way around. A cancelled run skips
+# its run_number. test and staging-test share this workflow's run_number, so each
+# lane's versionCode keeps increasing. The packages differ, so the codes are independent.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -157,11 +164,36 @@ jobs:
           fi
           echo "Decoded upload keystore ($(wc -c < keystore/grooveplayer-upload.jks) bytes)."
 
+      - name: Select release lane
+        id: lane
+        run: |
+          set -euo pipefail
+          # staging-test is the side-by-side app. Every other run of this workflow,
+          # including a manual dispatch from test, is the GroovePlayer tester lane.
+          if [ "${GITHUB_REF_NAME}" = "staging-test" ]; then
+            echo "Selected App Tester lane: staging (branch ${GITHUB_REF_NAME})."
+            echo "name=staging" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:app:assembleStagingRelease" >> "$GITHUB_OUTPUT"
+            echo "apk=app/build/outputs/apk/staging/release/app-staging-release.apk" >> "$GITHUB_OUTPUT"
+            echo "artifact=grooveplayer-staging-release" >> "$GITHUB_OUTPUT"
+            echo "api_property=STAGING_API_BASE_URL" >> "$GITHUB_OUTPUT"
+            echo "api_url=https://grooveplayer-backend-staging.fly.dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "Selected App Tester lane: test (branch ${GITHUB_REF_NAME})."
+            echo "name=test" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:app:assembleDevRelease" >> "$GITHUB_OUTPUT"
+            echo "apk=app/build/outputs/apk/dev/release/app-dev-release.apk" >> "$GITHUB_OUTPUT"
+            echo "artifact=grooveplayer-dev-release" >> "$GITHUB_OUTPUT"
+            echo "api_property=API_BASE_URL" >> "$GITHUB_OUTPUT"
+            echo "api_url=https://grooveplayer-backend-test.fly.dev" >> "$GITHUB_OUTPUT"
+          fi
       - name: Write local.properties
         env:
           RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          LANE_API_PROPERTY: ${{ steps.lane.outputs.api_property }}
+          LANE_API_URL: ${{ steps.lane.outputs.api_url }}
         run: |
           set -euo pipefail
           python3 - << 'PY'
@@ -185,19 +217,26 @@ jobs:
                       out.append(ch)
               return "".join(out)
 
-          # App Tester installs on physical devices. Bake the Fly API (not 10.0.2.2).
+          # App Tester installs on physical devices. Bake the lane API (not 10.0.2.2).
           # Web client ID must match backend verify; defaults match app/build.gradle.kts.
+          # Staging uses the same web client. Its Android OAuth client is package + SHA-1.
+          api_property = os.environ["LANE_API_PROPERTY"]
+          api_url = os.environ["LANE_API_URL"]
+          if api_property not in ("API_BASE_URL", "STAGING_API_BASE_URL"):
+              raise SystemExit("Unexpected API property for this lane.")
+          if not api_url.startswith("https://"):
+              raise SystemExit("Lane API URL must be https.")
           lines = [
               "RELEASE_STORE_FILE=keystore/grooveplayer-upload.jks",
               f"RELEASE_STORE_PASSWORD={prop(os.environ['RELEASE_STORE_PASSWORD'])}",
               f"RELEASE_KEY_ALIAS={prop(os.environ['RELEASE_KEY_ALIAS'])}",
               f"RELEASE_KEY_PASSWORD={prop(os.environ['RELEASE_KEY_PASSWORD'])}",
-              "API_BASE_URL=https://grooveplayer-backend.fly.dev",
+              f"{api_property}={api_url}",
               "GOOGLE_WEB_CLIENT_ID=356328665268-h7p2ct3o1k8358itiecp3h6o4r1tjjgo.apps.googleusercontent.com",
               "GOOGLE_ANDROID_CLIENT_ID=356328665268-1t80fc2j091cei383co7tncernl4p00c.apps.googleusercontent.com",
           ]
           Path("local.properties").write_text("\n".join(lines) + "\n", encoding="ascii")
-          print("Wrote local.properties (values not shown).")
+          print(f"Wrote local.properties with {api_property}={api_url} (secrets not shown).")
           PY
 
       - name: Export version
@@ -238,18 +277,27 @@ jobs:
           print("Kept daemon=true, caching=true, vfs.watch=false, enableResourceOptimizations=false, enableAsmInstrumentation=false")
           PY
 
-      - name: Build dev release APK
+      - name: Build release APK
         env:
           VERSION_CODE: ${{ github.run_number }}
           VERSION_NAME: 1.0.${{ github.run_number }}
+          GRADLE_TASK: ${{ steps.lane.outputs.gradle_task }}
         run: |
           echo "VERSION_CODE=${VERSION_CODE}"
           echo "VERSION_NAME=${VERSION_NAME}"
+          echo "LANE=${{ steps.lane.outputs.name }}"
           # Configuration cache works for a fixed version, but versionCode/versionName are
           # read while configuring defaultConfig and change every run, so the entry would miss.
           # versionCode still comes from github.run_number. It is a task input only for the
           # manifest, BuildConfig, and packaging tasks. No timestamp is added to task inputs.
-          ./gradlew :app:assembleDevRelease --stacktrace --build-cache --parallel --max-workers=4 \
+          case "$GRADLE_TASK" in
+            :app:assembleDevRelease|:app:assembleStagingRelease) ;;
+            *)
+              echo "Unexpected Gradle task for this lane."
+              exit 1
+              ;;
+          esac
+          ./gradlew "$GRADLE_TASK" --stacktrace --build-cache --parallel --max-workers=4 \
             -Pandroid.incremental=true \
             -Pandroid.useFullClasspathForDexingTransform=false \
             -PversionCode="${VERSION_CODE}" \
@@ -257,9 +305,11 @@ jobs:
 
       - name: Check signed APK
         id: apk
+        env:
+          APK_PATH: ${{ steps.lane.outputs.apk }}
         run: |
           set -euo pipefail
-          apk="app/build/outputs/apk/dev/release/app-dev-release.apk"
+          apk="$APK_PATH"
           if [ ! -f "$apk" ]; then
             echo "Signed APK not found at $apk"
             find app/build/outputs/apk -type f -name '*.apk' -print || true
@@ -275,18 +325,29 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: grooveplayer-dev-release
-          path: app/build/outputs/apk/dev/release/app-dev-release.apk
+          name: ${{ steps.lane.outputs.artifact }}
+          path: ${{ steps.lane.outputs.apk }}
           if-no-files-found: error
 
       - name: Check Firebase secrets
         env:
           FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          FIREBASE_APP_ID_STAGING: ${{ secrets.FIREBASE_APP_ID_STAGING }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          LANE: ${{ steps.lane.outputs.name }}
         run: |
           set -euo pipefail
-          if [ -z "${FIREBASE_APP_ID}" ] || [ -z "${FIREBASE_SERVICE_ACCOUNT}" ]; then
-            echo "Missing FIREBASE_APP_ID or FIREBASE_SERVICE_ACCOUNT."
+          if [ -z "${FIREBASE_SERVICE_ACCOUNT}" ]; then
+            echo "Missing FIREBASE_SERVICE_ACCOUNT."
+            exit 1
+          fi
+          if [ "$LANE" = "staging" ]; then
+            if [ -z "${FIREBASE_APP_ID_STAGING}" ]; then
+              echo "Missing FIREBASE_APP_ID_STAGING."
+              exit 1
+            fi
+          elif [ -z "${FIREBASE_APP_ID}" ]; then
+            echo "Missing FIREBASE_APP_ID."
             exit 1
           fi
           echo "Firebase App Distribution secrets are present."
@@ -345,7 +406,8 @@ jobs:
           sha = os.environ.get("GITHUB_SHA", "")
           short = sha[:7] if sha else "unknown"
           ref = os.environ.get("GITHUB_REF_NAME", "")
-          header = f"GroovePlayer {version} ({short})"
+          app_label = "GroovePlayer Staging" if ref == "staging-test" else "GroovePlayer"
+          header = f"{app_label} {version} ({short})"
           if ref:
               header += f" on {ref}"
 
@@ -439,9 +501,21 @@ jobs:
           PY
 
       - name: Upload to Firebase App Distribution
+        if: steps.lane.outputs.name == 'test'
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: ${{ steps.notes.outputs.groups }}
+          testers: ${{ steps.notes.outputs.testers }}
+          file: ${{ steps.apk.outputs.path }}
+          releaseNotesFile: release-notes.txt
+
+      - name: Upload staging APK to Firebase App Distribution
+        if: steps.lane.outputs.name == 'staging'
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_STAGING }}
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           groups: ${{ steps.notes.outputs.groups }}
           testers: ${{ steps.notes.outputs.testers }}
