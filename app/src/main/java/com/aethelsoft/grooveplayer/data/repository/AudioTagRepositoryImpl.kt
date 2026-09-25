@@ -7,12 +7,7 @@ import com.aethelsoft.grooveplayer.domain.repository.AudioTagRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jaudiotagger.audio.AudioFileIO
-import org.jaudiotagger.tag.FieldKey
-import org.jaudiotagger.tag.images.ArtworkFactory
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,144 +19,122 @@ class AudioTagRepositoryImpl @Inject constructor(
     override suspend fun readTags(contentUri: String): AudioTags? = withContext(Dispatchers.IO) {
         runCatching {
             val uri = Uri.parse(contentUri)
-            val ext = context.contentResolver.getType(uri)?.let(::extensionForMime) ?: ".mp3"
-            val tempFile = File.createTempFile("tag_read_", ext, context.cacheDir).apply {
-                deleteOnExit()
-            }
-            try {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    tempFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                } ?: return@withContext null
-
-                val audioFile = AudioFileIO.read(tempFile)
-                val tag = audioFile.tagOrCreateDefault ?: return@withContext null
-
-                val yearStr = tag.getFirst(FieldKey.YEAR)
-                val year = yearStr.toIntOrNull()
-
-                val trackStr = tag.getFirst(FieldKey.TRACK)
-                val trackNumber = trackStr.toIntOrNull()
-
-                val artistStr = tag.getFirst(FieldKey.ARTIST)
-                val artists = if (artistStr.isNotBlank()) {
-                    artistStr.split("/", ";&")
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() }
-                } else emptyList()
-
-                val genreStr = tag.getFirst(FieldKey.GENRE)
-                val genres = if (genreStr.isNotBlank()) listOf(genreStr) else emptyList()
-
-                val artwork = tag.getFirstArtwork()
-                val artworkBytes = artwork?.binaryData
-                val artworkMime = artwork?.mimeType
-
-                val grooveId = tag.getFirst(FieldKey.MUSICBRAINZ_TRACK_ID)
-                    .takeIf { it.isNotBlank() }
-
-                AudioTags(
-                    title = tag.getFirst(FieldKey.TITLE).ifBlank { "" },
-                    artists = artists.ifEmpty { listOf(tag.getFirst(FieldKey.ARTIST)).filter { it.isNotBlank() } },
-                    album = tag.getFirst(FieldKey.ALBUM).takeIf { it.isNotBlank() },
-                    genres = genres,
-                    year = year,
-                    trackNumber = trackNumber,
-                    artworkBytes = artworkBytes,
-                    artworkMimeType = artworkMime,
-                    grooveId = grooveId
-                )
-            } finally {
-                tempFile.delete()
+            val mime = mimeType(uri)
+            val file = localFile(uri)
+            if (file != null) {
+                AudioTagFiles.read(file, mime)
+            } else {
+                readContent(uri, mime)
             }
         }.getOrElse {
-            android.util.Log.e("AudioTagRepository", "Failed to read tags from $contentUri", it)
+            android.util.Log.e(TAG, "Failed to read tags from $contentUri", it)
             null
         }
     }
 
-    private fun extensionForMime(mimeType: String): String = when {
-        mimeType.contains("mpeg", ignoreCase = true) -> ".mp3"
-        mimeType.contains("mp4", ignoreCase = true) || mimeType.contains("x-m4a", ignoreCase = true) -> ".m4a"
-        mimeType.contains("flac", ignoreCase = true) -> ".flac"
-        mimeType.contains("ogg", ignoreCase = true) -> ".ogg"
-        mimeType.contains("wav", ignoreCase = true) -> ".wav"
-        mimeType.contains("aac", ignoreCase = true) -> ".aac"
-        else -> ".mp3"
+    override suspend fun writeTags(
+        contentUri: String,
+        tags: AudioTags,
+        replaceFrontCover: Boolean,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uri = Uri.parse(contentUri)
+            val mime = mimeType(uri)
+            val file = localFile(uri)
+            if (file != null) {
+                AudioTagFiles.replace(file, tags, replaceFrontCover, mime)
+            } else {
+                writeContent(uri, tags, replaceFrontCover, mime)
+            }
+        }
     }
 
-    override suspend fun writeTags(contentUri: String, tags: AudioTags): Result<Unit> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val uri = Uri.parse(contentUri)
-                val ext = context.contentResolver.getType(uri)?.let(::extensionForMime) ?: ".mp3"
-                val tempFile = File.createTempFile("tag_write_", ext, context.cacheDir).apply {
-                    deleteOnExit()
-                }
-                try {
-                    context.contentResolver.openInputStream(uri)?.use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    } ?: throw IllegalStateException("Cannot open input stream for $contentUri")
-
-                    val audioFile = AudioFileIO.read(tempFile)
-                    val tag = audioFile.tagOrCreateDefault
-                        ?: throw IllegalStateException("Cannot get or create tag")
-
-                    tag.setField(FieldKey.TITLE, tags.title)
-
-                    val artistStr = tags.artists.joinToString("; ")
-                    tag.setField(FieldKey.ARTIST, artistStr)
-
-                    tag.setField(FieldKey.ALBUM, tags.album ?: "")
-                    tag.setField(FieldKey.GENRE, tags.genres.firstOrNull() ?: "")
-
-                    if (tags.year != null) {
-                        tag.setField(FieldKey.YEAR, tags.year.toString())
-                    }
-                    if (tags.trackNumber != null) {
-                        tag.setField(FieldKey.TRACK, tags.trackNumber.toString())
-                    }
-
-                    // Persist app-specific stable ID in a standard tag field
-                    if (!tags.grooveId.isNullOrBlank()) {
-                        tag.setField(FieldKey.MUSICBRAINZ_TRACK_ID, tags.grooveId)
-                    }
-
-                    if (tags.artworkBytes != null) {
-                        tag.deleteArtworkField()
-                        val ext = when (tags.artworkMimeType) {
-                            "image/png" -> ".png"
-                            else -> ".jpg"
-                        }
-                        val tempArt = File.createTempFile("art_", ext, context.cacheDir).apply {
-                            deleteOnExit()
-                            writeBytes(tags.artworkBytes)
-                        }
-                        try {
-                            val artwork = ArtworkFactory.createArtworkFromFile(tempArt)
-                            artwork.mimeType = tags.artworkMimeType ?: "image/jpeg"
-                            tag.addField(artwork)
-                        } finally {
-                            tempArt.delete()
-                        }
-                    }
-
-                    audioFile.commit()
-
-                    context.contentResolver.openOutputStream(uri, "w")?.use { output ->
-                        tempFile.inputStream().use { input ->
-                            input.copyTo(output)
-                        }
-                    } ?: throw IllegalStateException("Cannot open output stream for $contentUri")
-                } finally {
-                    tempFile.delete()
-                }
-            }.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { Result.failure(it) }
-            )
+    private fun readContent(uri: Uri, mime: String?): AudioTags {
+        val temp = stageContent(uri, mime)
+        try {
+            return AudioTagFiles.read(temp, mime)
+        } finally {
+            temp.delete()
         }
+    }
+
+    private fun writeContent(
+        uri: Uri,
+        tags: AudioTags,
+        replaceFrontCover: Boolean,
+        mime: String?,
+    ) {
+        val temp = stageContent(uri, mime)
+        val backup = File(temp.parentFile, "${temp.name}.bak")
+        try {
+            temp.copyTo(backup, overwrite = true)
+            AudioTagFiles.editCopy(temp, tags, replaceFrontCover, mime)
+            var started = false
+            try {
+                val output = context.contentResolver.openOutputStream(uri, "w")
+                    ?: throw IllegalStateException(
+                        "Can't open this song for writing. The song was left unchanged.",
+                    )
+                started = true
+                output.use { out ->
+                    temp.inputStream().use { input -> input.copyTo(out) }
+                }
+            } catch (error: Exception) {
+                if (started) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(uri, "w")?.use { out ->
+                            backup.inputStream().use { input -> input.copyTo(out) }
+                        }
+                    }
+                }
+                if (error is IllegalStateException &&
+                    error.message.orEmpty().contains("left unchanged")
+                ) {
+                    throw error
+                }
+                throw IllegalStateException(
+                    "Couldn't save tags. The song was left unchanged.",
+                    error,
+                )
+            }
+        } finally {
+            temp.delete()
+            backup.delete()
+        }
+    }
+
+    private fun stageContent(uri: Uri, mime: String?): File {
+        val header = context.contentResolver.openInputStream(uri)?.use { input ->
+            val buf = ByteArray(128)
+            var offset = 0
+            while (offset < buf.size) {
+                val read = input.read(buf, offset, buf.size - offset)
+                if (read < 0) break
+                offset += read
+            }
+            if (offset == buf.size) buf else buf.copyOf(offset)
+        } ?: throw IllegalStateException("Can't open this song. The song was left unchanged.")
+        val name = uri.lastPathSegment
+        val format = AudioContainerFormat.detect(name, mime, header)
+        val suffix = format.writerSuffix ?: "bin"
+        val temp = File.createTempFile("tag_", ".$suffix", context.cacheDir)
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            temp.outputStream().use { output -> input.copyTo(output) }
+        } ?: throw IllegalStateException("Can't open this song. The song was left unchanged.")
+        return temp
+    }
+
+    private fun localFile(uri: Uri): File? {
+        val scheme = uri.scheme?.lowercase()
+        if (scheme != null && scheme != "file") return null
+        val path = uri.path ?: return null
+        return File(path).takeIf { it.isFile }
+    }
+
+    private fun mimeType(uri: Uri): String? =
+        runCatching { context.contentResolver.getType(uri) }.getOrNull()
+
+    private companion object {
+        const val TAG = "AudioTagRepository"
+    }
 }

@@ -14,8 +14,12 @@ interface AudioTagRepository {
 
     /**
      * Writes tags to the file at the given content URI.
-     * Uses copy-edit-write flow for content URIs (scoped storage).
-     * Returns Result.failure on error.
+     * Picture frames are left alone unless [replaceFrontCover] is true.
+     * A format this library cannot write fails without changing the file.
      */
-    suspend fun writeTags(contentUri: String, tags: AudioTags): Result<Unit>
+    suspend fun writeTags(
+        contentUri: String,
+        tags: AudioTags,
+        replaceFrontCover: Boolean = false,
+    ): Result<Unit>
 }

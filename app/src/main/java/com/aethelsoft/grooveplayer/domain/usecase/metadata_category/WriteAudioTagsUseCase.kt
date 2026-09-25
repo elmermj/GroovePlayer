@@ -7,6 +7,9 @@ import javax.inject.Inject
 class WriteAudioTagsUseCase @Inject constructor(
     private val audioTagRepository: AudioTagRepository
 ) {
-    suspend operator fun invoke(contentUri: String, tags: AudioTags): Result<Unit> =
-        audioTagRepository.writeTags(contentUri, tags)
+    suspend operator fun invoke(
+        contentUri: String,
+        tags: AudioTags,
+        replaceFrontCover: Boolean = false,
+    ): Result<Unit> = audioTagRepository.writeTags(contentUri, tags, replaceFrontCover)
 }
