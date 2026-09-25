@@ -6,6 +6,8 @@ package com.aethelsoft.grooveplayer.domain.model
 enum class CloudBackupPhase {
     IDLE,
     PREPARING,
+    /** Copying included-folder audio into the app library and updating Room paths. */
+    CONSOLIDATING,
     UPLOADING,
     SUCCESS,
     ERROR,
@@ -14,6 +16,20 @@ enum class CloudBackupPhase {
     BLOCKED_NOT_PREMIUM,
 }
 
+/** Ordered backup stages. Song upload and the catalog start only after consolidate finishes. */
+enum class BackupJobStep {
+    PREPARING,
+    CONSOLIDATING,
+    UPLOADING_FILES,
+    UPLOADING_CATALOG,
+}
+
+/** True while a manual backup is consolidating files or uploading them. */
+fun CloudBackupPhase.isUploadInProgress(): Boolean =
+    this == CloudBackupPhase.PREPARING ||
+        this == CloudBackupPhase.CONSOLIDATING ||
+        this == CloudBackupPhase.UPLOADING
+
 data class CloudBackupState(
     val phase: CloudBackupPhase = CloudBackupPhase.IDLE,
     val progressPercent: Int = 0,
@@ -21,8 +37,15 @@ data class CloudBackupState(
     val bytesUploaded: Long = 0L,
     val filesTotal: Int = 0,
     val filesCompleted: Int = 0,
+    /** Songs copied into the app library with Room paths updated. */
+    val consolidateCompleted: Int = 0,
+    val consolidateTotal: Int = 0,
+    /** Song files finished (uploaded or hash-skipped). Catalog upload is separate. */
+    val uploadCompleted: Int = 0,
+    val uploadTotal: Int = 0,
+    val jobStep: BackupJobStep = BackupJobStep.PREPARING,
     val filesDeduped: Int = 0,
-    /** Songs skipped client-side: catalog already has same basename(logical_path) + size_bytes. */
+    /** Songs skipped client-side: cloud already has the same SHA-256 and size. */
     val filesSkipped: Int = 0,
     val lastBackupAtEpochMs: Long? = null,
     val lastError: String? = null,
@@ -35,6 +58,11 @@ data class CloudBackupState(
      * Local files are untouched — UI should offer Retry (re-PUT + complete / Back up now).
      */
     val canRetry: Boolean = false,
+    /**
+     * Another install holds a non-expired backup lease.
+     * The primary backup button stays disabled with the exact other-device label.
+     */
+    val otherDeviceHoldingLease: Boolean = false,
 )
 
 /** Backup object kinds (Benny docs/backup-library.md). */

@@ -54,9 +54,13 @@ import com.aethelsoft.grooveplayer.utils.StorageFormatUtils
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
 import com.aethelsoft.grooveplayer.presentation.profile.ui.ProfileSettingsButton
+import com.aethelsoft.grooveplayer.domain.backup.BackupPrimaryAction
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
+import com.aethelsoft.grooveplayer.domain.backup.BackupProgressTone
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
 import com.aethelsoft.grooveplayer.domain.model.CloudLibrarySnapshot
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupPhase
+import com.aethelsoft.grooveplayer.domain.model.isUploadInProgress
 import androidx.compose.material3.LinearProgressIndicator
 
 /**
@@ -126,8 +130,9 @@ fun BackupContent(
         )
 
         Text(
-            text = "Cloud backup includes your library data (Room DB snapshot: favourites, " +
-                "recents, playlists, settings, metadata) plus audio from included folders. " +
+            text = "Cloud backup copies approved songs into the app library, uploads those files, " +
+                "then uploads the library snapshot (favourites, recents, playlists, settings). " +
+                "A song already in the cloud with the same content hash is skipped. " +
                 "Trim and long-press remove songs only — not the library snapshot.",
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = SoftWhite.copy(alpha = 0.75f),
@@ -194,6 +199,7 @@ fun BackupContent(
             librarySnapshot = librarySnapshot,
             libraryLoading = libraryLoading,
             restoreInFlight = restoreInFlight,
+            backupInProgress = visibleBackupState.phase.isUploadInProgress(),
             restoreMessage = restoreMessage,
             onRestoreLibrary = onRestoreLibrary,
         )
@@ -685,8 +691,9 @@ private fun ConfirmBackupDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Library data (Room DB) and audio from these folders will upload to cloud backup. " +
-                        "Songs already on cloud (same filename + size) are skipped.",
+                    text = "Approved songs are copied into the app library and the library paths are updated. " +
+                        "Audio uploads first. The Room snapshot uploads only after those files are in the cloud. " +
+                        "Songs already on cloud with the same content hash are skipped.",
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                     color = SoftWhite.copy(alpha = 0.85f),
                 )
@@ -742,7 +749,10 @@ private fun BackupNowSection(
     onStartBackup: () -> Unit,
 ) {
     val phase = backupState.phase
-    val busy = phase == CloudBackupPhase.PREPARING || phase == CloudBackupPhase.UPLOADING
+    val busy = phase == CloudBackupPhase.PREPARING ||
+        phase == CloudBackupPhase.CONSOLIDATING ||
+        phase == CloudBackupPhase.UPLOADING
+    val showSteps = busy || phase == CloudBackupPhase.SUCCESS || phase == CloudBackupPhase.ERROR
     val readOnlyGrace = storage?.readOnly == true && storage.overQuota != true
     val blockedQuota = storage?.overQuota == true || storage?.hardStop == true
     val canStart = tier == PrivilegeTier.PREMIUM &&
@@ -809,28 +819,66 @@ private fun BackupNowSection(
         }
         else -> {
             Text(
-                text = "Uploads library data (Room DB) plus included-folder audio to Cloudflare R2 " +
-                "(real PUT when backend dry_run is false).",
+                text = "Copies included-folder audio into the app library, uploads those files to Cloudflare R2, " +
+                "then uploads the Room snapshot (real PUT when backend dry_run is false).",
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite.copy(alpha = 0.85f),
             )
         }
     }
 
-    val buttonEnabled = canStart ||
-        (backupState.canRetry && !busy && !blockedQuota && !readOnlyGrace &&
-            tier == PrivilegeTier.PREMIUM && storage != null && !storage.isOptimisticStub)
+    val retryEligible = backupState.canRetry && !busy && !blockedQuota && !readOnlyGrace &&
+        tier == PrivilegeTier.PREMIUM && storage != null && !storage.isOptimisticStub
+    val otherDevice = backupState.otherDeviceHoldingLease
+    val progressLabel = BackupProgressLabel.status(
+        backupState.jobStep,
+        backupState.consolidateCompleted,
+        backupState.consolidateTotal,
+        backupState.uploadCompleted,
+        backupState.uploadTotal,
+    )
+    val buttonEnabled = BackupPrimaryAction.enabled(
+        otherDeviceHoldingLease = otherDevice,
+        busy = busy,
+        canStart = canStart,
+        canRetry = retryEligible,
+    )
     Spacer(Modifier.height(8.dp))
     ProfileSettingsButton(
         onClick = { if (buttonEnabled) onStartBackup() },
-        title = when {
-            busy -> "Backing up… ${backupState.progressPercent}%"
-            backupState.canRetry -> "Retry upload"
-            else -> "Back up now"
-        },
+        title = BackupPrimaryAction.label(
+            otherDeviceHoldingLease = otherDevice,
+            busy = busy,
+            canRetry = backupState.canRetry,
+            progressLabel = progressLabel,
+        ),
         isActive = buttonEnabled,
+        enabled = buttonEnabled,
         modifier = Modifier.fillMaxWidth(),
     )
+
+    if (showSteps) {
+        Spacer(Modifier.height(8.dp))
+        BackupProgressLabel.lines(
+            phase = phase,
+            step = backupState.jobStep,
+            consolidateCompleted = backupState.consolidateCompleted,
+            consolidateTotal = backupState.consolidateTotal,
+            uploadCompleted = backupState.uploadCompleted,
+            uploadTotal = backupState.uploadTotal,
+        ).forEach { line ->
+            Text(
+                text = line.text,
+                style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
+                color = when (line.tone) {
+                    BackupProgressTone.FAILED -> Color(0xFFFF8A80)
+                    BackupProgressTone.ACTIVE -> GrooveTheme.colors.onSurface
+                    BackupProgressTone.DONE -> SoftWhite.copy(alpha = 0.85f)
+                    BackupProgressTone.PENDING -> SoftWhite.copy(alpha = 0.45f)
+                },
+            )
+        }
+    }
 
     if (busy) {
         Spacer(Modifier.height(8.dp))
@@ -846,7 +894,14 @@ private fun BackupNowSection(
     }
 
     val status = backupState.message ?: backupState.lastError
-    if (!status.isNullOrBlank()) {
+    val activeLabel = BackupProgressLabel.status(
+        backupState.jobStep,
+        backupState.consolidateCompleted,
+        backupState.consolidateTotal,
+        backupState.uploadCompleted,
+        backupState.uploadTotal,
+    )
+    if (!status.isNullOrBlank() && !(busy && status == activeLabel)) {
         Spacer(Modifier.height(6.dp))
         val color = when (phase) {
             CloudBackupPhase.SUCCESS -> SoftWhite
@@ -867,7 +922,7 @@ private fun BackupNowSection(
     ) {
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "${backupState.filesSkipped} song(s) skipped — already on cloud (filename + size)",
+            text = "${backupState.filesSkipped} song(s) skipped — already on cloud (same content hash)",
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = SoftWhite.copy(alpha = 0.75f),
         )
@@ -890,6 +945,7 @@ private fun RestoreLibrarySection(
     librarySnapshot: CloudLibrarySnapshot?,
     libraryLoading: Boolean,
     restoreInFlight: Boolean,
+    backupInProgress: Boolean,
     restoreMessage: String?,
     onRestoreLibrary: () -> Unit,
 ) {
@@ -914,7 +970,8 @@ private fun RestoreLibrarySection(
             val schema = librarySnapshot?.schemaVersion?.toString() ?: "?"
             val size = librarySnapshot?.sizeBytes ?: 0L
             "Cloud Room DB ready · schema $schema · ${StorageFormatUtils.formatBytes(size, size.coerceAtLeast(1L))}. " +
-                "Restores favourites/recents/playlists/settings. Force-stop the app after restore."
+                "Missing songs download into the app library, then the app reopens on the restored library. " +
+                "Songs that were never backed up stay on this device."
         } else {
             emptyHint
         },
@@ -933,11 +990,16 @@ private fun RestoreLibrarySection(
         )
     }
     Spacer(Modifier.height(8.dp))
-    val enabled = hasSnapshot && !restoreInFlight && !libraryLoading && tier == PrivilegeTier.PREMIUM
+    val enabled = hasSnapshot &&
+        !restoreInFlight &&
+        !backupInProgress &&
+        !libraryLoading &&
+        tier == PrivilegeTier.PREMIUM
     ProfileSettingsButton(
         onClick = { if (enabled) onRestoreLibrary() },
         title = when {
             restoreInFlight -> "Restoring library…"
+            backupInProgress -> "Restore unavailable"
             !hasSnapshot -> "Restore unavailable"
             else -> "Restore library from cloud"
         },
@@ -960,4 +1022,5 @@ private fun CloudBackupState.asSignedOut(): CloudBackupState = copy(
     canRetry = false,
     lastError = null,
     lastRunDryRun = false,
+    otherDeviceHoldingLease = false,
 )

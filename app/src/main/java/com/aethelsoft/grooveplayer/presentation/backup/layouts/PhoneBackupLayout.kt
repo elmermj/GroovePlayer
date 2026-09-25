@@ -25,29 +25,41 @@ import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
-fun PhoneBackupLayout(viewModel: BackupViewModel) {
+fun PhoneBackupLayout(
+    viewModel: BackupViewModel,
+    onRestoreLibrary: () -> Unit,
+) {
     BackupScrollLayout(
         viewModel = viewModel,
         horizontalPadding = M_PADDING,
         compactTrimStack = true,
+        onRestoreLibrary = onRestoreLibrary,
     )
 }
 
 @Composable
-fun TabletBackupLayout(viewModel: BackupViewModel) {
+fun TabletBackupLayout(
+    viewModel: BackupViewModel,
+    onRestoreLibrary: () -> Unit,
+) {
     BackupScrollLayout(
         viewModel = viewModel,
         horizontalPadding = M_PADDING,
         compactTrimStack = true,
+        onRestoreLibrary = onRestoreLibrary,
     )
 }
 
 @Composable
-fun LargeTabletBackupLayout(viewModel: BackupViewModel) {
+fun LargeTabletBackupLayout(
+    viewModel: BackupViewModel,
+    onRestoreLibrary: () -> Unit,
+) {
     BackupScrollLayout(
         viewModel = viewModel,
         horizontalPadding = M_PADDING,
         compactTrimStack = false,
+        onRestoreLibrary = onRestoreLibrary,
     )
 }
 
@@ -57,6 +69,7 @@ private fun BackupScrollLayout(
     viewModel: BackupViewModel,
     horizontalPadding: androidx.compose.ui.unit.Dp,
     compactTrimStack: Boolean,
+    onRestoreLibrary: () -> Unit,
     billingViewModel: BillingViewModel = hiltViewModel(),
 ) {
     val user by viewModel.authUser.collectAsState()
@@ -132,7 +145,7 @@ private fun BackupScrollLayout(
                     libraryLoading = libraryLoading,
                     restoreInFlight = restoreInFlight,
                     restoreMessage = restoreMessage,
-                    onRestoreLibrary = { viewModel.restoreLibrary() },
+                    onRestoreLibrary = onRestoreLibrary,
                 )
             }
             item {

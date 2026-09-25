@@ -38,6 +38,7 @@ object SongMapper {
                 )
             },
             filePath = data.filePath,
+            fileSizeBytes = data.fileSizeBytes,
         )
     }
     

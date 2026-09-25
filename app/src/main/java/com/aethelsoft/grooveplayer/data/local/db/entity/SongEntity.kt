@@ -27,6 +27,8 @@ data class SongEntity(
     val uri: String,
     val title: String,
     val trackNumber: Int? = null,
-    val durationMs: Long? = null
+    val durationMs: Long? = null,
+    /** Filesystem path at last library index. Kept so a missing file can still match cloud audio. */
+    val sourcePath: String? = null,
 )
 

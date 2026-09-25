@@ -11,22 +11,43 @@ import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.aethelsoft.grooveplayer.data.playback.PremiumStreamSignals
+import com.aethelsoft.grooveplayer.data.playback.StreamPlaybackCache
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
+import com.aethelsoft.grooveplayer.domain.playback.PlaybackDropReason
+import com.aethelsoft.grooveplayer.domain.playback.STREAM_PREFETCH_MAX_BYTES
+import com.aethelsoft.grooveplayer.domain.playback.STREAM_REFRESH_FAILED_MESSAGE
+import com.aethelsoft.grooveplayer.domain.playback.StreamPlaybackFault
+import com.aethelsoft.grooveplayer.domain.playback.StreamRecoveryStep
+import com.aethelsoft.grooveplayer.domain.playback.nextCloudStreamUri
+import com.aethelsoft.grooveplayer.domain.playback.playbackStreamSongId
+import com.aethelsoft.grooveplayer.domain.playback.streamRecoveryStep
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvePlaybackSourceUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedPlayback
+import com.aethelsoft.grooveplayer.domain.usecase.player_category.ResolvedQueue
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import com.aethelsoft.grooveplayer.services.MusicPlaybackServiceManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -67,7 +88,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val userRepository: UserRepository,
     private val serviceManager: MusicPlaybackServiceManager,
     private val equalizerManager: EqualizerManager,
-    private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
+    private val equalizerRepository: com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository,
+    private val resolvePlaybackSource: ResolvePlaybackSourceUseCase,
+    private val streamPlaybackCache: StreamPlaybackCache,
+    private val premiumStreamSignals: PremiumStreamSignals,
 ) : PlayerRepository {
 
     private val player: ExoPlayer = createPlayerOnMainThread()
@@ -84,7 +108,6 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val _isFullScreenPlayerOpen = MutableStateFlow(false)
     private val _isPlayerMuted = MutableStateFlow(false)
     private val _audioVisualization = MutableStateFlow(AudioVisualizationData())
-    
     private var lastRecordedSongId: String? = null
     private var lastRecordedTimestamp: Long = 0L
     private var visualizer: Visualizer? = null
@@ -110,25 +133,44 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     /** Queue order from before shuffle was turned on; kept in sync with edits made while shuffled. Null when shuffle is off. */
     private var preShuffleOrder: MutableList<Song>? = null
     private var allAvailableSongs = listOf<Song>()
+    /** One re-fetch of an expired or rejected playback stream_url for the current song. */
+    private var streamRetrySongId: String? = null
+    /** Refresh already failed for this song. Further errors stay quiet until the user retries. */
+    private var streamRefreshGaveUpSongId: String? = null
+    private val _streamRefreshFailures = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    private var prefetchJob: Job? = null
+    private var prefetchUri: String? = null
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Main.immediate + CoroutineExceptionHandler { _, error ->
+            android.util.Log.e("ExoPlayerManager", "Player coroutine failed", error)
+        },
+    )
 
     /**
      * ExoPlayer binds to the current thread's looper at construction time.
      * Always build on the main looper, even if Hilt injects this singleton off-main.
      */
     private fun createPlayerOnMainThread(): ExoPlayer {
-        fun build(): ExoPlayer = ExoPlayer.Builder(ctx)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                    .build(),
-                /* handleAudioFocus = */ true,
-            )
-            // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
-            .setHandleAudioBecomingNoisy(true)
-            .build()
+        fun build(): ExoPlayer {
+            // Cloud items are groove-playback://. StreamPlaybackCache resolves the
+            // signed URL, caches the bytes, and leaves local files uncached.
+            // Range on that playback URL is allowed. Backup restore uses another client.
+            return ExoPlayer.Builder(ctx)
+                .setMediaSourceFactory(
+                    DefaultMediaSourceFactory(streamPlaybackCache.playbackDataSourceFactory),
+                )
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(C.USAGE_MEDIA)
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                        .build(),
+                    /* handleAudioFocus = */ true,
+                )
+                // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
+                .setHandleAudioBecomingNoisy(true)
+                .build()
+        }
         return if (Looper.myLooper() == Looper.getMainLooper()) {
             build()
         } else {
@@ -188,6 +230,8 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 if (isEndlessQueue && song != null) {
                     checkAndExtendQueue(song)
                 }
+                clearStreamRecovery()
+                scheduleNextCloudPrefetch()
             }
 
             override fun onPlaybackStateChanged(state: Int) {
@@ -195,6 +239,48 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 // When playback ends, update isPlaying state
                 if (state == Player.STATE_ENDED) {
                     _isPlaying.value = false
+                }
+                if (state == Player.STATE_READY) {
+                    // A later expiry on this same song can refresh again.
+                    streamRetrySongId = null
+                    scheduleNextCloudPrefetch()
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                val song = _currentSong.value ?: return
+                if (playbackStreamSongId(song.uri) == null) return
+                if (streamRefreshGaveUpSongId == song.id) return
+                when (streamRecoveryStep(faultOf(error), alreadyRefreshed = streamRetrySongId == song.id)) {
+                    StreamRecoveryStep.REFRESH_URL -> {
+                        streamRetrySongId = song.id
+                        android.util.Log.i(
+                            "ExoPlayerManager",
+                            "Refreshing stream URL for ${song.id} at ${player.currentPosition}ms",
+                        )
+                        resumeStreamAfterRefresh()
+                    }
+                    StreamRecoveryStep.SKIP_ABSENT -> {
+                        clearStreamRecovery()
+                        if (player.hasNextMediaItem()) {
+                            player.seekToNext()
+                            player.prepare()
+                            player.playWhenReady = true
+                        } else {
+                            player.playWhenReady = false
+                        }
+                    }
+                    StreamRecoveryStep.HOLD_FOR_PREMIUM -> {
+                        // Resolver already asked for the Premium snackbar. Keep the queue.
+                        streamRefreshGaveUpSongId = song.id
+                        player.playWhenReady = false
+                    }
+                    StreamRecoveryStep.SURFACE_FAILURE -> {
+                        streamRefreshGaveUpSongId = song.id
+                        player.playWhenReady = false
+                        _streamRefreshFailures.tryEmit(STREAM_REFRESH_FAILED_MESSAGE)
+                    }
+                    StreamRecoveryStep.IGNORE -> Unit
                 }
             }
         })
@@ -616,28 +702,11 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
     
     /**
-     * Local MediaItem builder.
-     *
-     * R2 cost rule 2: do **not** set signed R2 URLs as the
-     * playback URI. Media3 issues HTTP Range requests by default, which would
-     * Class-B spam GetObject. Download whole-object via BackupRepository first.
+     * Local file, or `groove-playback://` which [PlaybackStreamResolver] turns
+     * into `stream_url` on open. Range GET on that playback URL is allowed.
+     * Backup restore still must not Range-GET R2.
      */
     private fun buildMediaItem(uri: Uri): MediaItem {
-        val scheme = uri.scheme?.lowercase()
-        if (scheme == "http" || scheme == "https") {
-            val host = uri.host.orEmpty().lowercase()
-            val q = uri.query.orEmpty()
-            val looksLikeR2 = "r2.cloudflarestorage" in host ||
-                "X-Amz-Algorithm" in q ||
-                "X-Amz-Signature" in q
-            if (looksLikeR2) {
-                throw IllegalArgumentException(
-                    "R2 cost rule: ExoPlayer must not stream signed R2 URLs " +
-                        "(Range GET spam). Download the whole object locally first.",
-                )
-            }
-        }
-
         val mimeType = if (uri.scheme == "content") {
             try {
                 ctx.contentResolver.getType(uri)
@@ -663,17 +732,116 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _duration.value = song.durationMs
     }
 
+    override fun observePremiumStreamRequired(): Flow<Unit> = premiumStreamSignals.events
+
+    override fun observeStreamRefreshFailure(): Flow<String> = _streamRefreshFailures.asSharedFlow()
+
+    private fun clearStreamRecovery() {
+        streamRetrySongId = null
+        streamRefreshGaveUpSongId = null
+    }
+
+    private fun faultOf(error: PlaybackException): StreamPlaybackFault {
+        val messages = ArrayList<String>()
+        var http: Int? = null
+        generateSequence<Throwable>(error) { it.cause }.forEach { throwable ->
+            throwable.message?.let { messages += it }
+            if (http == null && throwable is HttpDataSource.InvalidResponseCodeException) {
+                http = throwable.responseCode
+            }
+        }
+        val io = error.errorCode in
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED..PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+        return StreamPlaybackFault(
+            httpStatus = http,
+            detail = messages.joinToString(" "),
+            ioFailure = io,
+        )
+    }
+
+    /**
+     * Re-open the current item so [PlaybackStreamResolver] mints a new stream URL.
+     * The queue, the position, and the signed-in session stay.
+     */
+    private fun resumeStreamAfterRefresh() {
+        val index = player.currentMediaItemIndex.coerceAtLeast(0)
+        val position = player.currentPosition.coerceAtLeast(0L)
+        player.seekTo(index, position)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    /**
+     * Download a short prefix of the next cloud item. Local files are skipped.
+     * One track at a time, capped by [STREAM_PREFETCH_MAX_BYTES].
+     */
+    private fun scheduleNextCloudPrefetch() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            scope.launch(Dispatchers.Main.immediate) { scheduleNextCloudPrefetch() }
+            return
+        }
+        val uris = _queue.value.map { it.uri }
+        val index = player.currentMediaItemIndex
+        val next = nextCloudStreamUri(uris, index, _repeat.value)
+        if (next == null) {
+            prefetchJob?.cancel()
+            streamPlaybackCache.cancelPrefetch()
+            prefetchUri = null
+            return
+        }
+        if (next == prefetchUri && prefetchJob?.isActive == true) return
+        prefetchJob?.cancel()
+        streamPlaybackCache.cancelPrefetch()
+        prefetchUri = next
+        prefetchJob = scope.launch(Dispatchers.IO) {
+            val job = coroutineContext[Job]
+            streamPlaybackCache.prefetchPrefix(next, STREAM_PREFETCH_MAX_BYTES) {
+                job?.isActive != false
+            }
+        }
+    }
+
+    private fun notePremiumGate(resolved: ResolvedQueue) {
+        if (resolved.premiumStreamBlocked) premiumStreamSignals.notifyRequired()
+    }
+
+    private fun notePremiumGate(resolved: ResolvedPlayback) {
+        if (resolved is ResolvedPlayback.Dropped && resolved.reason == PlaybackDropReason.NOT_ENTITLED) {
+            premiumStreamSignals.notifyRequired()
+        }
+    }
+
     override suspend fun setQueue(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
-        if (_shuffle.value && songs.size > 1) {
+        // Resolve before any MediaItem is opened: local, entitled stream ticket, or purge on 404.
+        val resolved = try {
+            resolvePlaybackSource.resolveQueue(songs, startIndex)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("ExoPlayerManager", "Playback resolve failed; keeping the local queue", e)
+            ResolvedQueue(
+                songs = songs,
+                startIndex = startIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0)),
+            )
+        }
+        notePremiumGate(resolved)
+        val playable = resolved.songs
+        val resolvedStart = resolved.startIndex
+        if (playable.isEmpty()) {
+            preShuffleOrder = null
+            setQueueInternal(emptyList(), 0, isEndlessQueue = false, autoPlay = false)
+            return
+        }
+        if (_shuffle.value && playable.size > 1) {
             // Shuffle is on: the chosen song plays first, the rest follow in a shuffled (real) order.
-            val start = startIndex.coerceIn(0, songs.lastIndex)
-            val chosen = songs[start]
-            val rest = songs.filterIndexed { i, _ -> i != start }.shuffled()
-            preShuffleOrder = songs.toMutableList()
+            val start = resolvedStart.coerceIn(0, playable.lastIndex)
+            val chosen = playable[start]
+            val rest = playable.filterIndexed { i, _ -> i != start }.shuffled()
+            preShuffleOrder = playable.toMutableList()
             return setQueueInternal(listOf(chosen) + rest, 0, isEndlessQueue, autoPlay)
         }
-        preShuffleOrder = if (_shuffle.value) songs.toMutableList() else null
-        setQueueInternal(songs, startIndex, isEndlessQueue, autoPlay)
+        preShuffleOrder = if (_shuffle.value) playable.toMutableList() else null
+        setQueueInternal(playable, resolvedStart, isEndlessQueue, autoPlay)
     }
 
     private suspend fun setQueueInternal(songs: List<Song>, startIndex: Int, isEndlessQueue: Boolean, autoPlay: Boolean) {
@@ -731,6 +899,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 android.util.Log.e("ExoPlayerManager", "Error saving player state: ${e.message}", e)
             }
         }
+        scheduleNextCloudPrefetch()
     }
 
     override suspend fun skipToQueueIndex(index: Int) {
@@ -762,6 +931,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _queue.value = newQueue
         preShuffleOrder?.let { orig -> placeAfterPredecessor(orig, newQueue, to) }
         persistQueueState()
+        scheduleNextCloudPrefetch()
     }
 
     override suspend fun removeQueueItem(index: Int): Boolean {
@@ -779,22 +949,27 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             if (i >= 0) orig.removeAt(i)
         }
         persistQueueState()
+        scheduleNextCloudPrefetch()
         return true
     }
 
     override suspend fun insertQueueItem(index: Int, song: Song) {
+        val resolved = resolvePlaybackSource.resolveOne(song)
+        notePremiumGate(resolved)
+        val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
         val q = _queue.value
         val at = index.coerceIn(0, q.size)
         val inserted = withContext(Dispatchers.Main.immediate) {
             if (at > player.mediaItemCount) return@withContext false
-            player.addMediaItem(at, buildMediaItem(song.uri.toUri()))
+            player.addMediaItem(at, buildMediaItem(playable.uri.toUri()))
             true
         }
         if (!inserted) return
-        val newQueue = q.toMutableList().apply { add(at, song) }
+        val newQueue = q.toMutableList().apply { add(at, playable) }
         _queue.value = newQueue
         preShuffleOrder?.let { orig -> placeAfterPredecessor(orig, newQueue, at) }
         persistQueueState()
+        scheduleNextCloudPrefetch()
     }
 
 
@@ -890,6 +1065,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         _position.value = position
         _duration.value = orig[origIndex].durationMs
         persistQueueState()
+        scheduleNextCloudPrefetch()
     }
 
     /** Swap the items after the current one without interrupting playback. */
@@ -909,6 +1085,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         } ?: return
         _queue.value = newQueue
         persistQueueState()
+        scheduleNextCloudPrefetch()
     }
 
     private fun persistQueueState() {
@@ -968,7 +1145,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
         
         // Pick 10 random songs
-        val randomSongs = songsToPickFrom.shuffled().take(10)
+        val randomSongs = songsToPickFrom.shuffled().take(10).mapNotNull { song ->
+            val resolved = resolvePlaybackSource.resolveOne(song)
+            notePremiumGate(resolved)
+            (resolved as? ResolvedPlayback.Playable)?.song
+        }
+        if (randomSongs.isEmpty()) return
         
         // Add to queue
         val newQueue = currentQueue + randomSongs
@@ -983,15 +1165,22 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         }
         
         android.util.Log.d("ExoPlayerManager", "Extended queue with ${randomSongs.size} songs. Total queue: ${newQueue.size}")
+        scheduleNextCloudPrefetch()
     }
 
     override suspend fun play() {
+        clearStreamRecovery()
         withContext(Dispatchers.Main.immediate) {
             // If the song has finished (reached the end), seek to the beginning
             val duration = player.duration
             val currentPosition = player.currentPosition
             if (duration > 0 && currentPosition >= duration - 100) { // 100ms threshold to account for timing differences
                 player.seekTo(0)
+            }
+            // An expired stream leaves the player idle. Prepare again so play
+            // re-opens the item and can mint a fresh URL.
+            if (player.playbackState == Player.STATE_IDLE && player.mediaItemCount > 0) {
+                player.prepare()
             }
             player.playWhenReady = true
             player.play()
@@ -1006,7 +1195,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun playSong(song: Song) {
-        prepareFromSong(song)
+        val resolved = resolvePlaybackSource.resolveOne(song)
+        notePremiumGate(resolved)
+        val playable = (resolved as? ResolvedPlayback.Playable)?.song ?: return
+        prepareFromSong(playable)
         withContext(Dispatchers.Main.immediate) {
             player.playWhenReady = true
             player.play()
@@ -1098,6 +1290,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun seekTo(positionMs: Long) {
+        clearStreamRecovery()
         withContext(Dispatchers.Main.immediate) {
             player.seekTo(positionMs.coerceAtLeast(0L))
             _position.value = player.currentPosition
@@ -1133,6 +1326,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         withContext(Dispatchers.IO) {
             userRepository.updateRepeatAndShuffle(_shuffle.value, _repeat.value.name)
         }
+        scheduleNextCloudPrefetch()
     }
 
     override suspend fun setVolume(volume: Float) {

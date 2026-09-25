@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +47,9 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
+import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptDialog
+import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptViewModel
+import com.aethelsoft.grooveplayer.presentation.backup.RestoreLaunchViewModel
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
 import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
@@ -82,6 +89,7 @@ private sealed interface BottomBarState {
             currentRoute?.startsWith("share_confirmation") == true -> None
             currentRoute?.startsWith("nearby_discovery") == true -> None
             currentRoute == AppRoutes.TRANSFER_PROGRESS -> None
+            currentRoute?.startsWith("restore_apply") == true -> None
             // Screens that set secondary content (e.g. SongsScreen selection mode)
             hasSecondaryContent -> Confirmation
             // Show mini player when playing and not in full-screen
@@ -164,15 +172,37 @@ fun GroovePlayerAppMain() {
     // Access activity-scoped PlayerViewModel from CompositionLocal
     val playerViewModel = LocalPlayerViewModel.current!!
     val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(Unit) {
+        playerViewModel.premiumStreamRequired.collect {
+            val result = snackbarHostState.showSnackbar(
+                message = "Cloud streaming is part of Premium.",
+                actionLabel = "Upgrade",
+                duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                navController.navigate(AppRoutes.PROFILE)
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        playerViewModel.streamRefreshFailure.collect { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
     val adsViewModel: AdsViewModel = hiltViewModel()
     val activity = LocalActivity.current
     LaunchedEffect(Unit) {
         // Delay so first frame / permissions settle; never blocks Sign-In.
+        // Then wait until privilege is confirmed. The post-restore restart used to
+        // fire this while /v1/me was still in flight and the missing user looked Free.
         delay(1800)
-        val act = activity as? android.app.Activity
-        if (act != null) {
-            StartupInterstitialHelper.maybeShow(act, adsViewModel)
-        }
+        val act = activity ?: return@LaunchedEffect
+        if (!adsViewModel.awaitCanShowStartupAd()) return@LaunchedEffect
+        StartupInterstitialHelper.maybeShow(act, adsViewModel)
     }
     val currentSong by playerViewModel.currentSong.collectAsState()
     val isFullScreenPlayerOpened by playerViewModel.isFullScreenPlayerOpened.collectAsState()
@@ -342,6 +372,7 @@ fun GroovePlayerAppMain() {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             containerColor = GrooveTheme.colors.canvas,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { innerPadding ->
             Box(
                 modifier = Modifier
@@ -352,7 +383,33 @@ fun GroovePlayerAppMain() {
                         bottom = 0.dp
                     )
             ) {
-                AppNavHost(navController = navController)
+                val restoreLaunch: RestoreLaunchViewModel = hiltViewModel()
+                val loginRestorePrompt: LoginRestorePromptViewModel = hiltViewModel()
+                val showLoginRestorePrompt by loginRestorePrompt.visible.collectAsState()
+                AppNavHost(
+                    navController = navController,
+                    startDestination = if (restoreLaunch.startOnApplyScreen) {
+                        AppRoutes.restoreApplyRoute(startDownload = restoreLaunch.resumeDownload)
+                    } else {
+                        AppRoutes.HOME
+                    },
+                    onBackupRestoreVisible = loginRestorePrompt::onBackupRestoreVisible,
+                    onManualRestoreOpened = loginRestorePrompt::onManualRestoreOpened,
+                )
+                if (showLoginRestorePrompt) {
+                    LoginRestorePromptDialog(
+                        onKeepCurrent = loginRestorePrompt::keepCurrentData,
+                        onRestore = {
+                            if (loginRestorePrompt.confirmRestore()) {
+                                navController.navigate(
+                                    AppRoutes.restoreApplyRoute(startDownload = true),
+                                ) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        },
+                    )
+                }
                 val bottomBarState = BottomBarState.resolve(
                     currentRoute = currentRoute,
                     hasSecondaryContent = secondaryBottomContent.value != null,

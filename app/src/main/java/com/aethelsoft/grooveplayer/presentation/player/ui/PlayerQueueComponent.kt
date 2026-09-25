@@ -286,6 +286,13 @@ private fun SideQueueRow(
                 )
                 Spacer(modifier = Modifier.height(S_PADDING))
             }
+            val availability = com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark(song)
+            if (availability != null) {
+                com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge(
+                    mark = availability,
+                    iconSize = 16.dp,
+                )
+            }
             MediaArtwork(
                 url = song.artworkUrl,
                 kind = MediaArtworkKind.SONG,

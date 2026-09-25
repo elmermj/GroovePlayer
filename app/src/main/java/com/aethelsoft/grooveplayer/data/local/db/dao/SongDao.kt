@@ -26,6 +26,19 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE songId = :songId")
     suspend fun getSong(songId: String): SongEntity?
 
+    @Query("SELECT songId FROM songs WHERE songId = :songId LIMIT 1")
+    suspend fun findSongId(songId: String): String?
+
+    @Query("SELECT sourcePath FROM songs WHERE songId = :songId")
+    suspend fun getSourcePath(songId: String): String?
+
+    @Query("UPDATE songs SET sourcePath = :sourcePath WHERE songId = :songId")
+    suspend fun updateSourcePath(songId: String, sourcePath: String)
+
+    /** Rows whose stored path matched. Callers delete the old file only when this is > 0. */
+    @Query("UPDATE songs SET sourcePath = :newPath WHERE sourcePath = :oldPath")
+    suspend fun retargetSourcePath(oldPath: String, newPath: String): Int
+
     @Query("DELETE FROM songs WHERE songId IN (:songIds)")
     suspend fun deleteBySongIds(songIds: List<String>)
 }

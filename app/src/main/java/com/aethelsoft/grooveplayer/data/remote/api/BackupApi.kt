@@ -2,6 +2,8 @@ package com.aethelsoft.grooveplayer.data.remote.api
 
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteResponseDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseRequestDto
+import com.aethelsoft.grooveplayer.data.remote.dto.BackupLeaseResponseDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDeleteResponseDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupDownloadUrlResponseDto
@@ -54,4 +56,28 @@ interface BackupApi {
 
     @POST("/v1/backup/trim")
     suspend fun trimBackup(@Body body: BackupTrimRequestDto): BackupTrimResponseDto
+
+    /**
+     * Cross-device backup lease (SCRUM-73). TTL 600s. Heartbeat about every 120s.
+     *
+     * - POST /v1/backup/lease — `{ device_id, device_label? }`.
+     *   200 `{ lease_id, device_id, expires_at, expires_in_sec, ttl_sec, heartbeat_interval_sec, refreshed }`.
+     *   Same device_id refreshes and keeps lease_id. 409 code OTHER_DEVICE_BACKUP.
+     *   403 when storage is read-only.
+     * - POST /v1/backup/lease/heartbeat — `{ device_id, lease_id }`. 200 extends TTL. 404 LEASE_NOT_FOUND.
+     * - POST /v1/backup/lease/release — `{ device_id, lease_id }`. 200 `{ released: true|false }`.
+     * - GET /v1/backup/lease?device_id= — `{ active, held_by_this_device, other_device_active }`
+     *   and code OTHER_DEVICE_BACKUP when another device holds the lease.
+     */
+    @GET("/v1/backup/lease")
+    suspend fun getLease(@Query("device_id") deviceId: String): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease")
+    suspend fun acquireLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease/heartbeat")
+    suspend fun heartbeatLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
+
+    @POST("/v1/backup/lease/release")
+    suspend fun releaseLease(@Body body: BackupLeaseRequestDto): Response<BackupLeaseResponseDto>
 }

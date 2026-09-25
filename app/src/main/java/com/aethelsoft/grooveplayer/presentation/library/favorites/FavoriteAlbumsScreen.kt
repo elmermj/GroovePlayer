@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aethelsoft.grooveplayer.domain.model.likedTrackLabel
 import com.aethelsoft.grooveplayer.domain.model.makeAlbumId
 import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
@@ -54,7 +55,7 @@ fun FavoriteAlbumsScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("No favorite albums yet")
+                GrooveMutedText("Like a song to see its album here")
             }
         } else {
             LazyColumn(
@@ -97,7 +98,7 @@ fun FavoriteAlbumsScreen(
                                 )
                                 GrooveTinySpacer()
                                 GrooveMutedText(
-                                    text = "${album.artist} • ${album.playCount} plays",
+                                    text = "${album.artist} • ${likedTrackLabel(album.playCount)}",
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                             }

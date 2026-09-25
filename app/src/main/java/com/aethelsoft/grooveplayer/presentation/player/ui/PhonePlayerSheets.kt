@@ -480,6 +480,13 @@ private fun QueueSongRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        val availability = com.aethelsoft.grooveplayer.presentation.common.rememberSongAvailabilityMark(song)
+        if (availability != null) {
+            com.aethelsoft.grooveplayer.presentation.common.SongAvailabilityBadge(
+                mark = availability,
+                iconSize = 16.dp,
+            )
+        }
         if (handle != null) {
             Box(
                 modifier = handle

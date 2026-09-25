@@ -6,6 +6,8 @@ import com.google.android.gms.nearby.connection.Payload
 import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import java.nio.ByteOrder
+import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
+import com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySongs
 import com.aethelsoft.grooveplayer.domain.model.transfer.TransferStatus
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.RefreshMusicCatalogUseCase
@@ -36,7 +38,7 @@ class NearbyTransferOrchestrator @Inject constructor(
     private val fileChunkReceiver: FileChunkReceiver,
     private val transferController: TransferController,
     private val notificationBridge: TransferNotificationBridge,
-    private val receivedMediaPublisher: ReceivedMediaPublisher,
+    private val grooveDownloads: GrooveDownloadsLocator,
     private val refreshMusicCatalogUseCase: RefreshMusicCatalogUseCase,
 ) {
     private val tag = logShareNearbyP2PTag(context)
@@ -320,8 +322,8 @@ class NearbyTransferOrchestrator @Inject constructor(
      * PayloadCallback for the receiver (discoverer). Must accept connection and receive chunks.
      */
     fun createReceiverPayloadCallback(context: android.content.Context, transferId: Long): PayloadCallback {
-        // Stage into app-private dir during chunked writes, then publish to Music/Groove Downloads.
-        val receiveDir = getGrooveDownloadsStagingDir(context)
+        // Chunks land in a private staging dir, then move into groove-library on complete.
+        val receiveDir = incomingDir()
         receiverFiles = null
         receiverDeviceName = "Sender"
         receiverTotalBytes = 0L
@@ -336,7 +338,7 @@ class NearbyTransferOrchestrator @Inject constructor(
         val payloadPipeline = Channel<Payload>(Channel.UNLIMITED)
         scope.launch {
             for (payload in payloadPipeline) {
-                handleReceiverPayloadReceived(context, transferId, payload, receiveDir)
+                handleReceiverPayloadReceived(transferId, payload, receiveDir)
                 val type = payload.asBytes()?.firstOrNull()?.toInt()?.and(0xFF)
                 if (type == TransferProtocol.MSG_COMPLETE || type == TransferProtocol.MSG_CANCEL) break
             }
@@ -358,7 +360,6 @@ class NearbyTransferOrchestrator @Inject constructor(
     }
 
     private suspend fun handleReceiverPayloadReceived(
-        ctx: android.content.Context,
         transferId: Long,
         payload: Payload,
         receiveDir: java.io.File,
@@ -500,7 +501,7 @@ class NearbyTransferOrchestrator @Inject constructor(
                     }
                     val finalTransfer = transferRepository.getTransferWithFiles(transferId)
                     // Mark terminal immediately so the notification leaves "Transferring 99%"
-                    // before MediaStore publish / catalog refresh (can take seconds).
+                    // before the files move into the private library.
                     notificationBridge.updateState(
                         TransferServiceState.Transferring(
                             deviceName = finalTransfer?.deviceName ?: "Sender",
@@ -514,32 +515,33 @@ class NearbyTransferOrchestrator @Inject constructor(
                     transferRepository.completeTransfer(transferId, TransferStatus.COMPLETED.name)
 
                     if (finalTransfer != null) {
-                        // App-private paths are invisible to MediaStore/MediaScanner (scan → null URI).
-                        // Publish into public Music/Groove Downloads so Files + library can see them.
-                        var published = 0
+                        val libraryRoot = grooveDownloads.directory()
+                        var stored = 0
                         finalTransfer.files.forEach { fileEntity ->
                             val staged = java.io.File(fileEntity.filePath)
-                            val uri = receivedMediaPublisher.publishToMusicDownloads(
-                                context = ctx,
-                                sourceFile = staged,
-                                displayName = fileEntity.fileName,
-                            )
-                            if (uri != null) {
-                                published++
-                                if (!staged.delete()) {
-                                    Log.w(tag, "Receiver: could not delete staging file ${staged.absolutePath}")
-                                }
+                            if (fileEntity.fileSize > 0L && staged.length() != fileEntity.fileSize) {
+                                Log.e(
+                                    tag,
+                                    "Receiver: incomplete ${fileEntity.fileName} " +
+                                        "(${staged.length()}/${fileEntity.fileSize}); removed staging file",
+                                )
+                                staged.delete()
+                                return@forEach
+                            }
+                            val dest = PrivateLibrarySongs.destination(libraryRoot, fileEntity.fileName)
+                            if (PrivateLibrarySongs.promote(staged, dest)) {
+                                stored++
                             } else {
                                 Log.e(
                                     tag,
-                                    "Receiver: failed to publish ${fileEntity.fileName}; " +
-                                        "left at ${staged.absolutePath} (not visible in library)"
+                                    "Receiver: could not store ${fileEntity.fileName} in the app library",
                                 )
+                                staged.delete()
                             }
                         }
                         Log.d(
                             tag,
-                            "Receiver: published $published/${finalTransfer.files.size} files to Music/Groove Downloads"
+                            "Receiver: stored $stored/${finalTransfer.files.size} files in ${libraryRoot.absolutePath}",
                         )
                         try {
                             refreshMusicCatalogUseCase()
@@ -547,6 +549,12 @@ class NearbyTransferOrchestrator @Inject constructor(
                         } catch (e: Exception) {
                             Log.e(tag, "Receiver: catalog refresh failed after transferId=$transferId", e)
                         }
+                    }
+                }
+                TransferProtocol.MSG_CANCEL -> {
+                    Log.d(tag, "Receiver: MSG_CANCEL transferId=$transferId")
+                    receiveDir.listFiles()?.forEach { child ->
+                        if (child.isFile) child.delete()
                     }
                 }
                 else -> Log.w(tag, "Receiver: unknown message type=$type transferId=$transferId")
@@ -593,14 +601,11 @@ class NearbyTransferOrchestrator @Inject constructor(
     }
 
     /**
-     * App-private staging directory for in-progress chunk writes.
-     * Final media is published to MediaStore `Music/Groove Downloads` on MSG_COMPLETE —
-     * app-private paths are not MediaStore-visible (MediaScanner returns null).
+     * In-progress chunks stay under the private library's incoming dir.
+     * MSG_COMPLETE moves finished files into the library root. Shared Music is not used.
      */
-    private fun getGrooveDownloadsStagingDir(context: android.content.Context): java.io.File {
-        val externalBase = context.getExternalFilesDir(null)
-        val baseDir = externalBase ?: context.filesDir
-        return java.io.File(baseDir, "Groove Downloads staging").apply { mkdirs() }
+    private fun incomingDir(): java.io.File {
+        return java.io.File(grooveDownloads.directory(), PrivateLibrarySongs.INCOMING_DIR).apply { mkdirs() }
     }
 
     fun cleanup() {

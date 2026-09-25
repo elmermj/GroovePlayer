@@ -22,5 +22,14 @@ interface ArtistDao {
     
     @Query("SELECT DISTINCT artist FROM playback_history WHERE artist LIKE :query || '%' ORDER BY artist ASC")
     suspend fun searchArtistsFromHistory(query: String): List<String>
+
+    @Query(
+        """
+        DELETE FROM artists
+        WHERE artistId NOT IN (SELECT artistId FROM song_artists)
+          AND artistId NOT IN (SELECT artistId FROM album_artists)
+        """
+    )
+    suspend fun deleteWithoutLinks()
 }
 

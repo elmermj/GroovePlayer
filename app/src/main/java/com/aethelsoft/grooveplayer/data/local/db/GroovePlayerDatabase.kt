@@ -26,6 +26,7 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.TransferEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.TransferFileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongGenreCrossRef
+import com.aethelsoft.grooveplayer.data.local.db.entity.SongLikeEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.SongMetadataEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserProfileEntity
 import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
@@ -46,10 +47,11 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.UserSettingsEntity
         SearchHistoryEntity::class,
         TransferEntity::class,
         TransferFileEntity::class,
+        SongLikeEntity::class,
         PlaylistEntity::class,
         PlaylistTrackEntity::class,
     ],
-    version = 16,
+    version = 18,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -58,7 +60,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
         /** Room SQLite file name under Context.getDatabasePath. */
         const val DATABASE_NAME = "grooveplayer_database"
         /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
-        const val SCHEMA_VERSION = 16
+        const val SCHEMA_VERSION = 18
     }
 
     abstract fun playbackHistoryDao(): PlaybackHistoryDao
@@ -72,6 +74,7 @@ abstract class GroovePlayerDatabase : RoomDatabase() {
     abstract fun searchHistoryDao(): SearchHistoryDao
     abstract fun transferDao(): TransferDao
     abstract fun transferFileDao(): TransferFileDao
+    abstract fun songLikeDao(): com.aethelsoft.grooveplayer.data.local.db.dao.SongLikeDao
     abstract fun playlistDao(): PlaylistDao
 }
 

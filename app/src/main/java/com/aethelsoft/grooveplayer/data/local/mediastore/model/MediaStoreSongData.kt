@@ -14,4 +14,5 @@ data class MediaStoreSongData(
     val artworkUrl: String? = null,
     val album: String? = null,
     val filePath: String? = null,
+    val fileSizeBytes: Long? = null,
 )
