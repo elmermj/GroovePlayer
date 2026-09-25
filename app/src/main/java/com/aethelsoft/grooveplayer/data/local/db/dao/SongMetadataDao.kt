@@ -27,5 +27,11 @@ interface SongMetadataDao {
 
     @Query("DELETE FROM song_metadata")
     suspend fun deleteAll()
+
+    @Query("SELECT songId FROM song_metadata")
+    suspend fun allSongIds(): List<String>
+
+    @Query("UPDATE song_metadata SET songId = :toId WHERE songId = :fromId")
+    suspend fun retargetSongId(fromId: String, toId: String)
 }
 

@@ -16,6 +16,8 @@ import com.aethelsoft.grooveplayer.domain.usecase.player_category.PreviousSongUs
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.QueueUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.EditQueueUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SeekUseCase
+import com.aethelsoft.grooveplayer.domain.playback.continueListeningIndex
+import com.aethelsoft.grooveplayer.domain.playback.restorePlaybackById
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.GetSongsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetMuteUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.player_category.SetVolumeUseCase
@@ -131,10 +133,10 @@ class PlayerViewModel @Inject constructor(
 
     fun setQueueFromLastPlayedSongs(songs: List<Song>, startSongId: String) = viewModelScope.launch {
         val shuffledSongs = songs.shuffled()
-        val startIndex = shuffledSongs.indexOfFirst { it.id == startSongId }
+        val startIndex = continueListeningIndex(shuffledSongs, startSongId) ?: return@launch
         queueUseCase(
             songs = shuffledSongs,
-            startIndex = if (startIndex >= 0) startIndex else 0,
+            startIndex = startIndex,
             isEndlessQueue = true
         )
     }
@@ -184,25 +186,26 @@ class PlayerViewModel @Inject constructor(
             val settings = userRepository.getUserSettings()
             if (settings.lastPlayedSongId != null && settings.lastPlayedPosition > 0) {
                 val allSongs = getSongsUseCase()
-                
-                // Restore queue if available
-                val queueSongs = if (settings.queueSongIds.isNotEmpty()) {
-                    settings.queueSongIds.mapNotNull { songId ->
-                        allSongs.find { it.id == songId }
-                    }
+                val savedIds = if (settings.queueSongIds.isNotEmpty()) {
+                    settings.queueSongIds
                 } else {
-                    // Fallback to just the last played song
-                    val lastPlayedSong = allSongs.find { it.id == settings.lastPlayedSongId }
-                    if (lastPlayedSong != null) listOf(lastPlayedSong) else emptyList()
+                    listOfNotNull(settings.lastPlayedSongId)
                 }
-                
-                if (queueSongs.isNotEmpty()) {
-                    // Restore queue without auto-playing (awaited so the shuffle flag below applies to this queue)
+                val restored = restorePlaybackById(
+                    savedIds = savedIds,
+                    savedStartIndex = if (settings.queueSongIds.isNotEmpty()) {
+                        settings.queueStartIndex
+                    } else {
+                        0
+                    },
+                    available = allSongs,
+                )
+                if (restored != null) {
                     queueUseCase(
-                        songs = queueSongs,
-                        startIndex = settings.queueStartIndex.coerceIn(0, queueSongs.lastIndex),
+                        songs = restored.songs,
+                        startIndex = restored.startIndex,
                         isEndlessQueue = settings.isEndlessQueue,
-                        autoPlay = false // Don't auto-play on restore
+                        autoPlay = false
                     )
                     
                     // Restore shuffle and repeat. The saved queue is already in real playback order,

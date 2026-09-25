@@ -825,6 +825,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             )
         }
         notePremiumGate(resolved)
+        if (resolved.keepExistingQueue) return
         val playable = resolved.songs
         val resolvedStart = resolved.startIndex
         if (playable.isEmpty()) {

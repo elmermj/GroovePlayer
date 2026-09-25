@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.aethelsoft.grooveplayer.domain.model.Song
@@ -48,12 +49,12 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.LocalBottomBarSecondaryContent
 import com.aethelsoft.grooveplayer.presentation.common.rememberNavigationActions
 import com.aethelsoft.grooveplayer.presentation.library.songs.layouts.LargeTabletSongsLayout
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
 import com.aethelsoft.grooveplayer.presentation.library.songs.layouts.PhoneSongsLayout
 import com.aethelsoft.grooveplayer.presentation.library.songs.layouts.TabletSongsLayout
 import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
-import com.aethelsoft.grooveplayer.utils.rememberAudioPermissionState
 import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
 import com.aethelsoft.grooveplayer.utils.theme.icons.XNFC
@@ -69,8 +70,8 @@ fun SongsScreen(
     viewModel: SongsViewModel = hiltViewModel()
 ) {
 
-    val (hasPermission, requestPermission) = rememberAudioPermissionState()
     val songsPagingItems: LazyPagingItems<Song> = viewModel.songsPagingFlow.collectAsLazyPagingItems()
+    val import = LocalLibraryImport.current
     val deviceType = rememberDeviceType()
     val selectedSongForEdit by viewModel.selectedSongForEdit.collectAsState()
     val isSelectionMode by viewModel.isSelectionMode.collectAsState()
@@ -132,6 +133,9 @@ fun SongsScreen(
         contentPadding = PaddingValues.Zero,
         actions = {
             if (!isSelectionMode) {
+                TextButton(onClick = import.pickFolder) {
+                    Text(text = "Import", color = SoftWhite)
+                }
                 TextButton(onClick = { viewModel.enterSelectionMode() }) {
                     Text(text = "Select", color = SoftWhite)
                 }
@@ -140,37 +144,7 @@ fun SongsScreen(
     ) {
         val layoutPadding = PaddingValues.Zero
         val horizontalPadding = M_PADDING
-        if (!hasPermission) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = "Permission Required",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        modifier = Modifier.padding(bottom = S_PADDING),
-                    )
-                    GrooveMutedText(
-                        text = "We need access to your music files",
-                        modifier = Modifier.padding(bottom = M_PADDING),
-                    )
-                    Button(
-                        onClick = requestPermission,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = SoftWhite,
-                            contentColor = Color.Black,
-                        ),
-                    ) {
-                        Text("Grant Permission")
-                    }
-                }
-            }
-        } else {
+        Box(modifier = Modifier.fillMaxSize()) {
             when (deviceType) {
                 DeviceType.PHONE -> {
                     PhoneSongsLayout(
@@ -210,6 +184,36 @@ fun SongsScreen(
                         onToggleSelection = { viewModel.toggleSelection(it) },
                         bottomPaddingForSelectionBar = SelectionBottomBarHeight
                     )
+                }
+            }
+            val refresh = songsPagingItems.loadState.refresh
+            if (refresh is LoadState.NotLoading && songsPagingItems.itemCount == 0) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(M_PADDING),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        text = "Your library is empty",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = S_PADDING),
+                    )
+                    GrooveMutedText(
+                        text = "Import a folder to copy songs into GroovePlayer",
+                        modifier = Modifier.padding(bottom = M_PADDING),
+                    )
+                    Button(
+                        onClick = import.pickFolder,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SoftWhite,
+                            contentColor = Color.Black,
+                        ),
+                    ) {
+                        Text("Import folder")
+                    }
                 }
             }
         }

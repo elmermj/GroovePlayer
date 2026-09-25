@@ -126,24 +126,18 @@ fun isDryRunPlaybackUrl(url: String?): Boolean {
 
 /**
  * Maps a resolved queue back onto the caller's start index.
- * The tapped song stays the start when it survived. Otherwise the next surviving
- * song after it plays; if none remain after it, playback starts at the first survivor.
+ * The tapped song stays the start when it survived. If it did not, returns -1
+ * so playback does not fall through to a different track.
  */
 fun adjustedQueueStartIndex(
     originalIds: List<String>,
     startIndex: Int,
     playableIds: List<String>,
 ): Int {
-    if (playableIds.isEmpty() || originalIds.isEmpty()) return 0
+    if (playableIds.isEmpty() || originalIds.isEmpty()) return -1
     val start = startIndex.coerceIn(0, originalIds.lastIndex)
     val tapped = originalIds[start]
-    val direct = playableIds.indexOf(tapped)
-    if (direct >= 0) return direct
-    for (i in (start + 1) until originalIds.size) {
-        val idx = playableIds.indexOf(originalIds[i])
-        if (idx >= 0) return idx
-    }
-    return 0
+    return playableIds.indexOf(tapped)
 }
 
 /**

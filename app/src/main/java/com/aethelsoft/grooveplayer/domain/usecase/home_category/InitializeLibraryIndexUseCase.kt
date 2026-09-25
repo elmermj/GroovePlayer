@@ -101,7 +101,8 @@ class InitializeLibraryIndexUseCase @Inject constructor(
             }
 
             // Ensure SongEntity + song-artist links
-            val existingPath = songDao.getSourcePath(song.id)
+            val existing = songDao.getSong(song.id)
+            val existingPath = existing?.sourcePath
             val songEntity = SongEntity(
                 songId = song.id,
                 albumId = albumId,
@@ -110,6 +111,8 @@ class InitializeLibraryIndexUseCase @Inject constructor(
                 trackNumber = null,
                 durationMs = song.durationMs,
                 sourcePath = if (keepsAppLibraryFile(existingPath)) existingPath else song.filePath,
+                contentHash = existing?.contentHash,
+                inPrivateLibrary = true,
             )
             songDao.insertOrUpdate(songEntity)
 

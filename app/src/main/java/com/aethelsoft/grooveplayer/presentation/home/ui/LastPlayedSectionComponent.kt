@@ -11,19 +11,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.LocalNavigation
 import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.library.importing.LocalLibraryImport
+import com.aethelsoft.grooveplayer.presentation.library.importing.rememberTrackPresence
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelsoft.grooveplayer.utils.theme.ui.HighlightPrimary
 
 @Composable
 fun LastPlayedSectionComponent(
@@ -89,43 +95,56 @@ fun LastPlayedSectionComponent(
             ) {
                 items(maxEightSongsList.size) { index ->
                     val song = maxEightSongsList[index]
+                    val presence = rememberTrackPresence(song)
+                    val import = LocalLibraryImport.current
                     val singleArtworkUrl: List<String> = listOf(song.artworkUrl ?: "")
-                    LibraryCardComponent(
+                    Box(
                         modifier = Modifier
                             .width(tileWidth)
-                            .height(tileHeight),
-                        square = tile.square,
-                        titleMaxLines = tile.titleMaxLines,
-                        subtitleMaxLines = tile.subtitleMaxLines,
-                        title = song.title,
-                        subtitle = song.artist,
-                        artworks = singleArtworkUrl,
-                        onClick = {
-                            // Scenario 1: No song is currently playing
-                            if(currentSong == null){
-                                playerViewModel?.setQueueFromLastPlayedSongs(
-                                    songs = allLibrarySongs,  // Use all songs for endless queue
-                                    startSongId = song.id,
-                                )
-                            } else if(song.id == currentSong.id) {
-                                // Scenario 2 & 3: The clicked song is the same as the current one
-                                if (isPlaying == true) {
-                                    // Scenario 3: If playing, open the full player screen
-                                    navigation.openFullPlayer()
+                            .height(tileHeight)
+                            .alpha(if (presence.playable) 1f else 0.45f),
+                    ) {
+                        LibraryCardComponent(
+                            modifier = Modifier
+                                .width(tileWidth)
+                                .height(tileHeight),
+                            square = tile.square,
+                            titleMaxLines = tile.titleMaxLines,
+                            subtitleMaxLines = tile.subtitleMaxLines,
+                            title = song.title,
+                            subtitle = if (presence.playable) song.artist else "${song.artist} · Unavailable",
+                            artworks = singleArtworkUrl,
+                            onClick = {
+                                if (!presence.playable) return@LibraryCardComponent
+                                if (currentSong == null) {
+                                    playerViewModel?.setQueueFromLastPlayedSongs(
+                                        songs = allLibrarySongs,
+                                        startSongId = song.id,
+                                    )
+                                } else if (song.id == currentSong.id) {
+                                    if (isPlaying == true) {
+                                        navigation.openFullPlayer()
+                                    } else {
+                                        playerViewModel?.playPauseToggle()
+                                    }
                                 } else {
-                                    // Scenario 2: If paused, resume playback
-                                    playerViewModel?.playPauseToggle()
+                                    playerViewModel?.setQueueFromLastPlayedSongs(
+                                        songs = allLibrarySongs,
+                                        startSongId = song.id,
+                                    )
                                 }
-                            } else {
-                                // Bonus Scenario: A different song is playing
-                                playerViewModel?.setQueueFromLastPlayedSongs(
-                                    songs = allLibrarySongs,
-                                    startSongId = song.id,
-                                )
+                            },
+                            emptyNoticeText = "Artwork not available",
+                        )
+                        if (presence.canRestore) {
+                            TextButton(
+                                onClick = { import.restoreSong(song) },
+                                modifier = Modifier.align(Alignment.TopCenter),
+                            ) {
+                                Text("Restore", color = HighlightPrimary)
                             }
-                        },
-                        emptyNoticeText = "Artwork not available"
-                    )
+                        }
+                    }
                 }
             }
         }

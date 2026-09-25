@@ -691,7 +691,7 @@ private fun ConfirmBackupDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Approved songs are copied into the app library and the library paths are updated. " +
+                    text = "Songs already in GroovePlayer are uploaded. " +
                         "Audio uploads first. The Room snapshot uploads only after those files are in the cloud. " +
                         "Songs already on cloud with the same content hash are skipped.",
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
@@ -704,7 +704,7 @@ private fun ConfirmBackupDialog(
                 )
                 if (includedFolders.isEmpty()) {
                     Text(
-                        text = "No included folders yet — check Excluded folders in Storage settings.",
+                        text = "No library folder yet.",
                         style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                         color = SoftWhite.copy(alpha = 0.7f),
                     )
@@ -750,7 +750,6 @@ private fun BackupNowSection(
 ) {
     val phase = backupState.phase
     val busy = phase == CloudBackupPhase.PREPARING ||
-        phase == CloudBackupPhase.CONSOLIDATING ||
         phase == CloudBackupPhase.UPLOADING
     val showSteps = busy || phase == CloudBackupPhase.SUCCESS || phase == CloudBackupPhase.ERROR
     val readOnlyGrace = storage?.readOnly == true && storage.overQuota != true
@@ -812,14 +811,14 @@ private fun BackupNowSection(
         }
         storage == null -> {
             Text(
-                text = "Sign in with Premium to back up included folders to the cloud.",
+                text = "Sign in with Premium to back up your library.",
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite,
             )
         }
         else -> {
             Text(
-                text = "Copies included-folder audio into the app library, uploads those files to Cloudflare R2, " +
+                text = "Uploads songs from your GroovePlayer library to Cloudflare R2, " +
                 "then uploads the Room snapshot (real PUT when backend dry_run is false).",
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite.copy(alpha = 0.85f),

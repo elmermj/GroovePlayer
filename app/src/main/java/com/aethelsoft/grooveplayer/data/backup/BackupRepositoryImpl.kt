@@ -25,8 +25,8 @@ import com.aethelsoft.grooveplayer.domain.backup.BackupProgressLabel
 import com.aethelsoft.grooveplayer.domain.backup.BackupTransfer
 import com.aethelsoft.grooveplayer.domain.backup.RemoteBackupLease
 import com.aethelsoft.grooveplayer.domain.backup.CloudHashDedup
-import com.aethelsoft.grooveplayer.domain.backup.ConsolidateByteProgress
 import com.aethelsoft.grooveplayer.domain.backup.ContentHash
+import com.aethelsoft.grooveplayer.domain.library.BackupLibraryFiles
 import com.aethelsoft.grooveplayer.domain.backup.DbSwapStep
 import com.aethelsoft.grooveplayer.domain.backup.GrooveDownloadPlacement
 import com.aethelsoft.grooveplayer.domain.backup.HashedAudio
@@ -53,7 +53,6 @@ import com.aethelsoft.grooveplayer.domain.model.TrimCloudBackupResult
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.BackupRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
-import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
@@ -93,8 +92,8 @@ import javax.inject.Singleton
 /**
  * Manual cloud backup via Benny R2 API (docs/backup-api.md + docs/backup-library.md).
  *
- * Approved songs are copied into the app-private library and Room `sourcePath` is updated
- * before any upload. Same SHA-256 + size already in the cloud is skipped.
+ * Uploads songs that already live in the app-private library. Same SHA-256 + size already
+ * in the cloud is skipped.
  * Song bytes are confirmed first; the Room snapshot is uploaded only after that.
  *
  * R2 cost rules: skip never remints upload-url;
@@ -109,7 +108,6 @@ class BackupRepositoryImpl @Inject constructor(
     private val grooveDownloads: GrooveDownloadsLocator,
     private val jobGate: BackupJobGate,
     private val musicRepository: MusicRepository,
-    private val userRepository: UserRepository,
     private val authRepository: AuthRepository,
     private val loginRestorePromptMemory: LoginRestorePromptMemory,
     private val backupApi: BackupApi,
@@ -178,9 +176,7 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     override suspend fun resolveIncludedFolders(): List<String> = withContext(Dispatchers.IO) {
-        val all = musicRepository.getMusicFolderPaths()
-        val excluded = userRepository.getUserSettings().excludedFolders.toSet()
-        all.filter { it !in excluded }.sorted()
+        listOf(grooveDownloads.directory().absolutePath)
     }
 
     override suspend fun startBackup(
@@ -286,23 +282,23 @@ class BackupRepositoryImpl @Inject constructor(
             }
             prefs.edit().putBoolean(KEY_CAN_RETRY, false).remove(KEY_LAST_ERROR).apply()
 
-            var prepared = 0L
-            val files = mutableListOf<File>()
-            folders.forEachIndexed { index, path ->
-                val dir = File(path)
-                if (dir.isDirectory) {
-                    dir.walkTopDown()
-                        .filter { it.isFile && isLikelyAudio(it) }
-                        .forEach { f ->
-                            files += f
-                            prepared += f.length()
-                        }
-                }
-                val pct = ((index + 1) * BackupProgressLabel.PREPARING_PERCENT_CAP) / folders.size
-                _state.update {
-                    it.copy(progressPercent = pct, bytesPrepared = prepared, filesTotal = files.size)
-                }
+            throwIfBackupLeaseLost()
+            val privateRoot = grooveDownloads.directory().absolutePath
+            val uploadFiles = BackupLibraryFiles.select(musicRepository.getAllSongs()) { path ->
+                AppPrivateLibrary.isInside(path, privateRoot) &&
+                    File(path).isFile &&
+                    File(path).length() > 0L
+            }.map { File(it) }
+            var prepared = uploadFiles.sumOf { it.length() }
+            _state.update {
+                it.copy(
+                    progressPercent = BackupProgressLabel.PREPARING_PERCENT_CAP,
+                    bytesPrepared = prepared,
+                    filesTotal = uploadFiles.size,
+                )
             }
+            val consolidateCompleted = 0
+            val consolidateTotal = 0
 
             // Soft warn is UI-only; allow backup under 100%.
             var uploadedBytes = 0L
@@ -312,14 +308,6 @@ class BackupRepositoryImpl @Inject constructor(
             var remainingQuotaHeadroom =
                 if (ent.quotaBytes > 0) (ent.quotaBytes - ent.usedBytes).coerceAtLeast(0L)
                 else Long.MAX_VALUE
-
-            // Paths in Room change before any upload. Progress is per file, and a failure
-            // here never reaches the song or catalog upload.
-            throwIfBackupLeaseLost()
-            val uploadFiles = canonicalizeApprovedSongs(files)
-            prepared = uploadFiles.sumOf { it.length() }
-            val consolidateCompleted = _state.value.consolidateCompleted
-            val consolidateTotal = _state.value.consolidateTotal
 
             // Skip only when cloud already has the same SHA-256 and size. A name match is not identity.
             var skippedCount = 0
@@ -560,7 +548,7 @@ class BackupRepositoryImpl @Inject constructor(
                         if (uploadFiles.isEmpty()) {
                             append("Library snapshot backed up")
                             if (roomResult.deduped) append(" (unchanged)")
-                            append(" — no audio in included folders")
+                            append(" — no songs in the library")
                         } else {
                             append("Backed up $completed file(s)")
                             if (skippedCount > 0) append(" · $skippedCount skipped (same content hash)")
@@ -1339,12 +1327,10 @@ class BackupRepositoryImpl @Inject constructor(
     ) {
         val completed = when (step) {
             BackupJobStep.UPLOADING_FILES -> uploadCompleted
-            BackupJobStep.CONSOLIDATING -> consolidateCompleted
             else -> 0
         }
         val total = when (step) {
             BackupJobStep.UPLOADING_FILES -> uploadTotal
-            BackupJobStep.CONSOLIDATING -> consolidateTotal
             else -> 0
         }
         _state.update {
@@ -1628,142 +1614,6 @@ class BackupRepositoryImpl @Inject constructor(
         Log.i(TAG, "library snapshot staged schema=$remoteSchema path=${staged.absolutePath}")
     }
 
-    /**
-     * Copy each approved song into the app-private library, point Room at that path, then delete
-     * the original only when the path update changed a row. Upload uses the canonical file.
-     * Hash and copy report bytes so the consolidate bar and N/M move for the whole phase.
-     */
-    private suspend fun canonicalizeApprovedSongs(sources: List<File>): List<File> {
-        val downloadsDir = grooveDownloads.directory()
-        adoptLegacyLibraryFiles(downloadsDir)
-        val pending = sources.filter { it.isFile && it.length() > 0L }
-        if (pending.isEmpty()) {
-            publishStep(
-                step = BackupJobStep.CONSOLIDATING,
-                phase = CloudBackupPhase.CONSOLIDATING,
-                consolidateCompleted = 0,
-                consolidateTotal = 0,
-                uploadCompleted = 0,
-                uploadTotal = 0,
-            )
-            return emptyList()
-        }
-        val indexFiles = grooveDownloadFiles(downloadsDir)
-        val plannedBytes = indexFiles.sumOf { it.length() } + pending.sumOf { it.length() } * 3L
-        val progress = ConsolidateByteProgress(pending.size, plannedBytes)
-        publishConsolidate(progress, force = true)
-        val existing = mutableListOf<HashedAudio>()
-        for (file in indexFiles) {
-            progress.beginOperation()
-            val hash = sha256Hex(file) { read, total ->
-                progress.onAbsoluteRead(read)
-                publishConsolidate(progress, force = total > 0L && read >= total)
-            }
-            existing += HashedAudio(file.absolutePath, hash, file.length())
-        }
-        val canonical = LinkedHashMap<String, File>()
-        pending.forEachIndexed { index, source ->
-            throwIfBackupLeaseLost()
-            progress.showFile(index + 1)
-            publishConsolidate(progress, force = true)
-            progress.beginOperation()
-            val size = source.length()
-            val hash = sha256Hex(source) { read, total ->
-                progress.onAbsoluteRead(read)
-                publishConsolidate(progress, force = total > 0L && read >= total)
-            }
-            val placement = GrooveDownloadPlacement.place(
-                downloadsDir = downloadsDir.absolutePath,
-                cosmeticFileName = source.name,
-                contentHash = hash,
-                sizeBytes = size,
-                existing = existing,
-            )
-            val dest = File(placement.destinationPath)
-            if (!placement.reusedExisting && source.absolutePath != dest.absolutePath) {
-                progress.beginOperation()
-                RoomDbSwapFiles.copyDurable(source, dest) { copied, total ->
-                    progress.onAbsoluteRead(copied)
-                    publishConsolidate(progress, force = total > 0L && copied >= total)
-                }
-                progress.beginOperation()
-                val copiedHash = sha256Hex(dest) { read, total ->
-                    progress.onAbsoluteRead(read)
-                    publishConsolidate(progress, force = total > 0L && read >= total)
-                }
-                if (!copiedHash.equals(hash, ignoreCase = true) || dest.length() != size) {
-                    dest.delete()
-                    error("Copy into the app library did not match ${source.name}")
-                }
-                existing += HashedAudio(dest.absolutePath, hash, dest.length())
-            } else {
-                if (placement.reusedExisting) {
-                    Log.i(TAG, "reuse app library hash=$hash path=${dest.absolutePath}")
-                }
-                progress.credit(size * 2L)
-                publishConsolidate(progress, force = true)
-            }
-            val aliases = buildList {
-                add(source.absolutePath)
-                runCatching { source.canonicalPath }.getOrNull()?.let { add(it) }
-            }.distinct()
-            var updated = 0
-            for (old in aliases) {
-                updated += database.songDao().retargetSourcePath(old, dest.absolutePath)
-            }
-            val moved = source.absolutePath != dest.absolutePath
-            if (updated > 0 && moved) {
-                if (!source.delete()) {
-                    Log.w(TAG, "Room path updated; original kept at ${source.absolutePath}")
-                }
-            } else if (updated == 0 && moved) {
-                Log.i(TAG, "No Room row for ${source.absolutePath}; original left in place")
-            }
-            canonical[dest.absolutePath] = dest
-        }
-        progress.complete()
-        publishConsolidate(progress, force = true)
-        return canonical.values.toList()
-    }
-
-    private fun publishConsolidate(progress: ConsolidateByteProgress, force: Boolean) {
-        val next = progress.percent().coerceIn(5, 40)
-        val shown = progress.filesShown
-        _state.update { current ->
-            val percent = if (current.jobStep == BackupJobStep.CONSOLIDATING) {
-                max(current.progressPercent, next)
-            } else {
-                next
-            }
-            if (!force &&
-                current.jobStep == BackupJobStep.CONSOLIDATING &&
-                current.progressPercent == percent &&
-                current.consolidateCompleted == shown &&
-                current.consolidateTotal == progress.fileCount
-            ) {
-                return@update current
-            }
-            current.copy(
-                phase = CloudBackupPhase.CONSOLIDATING,
-                jobStep = BackupJobStep.CONSOLIDATING,
-                progressPercent = percent,
-                filesCompleted = shown,
-                filesTotal = progress.fileCount,
-                consolidateCompleted = shown,
-                consolidateTotal = progress.fileCount,
-                uploadCompleted = 0,
-                uploadTotal = 0,
-                message = BackupProgressLabel.status(
-                    BackupJobStep.CONSOLIDATING,
-                    shown,
-                    progress.fileCount,
-                    0,
-                    0,
-                ),
-                canRetry = false,
-            )
-        }
-    }
 
     /**
      * Copy readable leftovers from shared Music/Groove Downloads (and older app folders)
@@ -2159,13 +2009,6 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun isLikelyAudio(file: File): Boolean {
-        val n = file.name.lowercase()
-        return n.endsWith(".mp3") || n.endsWith(".m4a") || n.endsWith(".flac") ||
-            n.endsWith(".ogg") || n.endsWith(".wav") || n.endsWith(".aac") ||
-            n.endsWith(".opus") || n.endsWith(".wma")
-    }
-
     private fun guessContentType(file: File): String {
         val n = file.name.lowercase()
         return when {
@@ -2210,7 +2053,6 @@ class BackupRepositoryImpl @Inject constructor(
         private const val KEY_CAN_RETRY = "backup_can_retry"
         private val ACTIVE_BACKUP_PHASES = setOf(
             CloudBackupPhase.PREPARING,
-            CloudBackupPhase.CONSOLIDATING,
             CloudBackupPhase.UPLOADING,
         )
         private const val KEY_LAST_ROOM_HASH = "last_room_db_hash"

@@ -11,6 +11,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * already has song_likes keeps those rows because they are inside the swapped file.
  */
 object GroovePlayerMigrations {
+    val MIGRATION_17_18 = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySchemaMigration.STATEMENTS.forEach {
+                db.execSQL(it)
+            }
+        }
+    }
+
     val MIGRATION_16_17 = object : Migration(16, 17) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL(
