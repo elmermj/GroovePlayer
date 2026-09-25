@@ -180,7 +180,10 @@ fun BasePageTemplate(
                         }
                     }
 
-                    is UiState.Success -> {
+                    is UiState.Success, is UiState.Idle -> {
+                        // Idle used to be an empty black canvas (the window background
+                        // is black too). Draw the local shell immediately so startup
+                        // is not a blank window while auth or the library loads.
                         when (deviceType) {
                             DeviceType.PHONE -> {
                                 phoneLayout()
@@ -194,14 +197,6 @@ fun BasePageTemplate(
                                 largeTabletLayout()
                             }
                         }
-                    }
-
-                    is UiState.Idle -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(GrooveTheme.colors.canvas),
-                        )
                     }
                 }
             }

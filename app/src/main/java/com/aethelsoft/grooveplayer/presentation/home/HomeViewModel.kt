@@ -113,12 +113,19 @@ class HomeViewModel @Inject constructor(
 
     fun loadSongs() {
         viewModelScope.launch {
-            setLoading()
+            // Do not replace Home with a full-screen loading gate. Idle/Loading
+            // used to paint a black canvas until this returned, including when
+            // startup auth was stuck on a 401.
             try {
                 songs = getSongsUseCase()
                 setSuccess(songs)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                setError(e.message ?: "Failed to load songs")
+                android.util.Log.e("HomeViewModel", "Failed to load songs", e)
+                if (_uiState.value !is UiState.Success) {
+                    setError(e.message ?: "Failed to load songs")
+                }
             }
             try {
                 _genres.value = getLibraryGenresUseCase()
