@@ -39,6 +39,12 @@ permissions:
   contents: read
   actions: write
 
+# Newer push to the same ref cancels an older in-flight run, so a merge batch
+# produces one App Tester release. A cancelled run skips its run_number.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   distribute:
     runs-on: ubuntu-latest
