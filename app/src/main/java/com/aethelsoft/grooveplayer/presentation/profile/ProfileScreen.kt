@@ -15,6 +15,7 @@ fun ProfileScreen(
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiCustomisation: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onNavigateToRecentUpdates: () -> Unit = {},
 ){
 
     /**
@@ -31,7 +32,15 @@ fun ProfileScreen(
     }
 
     BasePageTemplate(
-        phoneLayout = { PhoneProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
+        phoneLayout = {
+            PhoneProfileLayout(
+                viewModel,
+                onNavigateToShare,
+                onNavigateToUiCustomisation,
+                onNavigateToBackup,
+                onOpenRecentUpdates = onNavigateToRecentUpdates,
+            )
+        },
         tabletLayout = { TabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
         largeTabletLayout = { LargeTabletProfileLayout(viewModel, onNavigateToShare, onNavigateToUiCustomisation, onNavigateToBackup) },
         onNavigateToSearch = onNavigateToSearch,

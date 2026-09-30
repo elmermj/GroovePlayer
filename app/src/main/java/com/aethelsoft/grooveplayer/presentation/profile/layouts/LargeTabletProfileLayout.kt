@@ -83,6 +83,7 @@ fun LargeTabletProfileLayout(
     onNavigateToShare: () -> Unit = {},
     onNavigateToUiStyling: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onOpenRecentUpdates: () -> Unit = {},
 ){
     val context = LocalContext.current
     val canvas = GrooveTheme.colors.canvas
@@ -238,7 +239,9 @@ MiniPlayerOnStartRow(
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XRecentUpdates) },
                     title = "Recent updates",
-                    subtitle = "What’s new in GroovePlayer"
+                    subtitle = "What’s new in GroovePlayer",
+                    actionType = ActionType.LINK,
+                    onClick = onOpenRecentUpdates,
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(

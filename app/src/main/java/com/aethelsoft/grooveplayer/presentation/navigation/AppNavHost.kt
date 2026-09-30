@@ -35,6 +35,7 @@ import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyP
 import com.aethelsoft.grooveplayer.presentation.library.songs.SongsScreen
 import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
+import com.aethelsoft.grooveplayer.presentation.profile.RecentUpdatesScreen
 import com.aethelsoft.grooveplayer.presentation.ui_customisation.UiCustomisationScreen
 import com.aethelsoft.grooveplayer.presentation.backup.BackupScreen
 import com.aethelsoft.grooveplayer.presentation.backup.RestoreApplyScreen
@@ -570,6 +571,14 @@ fun AppNavHost(
                 onNavigateToBackup = {
                     navController.navigate(AppRoutes.BACKUP)
                 },
+                onNavigateToRecentUpdates = {
+                    navController.navigate(AppRoutes.RECENT_UPDATES)
+                },
+            )
+        }
+        composable(route = AppRoutes.RECENT_UPDATES) {
+            RecentUpdatesScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
         composable(route = AppRoutes.UI_CUSTOMISATION) {

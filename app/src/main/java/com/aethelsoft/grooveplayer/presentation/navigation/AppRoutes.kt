@@ -22,6 +22,7 @@ object AppRoutes {
     const val ALBUM_DETAIL = "album/{albumId}"
     const val ARTIST_DETAIL = "artist/{artistId}"
     const val PROFILE = "profile"
+    const val RECENT_UPDATES = "recent_updates"
     const val SHARE_OPTIONS = "share_options"
     const val SHARE_CONFIRMATION = "share_confirmation/{shareMethod}"
     const val SHARE_VIA_NFC = "share_via_nfc"

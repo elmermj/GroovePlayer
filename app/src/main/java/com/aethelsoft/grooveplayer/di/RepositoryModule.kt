@@ -23,6 +23,7 @@ import com.aethelsoft.grooveplayer.data.playback.PremiumCloudEntitlement
 import com.aethelsoft.grooveplayer.data.playback.PlaybackStreamTicketStore
 import com.aethelsoft.grooveplayer.data.library.FileM3uLocationHash
 import com.aethelsoft.grooveplayer.data.library.PlaylistLibraryIndex
+import com.aethelsoft.grooveplayer.data.profile.RecentUpdatesCatalog
 import com.aethelsoft.grooveplayer.data.playback.SongCatalogStore
 import com.aethelsoft.grooveplayer.domain.backup.AppLibraryPaths
 import com.aethelsoft.grooveplayer.domain.playback.CloudAudioLookup
@@ -44,6 +45,7 @@ import com.aethelsoft.grooveplayer.domain.repository.EqualizerRepository
 import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaybackHistoryRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
+import com.aethelsoft.grooveplayer.domain.repository.RecentUpdatesRepository
 import com.aethelsoft.grooveplayer.domain.repository.SongLikeRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlayerRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
@@ -149,6 +151,11 @@ abstract class RepositoryModule {
     abstract fun bindPlaylistRepository(
         impl: PlaylistRepositoryImpl
     ): PlaylistRepository
+
+    @Binds
+    abstract fun bindRecentUpdatesRepository(
+        impl: RecentUpdatesCatalog
+    ): RecentUpdatesRepository
 
     @Binds
     abstract fun bindLocalAudioAvailability(
