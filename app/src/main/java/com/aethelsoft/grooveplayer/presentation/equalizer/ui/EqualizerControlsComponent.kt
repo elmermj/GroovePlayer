@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.player.ui
+package com.aethelsoft.grooveplayer.presentation.equalizer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -16,7 +16,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,19 +26,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelsoft.grooveplayer.domain.model.EqualizerState
-import com.aethelsoft.grooveplayer.domain.usecase.equalizer_category.*
-import com.aethelsoft.grooveplayer.presentation.player.EqualizerViewModel
+import com.aethelsoft.grooveplayer.presentation.equalizer.EqualizerViewModel
 import com.aethelsoft.grooveplayer.utils.theme.ui.ToggledTextButton
 import kotlinx.coroutines.launch
 import android.util.Log
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
-import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 
 /** Eats vertical drags so a parent bottom sheet does not move while a band slider is dragged. */
 private val BandSliderScrollLock = object : NestedScrollConnection {
@@ -74,7 +71,7 @@ fun EqualizerControlsComponent(
             // Trigger state update when component is first shown
             // This ensures the state is fresh
         } catch (e: Exception) {
-            android.util.Log.e("EqualizerControls", "Error initializing equalizer UI: ${e.message}", e)
+            Log.e("EqualizerControls", "Error initializing equalizer UI: ${e.message}", e)
         }
     }
     
@@ -102,7 +99,7 @@ fun EqualizerControlsComponent(
         // Live apply is already handled by the ViewModel; persist shortly after the last change.
         LaunchedEffect(hasUnsavedChanges, equalizerState) {
             if (hasUnsavedChanges) {
-                kotlinx.coroutines.delay(600)
+                delay(600)
                 try {
                     viewModel.saveSettings()
                 } catch (e: Exception) {

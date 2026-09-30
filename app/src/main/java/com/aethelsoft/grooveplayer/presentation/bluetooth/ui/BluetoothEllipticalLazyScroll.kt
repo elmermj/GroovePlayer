@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.player.ui
+package com.aethelsoft.grooveplayer.presentation.bluetooth.ui
 
 import XCheckCircle
 import android.bluetooth.BluetoothAdapter
@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -61,7 +62,9 @@ import com.aethelsoft.grooveplayer.utils.theme.icons.*
 import com.aethelsoft.grooveplayer.utils.theme.shader.ELLIPSE_SHADER
 import com.aethelsoft.grooveplayer.utils.theme.ui.RunningText
 import kotlinx.coroutines.delay
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 
 
@@ -216,7 +219,7 @@ fun BluetoothEllipticalLazyScroll(
                     Button(
                         onClick = onRequestBluetoothPermission,
                         shape = RoundedCornerShape(100.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
                             contentColor = Color.Black
                         )
@@ -264,7 +267,7 @@ fun BluetoothEllipticalLazyScroll(
                             )
                         },
                         shape = RoundedCornerShape(100.dp),
-                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
                             contentColor = Color.Black
                         )
@@ -394,8 +397,8 @@ fun BluetoothEllipticalLazyScroll(
 
         if (deviceCount > 0) {
             // Cover a window around the scroll offset; modulo maps into the real list (endless).
-            val windowStart = kotlin.math.floor(scrollOffset - MAX_VISIBLE).toInt() - 1
-            val windowEnd = kotlin.math.ceil(scrollOffset + MAX_VISIBLE).toInt() + 1
+            val windowStart = floor(scrollOffset - MAX_VISIBLE).toInt() - 1
+            val windowEnd = ceil(scrollOffset + MAX_VISIBLE).toInt() + 1
             for (virtualI in windowStart..windowEnd) {
                 val device = availableDevices[Math.floorMod(virtualI, deviceCount)]
                 val slot = virtualI - scrollOffset

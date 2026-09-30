@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.backup
+package com.aethelsoft.grooveplayer.presentation.login_restore
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth

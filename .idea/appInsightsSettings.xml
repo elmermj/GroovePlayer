@@ -9,10 +9,10 @@
             <InsightsFilterSettings>
               <option name="connection">
                 <ConnectionSetting>
-                  <option name="appId" value="PLACEHOLDER" />
-                  <option name="mobileSdkAppId" value="" />
-                  <option name="projectId" value="" />
-                  <option name="projectNumber" value="" />
+                  <option name="appId" value="com.aethelsoft.grooveplayer" />
+                  <option name="mobileSdkAppId" value="1:922639144158:android:b80b9574abcce0de265e4f" />
+                  <option name="projectId" value="grooveplayer-69482" />
+                  <option name="projectNumber" value="922639144158" />
                 </ConnectionSetting>
               </option>
               <option name="signal" value="SIGNAL_UNSPECIFIED" />

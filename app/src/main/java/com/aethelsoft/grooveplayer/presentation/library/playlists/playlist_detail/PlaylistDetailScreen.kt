@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.library.playlists
+package com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,8 +34,17 @@ import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelsoft.grooveplayer.presentation.common.GrooveScreen
 import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
+import com.aethelsoft.grooveplayer.presentation.library.playlists.ConfirmPlaylistDialog
+import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistNameDialog
+import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistTrackList
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.layouts.LargeTabletPlaylistDetailLayout
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.layouts.PhonePlaylistDetailLayout
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.layouts.TabletPlaylistDetailLayout
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelsoft.grooveplayer.utils.DeviceType
+import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.XS_PADDING
+import com.aethelsoft.grooveplayer.utils.rememberDeviceType
 import com.aethelsoft.grooveplayer.utils.theme.icons.XMore
 import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
@@ -55,6 +64,8 @@ fun PlaylistDetailScreen(
     var deleteOpen by remember { mutableStateOf(false) }
     val title = playlist?.playlist?.name ?: "Playlist"
     val tracks = playlist?.tracks.orEmpty()
+
+    val deviceType = rememberDeviceType()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("audio/x-mpegurl"),
@@ -100,52 +111,49 @@ fun PlaylistDetailScreen(
             }
         },
     ) {
-        when {
-            isLoading && playlist == null -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = GrooveTheme.colors.onSurface)
+        val layoutPadding = PaddingValues.Zero
+        val horizontalPadding = M_PADDING
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (deviceType) {
+                DeviceType.PHONE -> {
+                    PhonePlaylistDetailLayout(
+                        playlist = playlist,
+                        tracks = tracks,
+                        isLoading = isLoading,
+                        message = message,
+                        onAddTracks = onAddTracks,
+                        viewModel = viewModel,
+                        playerViewModel = playerViewModel
+                    )
                 }
-            }
-            playlist == null -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    GrooveMutedText("Playlist not found")
+
+                DeviceType.TABLET -> {
+                    TabletPlaylistDetailLayout(
+                        playlist = playlist,
+                        tracks = tracks,
+                        isLoading = isLoading,
+                        message = message,
+                        onAddTracks = onAddTracks,
+                        viewModel = viewModel,
+                        playerViewModel = playerViewModel
+                    )
                 }
-            }
-            tracks.isEmpty() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        GrooveMutedText("No tracks yet")
-                        GrooveTinySpacer()
-                        TextButton(onClick = onAddTracks) {
-                            Text("Add tracks", color = SoftWhite)
-                        }
-                    }
+
+                DeviceType.LARGE_TABLET -> {
+                    LargeTabletPlaylistDetailLayout(
+                        playlist = playlist,
+                        tracks = tracks,
+                        isLoading = isLoading,
+                        message = message,
+                        onAddTracks = onAddTracks,
+                        viewModel = viewModel,
+                        playerViewModel = playerViewModel
+                    )
                 }
-            }
-            else -> {
-                PlaylistTrackList(
-                    tracks = tracks,
-                    onPlay = { index -> playPlaylist(playerViewModel, tracks, index) },
-                    onMove = viewModel::move,
-                    onRemove = viewModel::removeTrack,
-                    header = {
-                        Column(verticalArrangement = Arrangement.spacedBy(XS_PADDING)) {
-                            GrooveActionButton(
-                                label = "Play",
-                                onClick = { playPlaylist(playerViewModel, tracks, tappedIndex = null) },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            if (!message.isNullOrBlank()) {
-                                GrooveMutedText(
-                                    text = message.orEmpty(),
-                                    modifier = Modifier.padding(bottom = 4.dp),
-                                )
-                            }
-                        }
-                    },
-                )
             }
         }
+
     }
 
     if (renameOpen) {
@@ -174,7 +182,7 @@ fun PlaylistDetailScreen(
     }
 }
 
-private fun playPlaylist(
+fun playPlaylist(
     playerViewModel: PlayerViewModel,
     tracks: List<PlaylistTrack>,
     tappedIndex: Int?,

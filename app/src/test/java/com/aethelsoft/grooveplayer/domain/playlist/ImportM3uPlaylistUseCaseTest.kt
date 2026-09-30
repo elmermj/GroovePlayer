@@ -172,6 +172,8 @@ private class FakePlaylistRepository : PlaylistRepository {
         row.tracks.removeAll { it.entryId == entryId }
     }
 
+    override suspend fun getSongRecommendations(): List<Song> = emptyList()
+
     override suspend fun reorder(playlistId: Long, orderedEntryIds: List<Long>) {
         val row = stored.first { it.summary.id == playlistId }
         val byId = row.tracks.associateBy { it.entryId }
