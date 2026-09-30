@@ -343,6 +343,23 @@ Planned features and directions:
 
 GroovePlayer is developed and tested primarily on **Samsung Tab S10 Ultra**. The app is **highly optimized for `DeviceType.LARGE_TABLET`**. Layouts for **`DeviceType.PHONE`** differ significantly and are **not yet fully optimized**; full phone optimization will take additional development time.
 
+## Wear OS remote
+
+The `wear` module is a remote for the player on the paired phone. It does not play audio, store music, or call the backend. Controls are album art as the full-screen background, a progress ring along the real screen edge (drag or tap to seek), swipe left for next, swipe right for previous, and a center tap for play/pause. When the phone is not reachable the screen shows **Disconnected** and the controls do nothing.
+
+Install the same variant on the phone and the watch so the application id matches: `com.aethelsoft.grooveplayer`, or `com.aethelsoft.grooveplayer.staging` for the `staging` flavor and for a `dev` build while `GROOVE_ENV=staging`. Debug builds of both modules use the default debug keystore (`~/.android/debug.keystore`). Release builds of both use `RELEASE_STORE_*` from `local.properties` or CI. The Wearable Data Layer only connects the two apps when that id and signing key match.
+
+The phone advertises `grooveplayer_phone`. The watch advertises `grooveplayer_watch`. The watch is connected when a reachable node has `grooveplayer_phone`. The phone writes `/grooveplayer/state` (`title`, `artist`, `isPlaying`, `positionMs`, `durationMs`, `updatedAtMs`, and an optional JPEG `artwork` asset, longest edge 400px, only from a file already in the private library). The watch sends `/grooveplayer/cmd/play_pause`, `/grooveplayer/cmd/next`, `/grooveplayer/cmd/previous`, `/grooveplayer/cmd/seek` (8-byte big-endian `positionMs`), and `/grooveplayer/cmd/request_state` on launch and when the phone becomes reachable again. The watch moves the playhead locally while `isPlaying` is true.
+
+`build-prod.sh`, `build-staging.sh`, and **Distribute APK** still build and upload the phone APK only. The watch is not embedded in that APK.
+
+```bash
+./gradlew :wear:assembleDevDebug
+./gradlew :wear:testDevDebugUnitTest
+```
+
+Android Studio previews, without a watch or an emulator: open `wear/src/main/java/com/aethelsoft/grooveplayer/wear/ui/RemotePreviews.kt`, choose the wear **devDebug** variant, and use the Split or Design view. The previews are small round, large round, square, and rectangular, for playing, paused, and disconnected.
+
 ## 🚀 Getting Started
 
 ### Prerequisites

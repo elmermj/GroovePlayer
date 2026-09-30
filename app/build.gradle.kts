@@ -314,6 +314,10 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets.named("main") {
+        kotlin.srcDir(rootProject.file("wear-contract/src/main/kotlin"))
+    }
 }
 
 kotlin {
@@ -387,6 +391,8 @@ dependencies {
 
     // Nearby Connections (P2P transfer without internet)
     implementation(libs.play.services.nearby)
+    implementation(libs.play.services.wearable)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Google Sign-In (Credential Manager + Google ID)
     implementation(libs.androidx.credentials)
@@ -438,6 +444,7 @@ dependencies {
 // app/google-services.json. Fail here with the setup that unblocks GroovePlayer Staging.
 gradle.taskGraph.whenReady {
     val shippingStaging = allTasks.any { task ->
+        if (task.project.path != ":app") return@any false
         val n = task.name
         n.contains("Staging") && (
             n.startsWith("assemble") ||
@@ -460,6 +467,7 @@ gradle.taskGraph.whenReady {
 // Fail closed for Play-bound builds: no sample AdMob IDs, no debug-signed release.
 gradle.taskGraph.whenReady {
     val runningProdRelease = allTasks.any { task ->
+        if (task.project.path != ":app") return@any false
         val n = task.name
         n.contains("ProdRelease", ignoreCase = true) ||
             (n.contains("prod", ignoreCase = true) && n.contains("Release", ignoreCase = true) &&

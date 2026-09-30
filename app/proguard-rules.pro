@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# The watch bridge is a manifest service. Release minify is off today; keep the
+# entry point if it is turned on later. Do not keep the whole Wearable SDK.
+-keep class com.aethelsoft.grooveplayer.wear.GroovePlayerWearListenerService { <init>(); }
