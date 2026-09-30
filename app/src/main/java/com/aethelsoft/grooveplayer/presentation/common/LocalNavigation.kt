@@ -23,6 +23,7 @@ data class NavigationActions(
     val openShareViaNearbyWithSongs: (List<Song>) -> Unit = {},
     val openUiStyling: () -> Unit = {},
     val openBackup: () -> Unit = {},
+    val openRecentUpdates: () -> Unit = {},
 )
 
 /**

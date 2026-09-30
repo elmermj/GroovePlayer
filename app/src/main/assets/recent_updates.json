@@ -1,0 +1,132 @@
+{
+  "title": "Recent updates",
+  "intro": "This first version of GroovePlayer includes the library, playback, and account features below.",
+  "sections": [
+    {
+      "title": "Library",
+      "items": [
+        {
+          "title": "Songs",
+          "detail": "Play audio stored in the app library."
+        },
+        {
+          "title": "Albums and artists",
+          "detail": "Browse by album or artist and open a page for each."
+        },
+        {
+          "title": "Genres",
+          "detail": "Browse songs grouped by genre."
+        },
+        {
+          "title": "Search",
+          "detail": "Find songs, albums, and artists from the home search bar."
+        },
+        {
+          "title": "Edit song details",
+          "detail": "Change a song’s title, artist, album, genre, and year."
+        }
+      ]
+    },
+    {
+      "title": "Playlists",
+      "items": [
+        {
+          "title": "Create and edit playlists",
+          "detail": "Name a playlist, add and remove tracks, and reorder them."
+        },
+        {
+          "title": "Import and export",
+          "detail": "Bring in an M3U playlist or export one."
+        },
+        {
+          "title": "Recommendations",
+          "detail": "On an empty playlist, suggested songs appear so you can add them."
+        }
+      ]
+    },
+    {
+      "title": "Listening",
+      "items": [
+        {
+          "title": "Player",
+          "detail": "Play, pause, skip, and open the full player."
+        },
+        {
+          "title": "Queue",
+          "detail": "See what plays next, reorder tracks, and remove them."
+        },
+        {
+          "title": "Mini player",
+          "detail": "Keep the current song on screen, and choose whether it shows when the app starts."
+        },
+        {
+          "title": "Repeat and shuffle",
+          "detail": "Repeat one song, repeat the queue, or shuffle playback."
+        },
+        {
+          "title": "Equalizer",
+          "detail": "Shape the sound with the equalizer."
+        },
+        {
+          "title": "Visualization",
+          "detail": "Choose a visual mode while music plays."
+        },
+        {
+          "title": "Bluetooth",
+          "detail": "Connect a speaker or headphones from the player."
+        }
+      ]
+    },
+    {
+      "title": "History and favorites",
+      "items": [
+        {
+          "title": "Recently played",
+          "detail": "Jump back to songs you played lately."
+        },
+        {
+          "title": "Most played",
+          "detail": "See the songs you play the most."
+        },
+        {
+          "title": "Favorites",
+          "detail": "Like tracks, artists, and albums, then open them from Home."
+        }
+      ]
+    },
+    {
+      "title": "Share and backup",
+      "items": [
+        {
+          "title": "Share music",
+          "detail": "Send songs by tap (NFC) or to a nearby device."
+        },
+        {
+          "title": "Backup and restore",
+          "detail": "Back up the library and restore it on this device."
+        }
+      ]
+    },
+    {
+      "title": "Account and appearance",
+      "items": [
+        {
+          "title": "Account",
+          "detail": "Sign in and use a free, basic, or premium account."
+        },
+        {
+          "title": "UI customisation",
+          "detail": "Change colors, type, and spacing."
+        },
+        {
+          "title": "Notifications",
+          "detail": "Control playback notifications."
+        },
+        {
+          "title": "Storage",
+          "detail": "See storage use, manage excluded folders, and clear cache."
+        }
+      ]
+    }
+  ]
+}
