@@ -21,4 +21,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Groove Player"
 include(":app")
+include(":wear")
  

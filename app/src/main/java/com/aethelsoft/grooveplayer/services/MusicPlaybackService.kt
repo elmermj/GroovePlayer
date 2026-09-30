@@ -33,6 +33,7 @@ import com.aethelsoft.grooveplayer.MainActivity
 import com.aethelsoft.grooveplayer.R
 import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.wear.WearStatePublisher
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +59,9 @@ class MusicPlaybackService : Service() {
 
     @Inject
     lateinit var exoPlayerManager: ExoPlayerManager
+
+    @Inject
+    lateinit var wearStatePublisher: WearStatePublisher
 
     private lateinit var notificationManager: NotificationManager
     private lateinit var mediaSession: MediaSession
@@ -91,6 +95,7 @@ class MusicPlaybackService : Service() {
 
         // Observe player state
         observePlayerState()
+        wearStatePublisher.start()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
