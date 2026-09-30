@@ -33,8 +33,8 @@ class BackendCallGuardTest {
         assertTrue(allow("POST", "/v1/billing/play/ack", signedIn = true, PrivilegeTier.FREE))
         assertTrue(allow("POST", "/v1/auth/logout", signedIn = true, PrivilegeTier.FREE))
         assertTrue(allow("DELETE", "/v1/account", signedIn = true, PrivilegeTier.FREE))
-        assertTrue(allow("GET", "/v1/playback/objects", signedIn = true, PrivilegeTier.FREE))
-        assertTrue(allow("POST", "/v1/playback/stream-url", signedIn = true, PrivilegeTier.FREE))
+        assertFalse(allow("GET", "/v1/playback/objects", signedIn = true, PrivilegeTier.FREE))
+        assertFalse(allow("POST", "/v1/playback/stream-url", signedIn = true, PrivilegeTier.FREE))
     }
 
     @Test
@@ -44,6 +44,8 @@ class BackendCallGuardTest {
             assertTrue(allow("GET", "/v1/backup/objects", signedIn = true, tier))
             assertTrue(allow("POST", "/v1/backup/upload-url", signedIn = true, tier))
             assertTrue(allow("POST", "/v1/billing/addons/cancel", signedIn = true, tier))
+            assertTrue(allow("GET", "/v1/playback/objects", signedIn = true, tier))
+            assertTrue(allow("POST", "/v1/playback/stream-url", signedIn = true, tier))
             assertTrue(BackendCallGuard.allowsPaidApis(hasSession = true, tier = tier))
         }
         assertFalse(BackendCallGuard.allowsPaidApis(hasSession = true, tier = PrivilegeTier.FREE))

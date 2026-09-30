@@ -23,8 +23,8 @@ enum class SessionLoadPurpose {
  * Signed-out users and signed-in Free users do not call the backend except:
  * sign-in, Play purchase verify/ack, the startup `/v1/me` check (and the
  * refresh it needs), a user-tapped Retry of that check, logout, and account
- * deletion. Playback object lookup stays available to a signed-in session
- * because a 404 `{exists:false}` purges the catalog row for every tier.
+ * deletion. Playback lookup is Basic or Premium only. A skipped Free lookup
+ * is unknown, so it does not purge a catalog row.
  */
 object BackendCallGuard {
 
@@ -66,8 +66,6 @@ object BackendCallGuard {
         if (normalized == "/v1/auth/logout" || normalized == "/v1/account") {
             return hasSession
         }
-        // Signed-in Free still hits playback so a missing cloud object can be purged.
-        if (normalized.startsWith("/v1/playback/")) return hasSession
         return allowsPaidApis(hasSession, tier)
     }
 }

@@ -22,6 +22,8 @@ import javax.inject.Singleton
 /**
  * GET `/v1/playback/objects`, then POST `/v1/playback/stream-url` only when a
  * track is about to play. Backup object listing and download-url are not used.
+ * Both calls are Basic or Premium only. Signed-out and Free return unknown
+ * without a request, so a skipped lookup does not purge the catalog row.
  *
  * 404 `{exists:false}` is absence. `entitled:false` and stream-url 403 keep the
  * catalog row. Network, 401, and 5xx are unknown.
@@ -37,7 +39,7 @@ class CloudAudioLookupImpl @Inject constructor(
     private val bodyAdapter = moshi.adapter(PlaybackObjectDto::class.java)
 
     override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit {
-        if (!serverAccess.sessionPresent()) {
+        if (!serverAccess.allowsPaidApis()) {
             return CloudAudioHit(CloudAudioPresence.UNKNOWN)
         }
         val path = logicalPath?.takeIf { it.isNotBlank() }
@@ -73,7 +75,7 @@ class CloudAudioLookupImpl @Inject constructor(
     }
 
     override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen {
-        if (!serverAccess.sessionPresent()) return CloudStreamOpen.Unknown
+        if (!serverAccess.allowsPaidApis()) return CloudStreamOpen.Unknown
         val hash = ticket.contentHash?.takeIf { it.isNotBlank() }
         val path = ticket.logicalPath?.takeIf { it.isNotBlank() }
         val size = ticket.sizeBytes?.takeIf { it > 0L }
