@@ -51,12 +51,12 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.library.importing.LibraryImportHost
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
-import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptDialog
-import com.aethelsoft.grooveplayer.presentation.backup.LoginRestorePromptViewModel
-import com.aethelsoft.grooveplayer.presentation.backup.RestoreLaunchViewModel
+import com.aethelsoft.grooveplayer.presentation.login_restore.LoginRestorePromptDialog
+import com.aethelsoft.grooveplayer.presentation.login_restore.LoginRestorePromptViewModel
+import com.aethelsoft.grooveplayer.presentation.restore_apply.RestoreLaunchViewModel
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
-import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.bluetooth.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.data.share.NfcShareDiscovery
 import com.aethelsoft.grooveplayer.presentation.share.ShareNfcReceiver

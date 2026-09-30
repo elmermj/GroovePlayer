@@ -134,14 +134,24 @@ fun syncDevGoogleServicesOverlay(env: String) {
 
 syncDevGoogleServicesOverlay(grooveEnv())
 
+/**
+ * -P, then VERSION_NAME / VERSION_CODE in the environment, then local.properties.
+ * GitHub Actions ignores the file, the same way it ignores GROOVE_ENV, so CI stays
+ * on the -P / env value Distribute passes (1.0.<run_number>).
+ */
+fun versionFromBuild(propertyName: String, envAndFileKey: String): String? {
+    projectProp(propertyName)?.let { return it }
+    System.getenv(envAndFileKey)?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    if (System.getenv("GITHUB_ACTIONS") == "true") return null
+    return localPropMap[envAndFileKey]?.trim()?.takeIf { it.isNotEmpty() }
+}
+
 val resolvedVersionCode: Int =
-    projectProp("versionCode")?.toIntOrNull()
-        ?: System.getenv("VERSION_CODE")?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+    versionFromBuild("versionCode", "VERSION_CODE")?.toIntOrNull()
         ?: 1
 
 val resolvedVersionName: String =
-    projectProp("versionName")
-        ?: System.getenv("VERSION_NAME")?.trim()?.takeIf { it.isNotEmpty() }
+    versionFromBuild("versionName", "VERSION_NAME")
         ?: "1.0"
 
 android {

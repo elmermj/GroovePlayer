@@ -276,13 +276,13 @@ class LibraryImportPolicyTest {
     fun mediaStoreMatchRequiresThePickedFolder() {
         val picked = "primary:Download/gp_qa_a1"
         val rows = listOf(
-            MediaStoreAudioRow(id = 1, relativePath = "Download/other/"),
-            MediaStoreAudioRow(id = 2, relativePath = "Music/gp_qa_a1/"),
+            MediaStoreAudioRow(id = 1, relativePath = "Download/other/", volumeName = "external_primary"),
+            MediaStoreAudioRow(id = 2, relativePath = "Music/gp_qa_a1/", volumeName = "external_primary"),
         )
         assertNull(MediaStoreOriginalMatch.uniqueId(rows, picked, importedSha256 = "abc"))
         val exact = listOf(
-            MediaStoreAudioRow(id = 7, relativePath = "Download/gp_qa_a1/", contentHash = "abc"),
-            MediaStoreAudioRow(id = 8, relativePath = "Download/other/", contentHash = "abc"),
+            MediaStoreAudioRow(id = 7, relativePath = "Download/gp_qa_a1/", contentHash = "abc", volumeName = "external_primary"),
+            MediaStoreAudioRow(id = 8, relativePath = "Download/other/", contentHash = "abc", volumeName = "external_primary"),
         )
         assertEquals(7L, MediaStoreOriginalMatch.uniqueId(exact, picked, "ABC"))
     }
@@ -291,20 +291,44 @@ class LibraryImportPolicyTest {
     fun mediaStoreMatchRejectsADifferentHashAndDuplicateFolders() {
         val picked = "primary:Download/gp_qa_a1"
         val wrongHash = listOf(
-            MediaStoreAudioRow(id = 3, relativePath = "Download/gp_qa_a1/", contentHash = "other"),
+            MediaStoreAudioRow(id = 3, relativePath = "Download/gp_qa_a1/", contentHash = "other", volumeName = "external_primary"),
         )
         assertNull(MediaStoreOriginalMatch.uniqueId(wrongHash, picked, "abc"))
         val twins = listOf(
-            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/"),
-            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/"),
+            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/", volumeName = "external_primary"),
+            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/", volumeName = "external_primary"),
         )
         assertNull(MediaStoreOriginalMatch.uniqueId(twins, picked, importedSha256 = null))
         val hashed = listOf(
-            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/", contentHash = "nope"),
-            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/", contentHash = "abc"),
+            MediaStoreAudioRow(id = 4, relativePath = "Download/gp_qa_a1/", contentHash = "nope", volumeName = "external_primary"),
+            MediaStoreAudioRow(id = 5, relativePath = "Download/gp_qa_a1/sub/", contentHash = "abc", volumeName = "external_primary"),
         )
         assertEquals(5L, MediaStoreOriginalMatch.uniqueId(hashed, picked, "abc"))
         assertNull(MediaStoreOriginalMatch.uniqueId(hashed, "", "abc"))
+    }
+
+    @Test
+    fun mediaStoreMatchRequiresThePickedVolume() {
+        val picked = "primary:Download/gp_qa_a1"
+        val otherVolume = listOf(
+            MediaStoreAudioRow(
+                id = 9,
+                relativePath = "Download/gp_qa_a1/",
+                contentHash = "abc",
+                volumeName = "aaaa-bbbb",
+            ),
+        )
+        assertNull(MediaStoreOriginalMatch.uniqueId(otherVolume, picked, "abc"))
+        val onCard = listOf(
+            MediaStoreAudioRow(
+                id = 9,
+                relativePath = "Download/gp_qa_a1/",
+                contentHash = "abc",
+                volumeName = "abcd-1234",
+            ),
+        )
+        assertEquals(9L, MediaStoreOriginalMatch.uniqueId(onCard, "ABCD-1234:Download/gp_qa_a1", "abc"))
+        assertNull(MediaStoreOriginalMatch.uniqueId(onCard, picked, "abc"))
     }
 
     @Test

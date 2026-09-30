@@ -23,6 +23,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:922639144158:android:8c602b9d5f6ac513265e4f",
+        "android_client_info": {
+          "package_name": "com.aethelsoft.grooveplayer.staging"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGoe9XvTv-r_uufUu4tJ8o2w5cylHGM80"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.library.playlists
+package com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail
 
 import android.content.Context
 import android.net.Uri
@@ -6,9 +6,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.domain.model.PlaylistWithTracks
+import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.playlist.InvalidPlaylistNameException
+import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.AddSongsToPlaylistUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.DeletePlaylistUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ExportM3uPlaylistUseCase
+import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.GetSongRecommendationsUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.ObservePlaylistUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.RemovePlaylistTrackUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.playlist_category.RenamePlaylistUseCase
@@ -35,6 +38,8 @@ class PlaylistDetailViewModel @Inject constructor(
     private val removePlaylistTrackUseCase: RemovePlaylistTrackUseCase,
     private val reorderPlaylistUseCase: ReorderPlaylistUseCase,
     private val exportM3uPlaylistUseCase: ExportM3uPlaylistUseCase,
+    private val getSongRecommendationsUseCase: GetSongRecommendationsUseCase,
+    private val addSongsToPlaylistUseCase: AddSongsToPlaylistUseCase,
 ) : ViewModel() {
 
     val playlistId: Long = savedStateHandle.get<Long>("playlistId") ?: 0L
@@ -45,10 +50,18 @@ class PlaylistDetailViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _isRecommendationShown = MutableStateFlow(false)
+    val isRecommendationShown: StateFlow<Boolean> = _isRecommendationShown.asStateFlow()
+
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    private val _recommends = MutableStateFlow<List<Song>>(emptyList())
+    val recommends: StateFlow<List<Song>> = _recommends.asStateFlow()
+
+
     private val edits = Mutex()
+    private var recommendationLoad = 0
 
     init {
         viewModelScope.launch {
@@ -111,5 +124,66 @@ class PlaylistDetailViewModel @Inject constructor(
 
     fun dismissMessage() {
         _message.value = null
+    }
+
+    fun showRecommendations() {
+        val load = ++recommendationLoad
+        viewModelScope.launch {
+            try {
+                val songs = getSongRecommendationsUseCase()
+                if (load != recommendationLoad) return@launch
+                _recommends.value = songs
+                _isRecommendationShown.value = true
+            } catch (e: Exception) {
+                if (load != recommendationLoad) return@launch
+                _message.value = e.message ?: "Could not load recommendations"
+            }
+        }
+    }
+
+    fun dismissRecommendations() {
+        _recommends.value = emptyList()
+    }
+
+    fun dismissSheet() {
+        recommendationLoad++
+        _isRecommendationShown.value = false
+    }
+
+    fun onSwipeToDismissRecommendationItem(song: Song) {
+        removeRecommendation(song)
+    }
+
+    fun addToPlaylist(song: Song) {
+        viewModelScope.launch {
+            edits.withLock {
+                try {
+                    addSongsToPlaylistUseCase(playlistId, listOf(song))
+                    removeRecommendation(song)
+                } catch (e: Exception) {
+                    _message.value = e.message ?: "Could not add song"
+                }
+            }
+        }
+    }
+
+    fun addAll(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        viewModelScope.launch {
+            edits.withLock {
+                try {
+                    addSongsToPlaylistUseCase(playlistId, songs)
+                    dismissRecommendations()
+                    dismissSheet()
+                } catch (e: Exception) {
+                    _message.value = e.message ?: "Could not add songs"
+                }
+            }
+        }
+    }
+
+    private fun removeRecommendation(song: Song) {
+        _recommends.value = _recommends.value.filterNot { it.id == song.id }
+        if (_recommends.value.isEmpty()) dismissSheet()
     }
 }

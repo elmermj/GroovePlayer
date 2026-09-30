@@ -5,12 +5,12 @@ import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import com.aethelsoft.grooveplayer.domain.backup.ContentHash
 import com.aethelsoft.grooveplayer.domain.library.ImportByteSource
 import com.aethelsoft.grooveplayer.domain.library.LibraryAudioKinds
 import com.aethelsoft.grooveplayer.domain.library.MediaStoreAudioRow
 import com.aethelsoft.grooveplayer.domain.library.MediaStoreOriginalMatch
 import java.io.InputStream
-import java.security.MessageDigest
 
 data class ListedAudioDocument(
     val uri: Uri,
@@ -94,6 +94,7 @@ object SafAudioTree {
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.RELATIVE_PATH,
+            MediaStore.Audio.Media.VOLUME_NAME,
         )
         val rows = runCatching {
             resolver.query(
@@ -105,11 +106,13 @@ object SafAudioTree {
             )?.use { cursor ->
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
                 val pathCol = cursor.getColumnIndex(MediaStore.Audio.Media.RELATIVE_PATH)
+                val volumeCol = cursor.getColumnIndex(MediaStore.Audio.Media.VOLUME_NAME)
                 buildList {
                     while (cursor.moveToNext()) {
                         val id = cursor.getLong(idCol)
                         val relative = if (pathCol >= 0 && !cursor.isNull(pathCol)) cursor.getString(pathCol) else null
-                        add(MediaStoreAudioRow(id = id, relativePath = relative))
+                        val volume = if (volumeCol >= 0 && !cursor.isNull(volumeCol)) cursor.getString(volumeCol) else null
+                        add(MediaStoreAudioRow(id = id, relativePath = relative, volumeName = volume))
                     }
                 }
             }
@@ -117,29 +120,21 @@ object SafAudioTree {
         val confirmed = rows.map { row ->
             if (importedSha256.isNullOrBlank()) return@map row
             if (!MediaStoreOriginalMatch.folderMatches(row.relativePath, pickedTreeDocumentId)) return@map row
+            if (!MediaStoreOriginalMatch.volumeMatches(row.volumeName, pickedTreeDocumentId)) return@map row
             val uri = android.content.ContentUris.withAppendedId(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 row.id,
             )
-            row.copy(contentHash = sha256(resolver, uri))
+            row.copy(contentHash = hash(resolver, uri))
         }
         val id = MediaStoreOriginalMatch.uniqueId(confirmed, pickedTreeDocumentId, importedSha256)
             ?: return null
         return android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
     }
 
-    private fun sha256(resolver: ContentResolver, uri: Uri): String? {
+    private fun hash(resolver: ContentResolver, uri: Uri): String? {
         return runCatching {
-            val digest = MessageDigest.getInstance("SHA-256")
-            resolver.openInputStream(uri)?.use { input ->
-                val buf = ByteArray(8 * 1024)
-                while (true) {
-                    val read = input.read(buf)
-                    if (read < 0) break
-                    digest.update(buf, 0, read)
-                }
-            } ?: return null
-            digest.digest().joinToString("") { b -> "%02x".format(b) }
+            resolver.openInputStream(uri)?.use { ContentHash.sha256(it) }
         }.getOrNull()
     }
 }

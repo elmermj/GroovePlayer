@@ -15,4 +15,5 @@ interface PlaylistRepository {
     suspend fun addSongs(playlistId: Long, songs: List<Song>)
     suspend fun removeTrack(playlistId: Long, entryId: Long)
     suspend fun reorder(playlistId: Long, orderedEntryIds: List<Long>)
+    suspend fun getSongRecommendations(): List<Song>
 }

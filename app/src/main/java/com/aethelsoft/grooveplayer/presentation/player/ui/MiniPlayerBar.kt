@@ -44,7 +44,9 @@ import com.aethelsoft.grooveplayer.presentation.common.grooveBottomChromeGlass
 import com.aethelsoft.grooveplayer.presentation.common.grooveTopChromeGlass
 import com.aethelsoft.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
-import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.bluetooth.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.bluetooth.ui.BTIndicatorIconComponent
+import com.aethelsoft.grooveplayer.presentation.bluetooth.ui.BluetoothBottomSheet
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
 import com.aethelsoft.grooveplayer.utils.DeviceType
@@ -322,7 +324,8 @@ private fun TabletMiniPlayerBarContent(
                             IconButton(onClick = onShowBluetoothSheet) {
                                 BTIndicatorIconComponent(
                                     modifier = Modifier.size(24.dp).padding(),
-                                    connectedDeviceName = bluetoothViewModel.connectedDevice.collectAsState().value?.name ?: "",
+                                    connectedDeviceName = bluetoothViewModel.connectedDevice.collectAsState().value?.name
+                                        ?: "",
                                     isConnected = bluetoothViewModel.connectedDevice.collectAsState().value != null
                                 )
                             }

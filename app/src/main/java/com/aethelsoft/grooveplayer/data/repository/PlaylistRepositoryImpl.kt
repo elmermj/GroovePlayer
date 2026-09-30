@@ -17,8 +17,11 @@ import com.aethelsoft.grooveplayer.domain.model.PlaylistWithTracks
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.domain.playlist.InvalidPlaylistNameException
 import com.aethelsoft.grooveplayer.domain.playlist.PlaylistNames
+import com.aethelsoft.grooveplayer.domain.playlist.SongRecommendations
+import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.PlaylistRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.File
 import javax.inject.Inject
@@ -28,6 +31,7 @@ class PlaylistRepositoryImpl @Inject constructor(
     private val playlistDao: PlaylistDao,
     private val songDao: SongDao,
     private val libraryIndex: PlaylistLibraryIndex,
+    private val musicRepository: MusicRepository,
 ) : PlaylistRepository {
 
     override fun observePlaylists(): Flow<List<Playlist>> =
@@ -109,6 +113,25 @@ class PlaylistRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getSongRecommendations(): List<Song> {
+        val library = musicRepository.getAllSongs()
+        if (library.isEmpty()) return emptyList()
+        val playCounts = database.playbackHistoryDao()
+            .getMostPlayed(limit = Int.MAX_VALUE)
+            .first()
+            .associate { it.songId to it.playCount }
+        val years = database.songMetadataDao()
+            .getAllMetadata()
+            .first()
+            .mapNotNull { row -> row.year?.let { row.songId to it } }
+            .toMap()
+        return SongRecommendations.top(
+            songs = library.map { song -> song.withYear(years[song.id]) },
+            playCounts = playCounts,
+            order = SongRecommendations.Order.entries.random(),
+        )
+    }
+
     private suspend fun resolve(relation: PlaylistWithTracksRelation): PlaylistWithTracks {
         val base = PlaylistMapper.toDomain(relation)
         val tracks = relation.tracks
@@ -152,6 +175,11 @@ class PlaylistRepositoryImpl @Inject constructor(
             contentHash = hash,
             available = false,
         )
+    }
+
+    private fun Song.withYear(metadataYear: Int?): Song {
+        val resolved = metadataYear ?: year ?: album?.year
+        return if (resolved == year) this else copy(year = resolved)
     }
 
     private fun fileReady(row: SongEntity): Boolean {

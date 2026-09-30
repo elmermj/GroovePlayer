@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.player.ui
+package com.aethelsoft.grooveplayer.presentation.bluetooth.ui
 
 import XCheckCircle
 import android.bluetooth.BluetoothAdapter
@@ -42,7 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aethelsoft.grooveplayer.domain.model.BluetoothDevice
 import com.aethelsoft.grooveplayer.presentation.common.rememberBluetoothViewModel
-import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.bluetooth.BluetoothViewModel
 import com.aethelsoft.grooveplayer.utils.rememberBluetoothPermissionState
 import com.aethelsoft.grooveplayer.utils.theme.icons.XClose
 

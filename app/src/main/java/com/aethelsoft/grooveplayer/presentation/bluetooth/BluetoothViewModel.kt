@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.player
+package com.aethelsoft.grooveplayer.presentation.bluetooth
 
 import android.app.Application
 import android.util.Log

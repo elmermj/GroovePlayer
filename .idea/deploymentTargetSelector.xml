@@ -35,6 +35,12 @@
       <SelectionState runConfigName="Large Tablet Player Layout Preview - LargeTabletPlayerLayout">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
+      <SelectionState runConfigName="Groove Prod">
+        <option name="selectionMode" value="DROPDOWN" />
+      </SelectionState>
+      <SelectionState runConfigName="Groove Staging">
+        <option name="selectionMode" value="DROPDOWN" />
+      </SelectionState>
     </selectionStates>
   </component>
 </project>

@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.library.playlists
+package com.aethelsoft.grooveplayer.presentation.library.playlists.add_playlist
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

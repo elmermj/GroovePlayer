@@ -1,4 +1,4 @@
-package com.aethelsoft.grooveplayer.presentation.player.ui
+package com.aethelsoft.grooveplayer.presentation.bluetooth.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon

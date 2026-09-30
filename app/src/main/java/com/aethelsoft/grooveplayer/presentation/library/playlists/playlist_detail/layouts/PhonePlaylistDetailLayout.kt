@@ -1,0 +1,147 @@
+package com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.layouts
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.aethelsoft.grooveplayer.domain.model.PlaylistTrack
+import com.aethelsoft.grooveplayer.domain.model.PlaylistWithTracks
+import com.aethelsoft.grooveplayer.presentation.common.GrooveActionButton
+import com.aethelsoft.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelsoft.grooveplayer.presentation.common.GrooveTinySpacer
+import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistTrackList
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.PlaylistDetailViewModel
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.playPlaylist
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.ui.RecommendationsList
+import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelsoft.grooveplayer.utils.XS_PADDING
+import com.aethelsoft.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelsoft.grooveplayer.utils.theme.ui.SoftWhite
+import kotlinx.coroutines.delay
+
+@Composable
+fun PhonePlaylistDetailLayout(
+    playlist: PlaylistWithTracks?,
+    tracks: List<PlaylistTrack>,
+    isLoading: Boolean,
+    message: String?,
+    onAddTracks: () -> Unit,
+    viewModel: PlaylistDetailViewModel,
+    playerViewModel: PlayerViewModel
+){
+    val recommends by viewModel.recommends.collectAsState()
+    val recommendationsShown by viewModel.isRecommendationShown.collectAsState()
+    val pageReady = !isLoading && playlist != null
+    var revealRecommendations by remember { mutableStateOf(false) }
+    LaunchedEffect(pageReady) {
+        if (!pageReady) {
+            revealRecommendations = false
+            viewModel.dismissSheet()
+            return@LaunchedEffect
+        }
+        viewModel.showRecommendations()
+        delay(1_000)
+        revealRecommendations = true
+    }
+
+    when {
+        isLoading && playlist == null -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = GrooveTheme.colors.onSurface)
+            }
+        }
+        playlist == null -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                GrooveMutedText("Playlist not found")
+            }
+        }
+        tracks.isEmpty() -> {
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    GrooveMutedText("No tracks yet")
+                    GrooveTinySpacer()
+                    TextButton(onClick = onAddTracks) {
+                        Text("Add tracks", color = SoftWhite)
+                    }
+                }
+                AnimatedVisibility(
+                    visible = revealRecommendations && recommendationsShown,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    enter = slideInVertically(
+                        animationSpec = tween(durationMillis = 400),
+                        initialOffsetY = { fullHeight -> fullHeight },
+                    ) + fadeIn(animationSpec = tween(durationMillis = 400)),
+                    exit = slideOutVertically(
+                        animationSpec = tween(durationMillis = 300),
+                        targetOffsetY = { fullHeight -> fullHeight },
+                    ) + fadeOut(animationSpec = tween(durationMillis = 300)),
+                ) {
+                    RecommendationsList(
+                        recommends = recommends,
+                        onAddToPlaylist = viewModel::addToPlaylist,
+                        onAddAll = viewModel::addAll,
+                        onDismiss = viewModel::onSwipeToDismissRecommendationItem,
+                        onDismissSheet = viewModel::dismissSheet,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(0.72f),
+                    )
+                }
+            }
+        }
+        else -> {
+            PlaylistTrackList(
+                tracks = tracks,
+                onPlay = { index -> playPlaylist(playerViewModel, tracks, index) },
+                onMove = viewModel::move,
+                onRemove = viewModel::removeTrack,
+                header = {
+                    Column(verticalArrangement = Arrangement.spacedBy(XS_PADDING)) {
+                        GrooveActionButton(
+                            label = "Play",
+                            onClick = {
+                                playPlaylist(
+                                    playerViewModel,
+                                    tracks,
+                                    tappedIndex = null
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        if (!message.isNullOrBlank()) {
+                            GrooveMutedText(
+                                text = message.orEmpty(),
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
+                    }
+                },
+            )
+        }
+    }
+}

@@ -27,8 +27,8 @@ import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteArtist
 import com.aethelsoft.grooveplayer.presentation.library.favorites.FavoriteTracksScreen
 import com.aethelsoft.grooveplayer.presentation.library.genres.GenreTracksScreen
 import com.aethelsoft.grooveplayer.presentation.library.genres.GenresScreen
-import com.aethelsoft.grooveplayer.presentation.library.playlists.AddPlaylistTracksScreen
-import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistDetailScreen
+import com.aethelsoft.grooveplayer.presentation.library.playlists.add_playlist.AddPlaylistTracksScreen
+import com.aethelsoft.grooveplayer.presentation.library.playlists.playlist_detail.PlaylistDetailScreen
 import com.aethelsoft.grooveplayer.presentation.library.playlists.PlaylistsScreen
 import com.aethelsoft.grooveplayer.presentation.library.mostplayed.MostPlayedScreen
 import com.aethelsoft.grooveplayer.presentation.library.recentlyplayed.RecentlyPlayedScreen
@@ -37,7 +37,7 @@ import com.aethelsoft.grooveplayer.presentation.player.FullPlayerScreen
 import com.aethelsoft.grooveplayer.presentation.profile.ProfileScreen
 import com.aethelsoft.grooveplayer.presentation.ui_customisation.UiCustomisationScreen
 import com.aethelsoft.grooveplayer.presentation.backup.BackupScreen
-import com.aethelsoft.grooveplayer.presentation.backup.RestoreApplyScreen
+import com.aethelsoft.grooveplayer.presentation.restore_apply.RestoreApplyScreen
 import com.aethelsoft.grooveplayer.presentation.search.SearchScreen
 import com.aethelsoft.grooveplayer.presentation.share.ReceiveApprovalScreen
 import com.aethelsoft.grooveplayer.presentation.transfer.DeviceDiscoveryScreen

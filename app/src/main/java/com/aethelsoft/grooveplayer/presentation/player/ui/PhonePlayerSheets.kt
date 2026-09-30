@@ -65,6 +65,7 @@ import androidx.compose.ui.zIndex
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtwork
 import com.aethelsoft.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelsoft.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.theme.animations.AudioWaveAnimation
@@ -365,7 +366,7 @@ fun PhoneQueueSheet(
 
 /**
  * Phone equalizer bottom sheet: fixed ~70% height (does not drag to full screen).
- * Content is the Tablet EQ panel ([EqualizerControlsComponent]) in its Phone-sheet variant, so the logic is shared.
+ * Content is the Tablet EQ panel ([com.aethelsoft.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent]) in its Phone-sheet variant, so the logic is shared.
  * Band drags lock the sheet so the gesture stays on the slider.
  */
 @OptIn(ExperimentalMaterial3Api::class)

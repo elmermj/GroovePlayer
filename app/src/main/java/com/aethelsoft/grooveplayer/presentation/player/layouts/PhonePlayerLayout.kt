@@ -16,22 +16,17 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +46,6 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.palette.graphics.Palette
@@ -66,12 +60,12 @@ import coil3.toBitmap
 import com.aethelsoft.grooveplayer.data.player.AudioVisualizationData
 import com.aethelsoft.grooveplayer.domain.model.RepeatMode
 import com.aethelsoft.grooveplayer.domain.model.VisualizationMode
-import com.aethelsoft.grooveplayer.presentation.player.BluetoothViewModel
+import com.aethelsoft.grooveplayer.presentation.bluetooth.BluetoothViewModel
 import com.aethelsoft.grooveplayer.presentation.player.PlayerSongDetailsSheetState
 import com.aethelsoft.grooveplayer.presentation.player.PlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.player.formatMillis
-import com.aethelsoft.grooveplayer.presentation.player.ui.BTIndicatorIconComponent
-import com.aethelsoft.grooveplayer.presentation.player.ui.BluetoothEllipticalLazyScroll
+import com.aethelsoft.grooveplayer.presentation.bluetooth.ui.BTIndicatorIconComponent
+import com.aethelsoft.grooveplayer.presentation.bluetooth.ui.BluetoothEllipticalLazyScroll
 import com.aethelsoft.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelsoft.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelsoft.grooveplayer.presentation.player.ui.PhoneEqualizerSheet
@@ -85,6 +79,7 @@ import com.aethelsoft.grooveplayer.presentation.player.ui.VisualizationControl
 import com.aethelsoft.grooveplayer.presentation.player.ui.rememberArtworkGlowMotion
 import com.aethelsoft.grooveplayer.presentation.player.ui.detectPullUpToSongDetails
 import com.aethelsoft.grooveplayer.utils.APP_BAR_HEIGHT
+import com.aethelsoft.grooveplayer.utils.DeviceType
 import com.aethelsoft.grooveplayer.utils.M_PADDING
 import com.aethelsoft.grooveplayer.utils.S_PADDING
 import com.aethelsoft.grooveplayer.utils.rememberAdaptiveWindowInfo
@@ -383,7 +378,7 @@ fun PhonePlayerLayout(
                         hasBluetoothPermissions = hasBluetoothPermissions,
                         onRequestBluetoothPermission = requestBluetoothPermissions,
                         onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
-                        deviceType = com.aethelsoft.grooveplayer.utils.DeviceType.PHONE,
+                        deviceType = DeviceType.PHONE,
                         onShaderClicked = { showBluetoothSheet = false }
                     )
                 }
