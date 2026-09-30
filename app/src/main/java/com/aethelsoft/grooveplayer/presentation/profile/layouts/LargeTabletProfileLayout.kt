@@ -70,6 +70,7 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.ui.platform.LocalContext
+import com.aethelsoft.grooveplayer.BuildConfig
 
 @Composable
 fun LargeTabletProfileLayout(
@@ -227,7 +228,7 @@ MiniPlayerOnStartRow(
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XAppVersion) },
                     title = "App version",
-                    subtitle = "See current version"
+                    subtitle = "Version ${BuildConfig.VERSION_NAME}"
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
