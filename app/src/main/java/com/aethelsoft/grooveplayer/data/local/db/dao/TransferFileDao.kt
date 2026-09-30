@@ -19,6 +19,9 @@ interface TransferFileDao {
     @Query("UPDATE transfer_files SET transferredBytes = :bytes, status = :status, retryCount = :retryCount WHERE id = :id")
     suspend fun updateProgress(id: Long, bytes: Long, status: String, retryCount: Int)
 
+    @Query("UPDATE transfer_files SET checksum = :checksum WHERE id = :id")
+    suspend fun updateChecksum(id: Long, checksum: String)
+
     @Query("SELECT * FROM transfer_files WHERE transferId = :transferId ORDER BY id")
     suspend fun getByTransferId(transferId: Long): List<TransferFileEntity>
 

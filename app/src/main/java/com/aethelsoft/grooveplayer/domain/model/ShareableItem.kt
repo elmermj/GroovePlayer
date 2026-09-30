@@ -10,5 +10,9 @@ data class ShareableItem(
     val artist: String,
     val album: String?,
     val sizeBytes: Long,
-    val mimeType: String
+    val mimeType: String,
+    /** Original file name, extension included. */
+    val fileName: String? = null,
+    /** SHA-256 from [com.aethelsoft.grooveplayer.domain.backup.ContentHash]. */
+    val checksum: String? = null,
 )
