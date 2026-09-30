@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.aethelsoft.grooveplayer.domain.model.UserProfile
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
+import com.aethelsoft.grooveplayer.domain.auth.SessionLoadPurpose
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.usecase.auth_category.SignInWithGoogleUseCase
 import com.aethelsoft.grooveplayer.domain.usecase.auth_category.DeleteAccountUseCase
@@ -212,9 +213,12 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val result = if (userInitiated) {
-                    restoreAuthSessionUseCase(boundByStartupTimeout = false)
+                    restoreAuthSessionUseCase(
+                        boundByStartupTimeout = false,
+                        purpose = SessionLoadPurpose.USER_RETRY,
+                    )
                 } else {
-                    restoreAuthSessionUseCase()
+                    restoreAuthSessionUseCase(purpose = SessionLoadPurpose.FOLLOW_UP)
                 }
                 result.onFailure { error ->
                     if (error is CancellationException) throw error

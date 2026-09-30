@@ -3,9 +3,11 @@ package com.aethelsoft.grooveplayer.data.mapper
 import com.aethelsoft.grooveplayer.data.remote.dto.PublicUserDto
 import com.aethelsoft.grooveplayer.data.remote.dto.StorageAddonDto
 import com.aethelsoft.grooveplayer.data.remote.dto.StorageEntitlementDto
+import com.aethelsoft.grooveplayer.data.remote.dto.SubscriptionDto
 import com.aethelsoft.grooveplayer.data.remote.dto.TokenResponseDto
 import com.aethelsoft.grooveplayer.domain.model.AuthTokens
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
+import com.aethelsoft.grooveplayer.domain.model.PlanSubscription
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.model.StorageAddon
 import com.aethelsoft.grooveplayer.domain.model.StorageEntitlement
@@ -31,6 +33,24 @@ object AuthMapper {
             avatarUrl = dto.avatarUrl,
             privilegeTier = tier,
             storage = storage,
+            subscription = toSubscription(dto.subscription),
+        )
+    }
+
+    /** Null when the object is missing or carries no plan fields (older servers, free). */
+    fun toSubscription(dto: SubscriptionDto?): PlanSubscription? {
+        if (dto == null) return null
+        val blank = dto.planKind.isNullOrBlank() &&
+            dto.status.isNullOrBlank() &&
+            dto.currentPeriodEnd.isNullOrBlank() &&
+            dto.graceUntil.isNullOrBlank()
+        if (blank) return null
+        return PlanSubscription(
+            planKind = tierFromServer(dto.planKind),
+            status = dto.status.orEmpty(),
+            currentPeriodEndEpochMs = parseIsoEpochMs(dto.currentPeriodEnd),
+            autoRenew = dto.autoRenew == true,
+            graceUntilEpochMs = parseIsoEpochMs(dto.graceUntil),
         )
     }
 

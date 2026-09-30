@@ -1,5 +1,6 @@
 package com.aethelsoft.grooveplayer.data.playback
 
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
 import com.aethelsoft.grooveplayer.domain.playback.cloudObjectMatchesSong
 import com.aethelsoft.grooveplayer.domain.repository.BackupRepository
@@ -16,6 +17,7 @@ import javax.inject.Singleton
 @Singleton
 class CloudSongCatalog @Inject constructor(
     private val backupRepository: BackupRepository,
+    private val serverAccess: ServerAccessGate,
 ) {
     private val mutex = Mutex()
     private val confirmedSongIds = ConcurrentHashMap.newKeySet<String>()
@@ -38,6 +40,7 @@ class CloudSongCatalog @Inject constructor(
      * @return null when the catalog could not be read (do not treat as "absent").
      */
     suspend fun load(): List<BackupObject>? = mutex.withLock {
+        if (!serverAccess.allowsPaidApis()) return@withLock null
         val now = System.currentTimeMillis()
         val cached = objects
         if (cached != null && now - loadedAtMs < TTL_MS) return@withLock cached

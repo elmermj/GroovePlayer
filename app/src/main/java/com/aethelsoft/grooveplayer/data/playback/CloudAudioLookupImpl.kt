@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.data.playback
 
 import android.util.Log
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
 import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackObjectDto
 import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackStreamRequestDto
@@ -30,11 +31,15 @@ class CloudAudioLookupImpl @Inject constructor(
     private val playbackApi: PlaybackApi,
     private val moshi: Moshi,
     private val cloudSongCatalog: CloudSongCatalog,
+    private val serverAccess: ServerAccessGate,
 ) : CloudAudioLookup {
 
     private val bodyAdapter = moshi.adapter(PlaybackObjectDto::class.java)
 
     override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit {
+        if (!serverAccess.sessionPresent()) {
+            return CloudAudioHit(CloudAudioPresence.UNKNOWN)
+        }
         val path = logicalPath?.takeIf { it.isNotBlank() }
         val size = song.fileSizeBytes?.takeIf { it > 0L }
         // No sha256 on the device catalog. Path + size is the supported fallback.
@@ -68,6 +73,7 @@ class CloudAudioLookupImpl @Inject constructor(
     }
 
     override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen {
+        if (!serverAccess.sessionPresent()) return CloudStreamOpen.Unknown
         val hash = ticket.contentHash?.takeIf { it.isNotBlank() }
         val path = ticket.logicalPath?.takeIf { it.isNotBlank() }
         val size = ticket.sizeBytes?.takeIf { it > 0L }

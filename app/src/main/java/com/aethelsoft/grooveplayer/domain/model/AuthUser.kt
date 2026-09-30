@@ -14,4 +14,6 @@ data class AuthUser(
      * but backend omits the object.
      */
     val storage: StorageEntitlement? = null,
+    /** From `/v1/me.subscription`. Null for free users and older servers. */
+    val subscription: PlanSubscription? = null,
 )

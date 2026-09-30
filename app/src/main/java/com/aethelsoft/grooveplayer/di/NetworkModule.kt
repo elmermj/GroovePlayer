@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.di
 
 import com.aethelsoft.grooveplayer.BuildConfig
 import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.auth.TokenRefreshAuthenticator
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
@@ -21,8 +22,11 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.Authenticator
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -101,6 +105,7 @@ object NetworkModule {
     fun provideOkHttpClient(
         authInterceptor: Interceptor,
         tokenRefreshAuthenticator: Authenticator,
+        serverAccess: ServerAccessGate,
     ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
@@ -109,12 +114,34 @@ object NetworkModule {
                 HttpLoggingInterceptor.Level.NONE
             }
         }
+        val paidGate = Interceptor { chain ->
+            val request = chain.request()
+            if (serverAccess.allows(request.url.encodedPath, request.method)) {
+                chain.proceed(request)
+            } else {
+                android.util.Log.i(
+                    "BackendCallGuard",
+                    "blocked ${request.method} ${request.url.encodedPath}",
+                )
+                Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(403)
+                    .message("Blocked")
+                    .body(
+                        """{"error":"paid_tier_required"}"""
+                            .toResponseBody("application/json".toMediaType()),
+                    )
+                    .build()
+            }
+        }
         // IPv4 before IPv6, short handshake. A blackholed AAAA route used to
         // outlast the 12s startup cap, so /v1/me never ran and Profile hid quota.
         return OkHttpClient.Builder()
             .backendDns()
             .readTimeout(20, TimeUnit.SECONDS)
             .callTimeout(StartupSessionRecovery.RETRY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+            .addInterceptor(paidGate)
             .addInterceptor(authInterceptor)
             .addInterceptor(logging)
             .authenticator(tokenRefreshAuthenticator)

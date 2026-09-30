@@ -25,12 +25,25 @@ object StartupSessionRecovery {
      */
     const val RETRY_TIMEOUT_MS = 30_000L
 
+    const val ACCOUNT_DELETED = "account_deleted"
+
+    private val ACCOUNT_DELETED_BODY = Regex(
+        """"(?:error|code)"\s*:\s*"account_deleted"""",
+        RegexOption.IGNORE_CASE,
+    )
+
     enum class FailureKind {
         /** HTTP 401. Refresh, then retry. */
         UNAUTHORIZED,
 
         /** No HTTP response (DNS, connect, timeout). Do not refresh. */
         UNREACHABLE,
+
+        /**
+         * HTTP 404, or a JSON `error` / `code` of [ACCOUNT_DELETED], from
+         * `/v1/me` or refresh. The account row is gone. Do not keep the session.
+         */
+        ACCOUNT_DELETED,
 
         /** Any other failure, including HTTP 5xx. Refresh once, then fall back. */
         OTHER,
@@ -50,6 +63,22 @@ object StartupSessionRecovery {
 
         /** Refresh token was rejected. Caller drops the local session. */
         data object RefreshRejected : Outcome()
+
+        /**
+         * `/v1/me` or refresh said the account is gone (HTTP 404 or
+         * [ACCOUNT_DELETED]). Caller drops the local session.
+         */
+        data object AccountDeleted : Outcome()
+    }
+
+    /**
+     * True for HTTP 404 or a JSON body whose `error` or `code` is
+     * [ACCOUNT_DELETED]. Harmless when the server never sends that signal.
+     */
+    fun isAccountDeletedSignal(statusCode: Int?, body: String?): Boolean {
+        if (statusCode == 404) return true
+        if (body.isNullOrBlank()) return false
+        return ACCOUNT_DELETED_BODY.containsMatchIn(body)
     }
 
     /**
@@ -69,16 +98,19 @@ object StartupSessionRecovery {
         outcome: Outcome,
         newerRemotePublished: Boolean,
     ): Boolean {
-        if (outcome is Outcome.RefreshRejected) return true
+        if (outcome is Outcome.RefreshRejected || outcome is Outcome.AccountDeleted) return true
         if (attempt >= latestAttempt) return true
         return when (outcome) {
             is Outcome.LocalFallback -> false
             is Outcome.Remote -> !newerRemotePublished
-            Outcome.RefreshRejected -> true
+            Outcome.RefreshRejected, Outcome.AccountDeleted -> true
         }
     }
 
     fun failureKind(error: Throwable): FailureKind {
+        if (findErrorCode(error) == ACCOUNT_DELETED || findStatus(error) == 404) {
+            return FailureKind.ACCOUNT_DELETED
+        }
         val status = findStatus(error)
         if (status == 401) return FailureKind.UNAUTHORIZED
         if (status != null) return FailureKind.OTHER
@@ -125,8 +157,11 @@ object StartupSessionRecovery {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (failureKind(e) == FailureKind.UNREACHABLE) {
-                    return Outcome.LocalFallback(localUserOrNull(localUser))
+                when (failureKind(e)) {
+                    FailureKind.UNREACHABLE ->
+                        return Outcome.LocalFallback(localUserOrNull(localUser))
+                    FailureKind.ACCOUNT_DELETED -> return Outcome.AccountDeleted
+                    FailureKind.UNAUTHORIZED, FailureKind.OTHER -> Unit
                 }
             }
         }
@@ -137,16 +172,19 @@ object StartupSessionRecovery {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (failureKind(e) == FailureKind.UNAUTHORIZED) {
-                return Outcome.RefreshRejected
+            return when (failureKind(e)) {
+                FailureKind.UNAUTHORIZED -> Outcome.RefreshRejected
+                FailureKind.ACCOUNT_DELETED -> Outcome.AccountDeleted
+                FailureKind.UNREACHABLE, FailureKind.OTHER ->
+                    Outcome.LocalFallback(localUserOrNull(localUser))
             }
-            return Outcome.LocalFallback(localUserOrNull(localUser))
         }
         val user = try {
             me(refreshed.accessToken)
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (failureKind(e) == FailureKind.ACCOUNT_DELETED) return Outcome.AccountDeleted
             // Refresh already returned a user. A failed retry must not blank Home.
             refreshed.user
         }
@@ -170,12 +208,22 @@ object StartupSessionRecovery {
         }
         return null
     }
+
+    private fun findErrorCode(error: Throwable): String? {
+        var cur: Throwable? = error
+        while (cur != null) {
+            if (cur is AuthStatusException && !cur.errorCode.isNullOrBlank()) return cur.errorCode
+            cur = cur.cause
+        }
+        return null
+    }
 }
 
 /** HTTP status from an auth call, or null when the server never answered. */
 class AuthStatusException(
     val statusCode: Int?,
     cause: Throwable? = null,
+    val errorCode: String? = null,
 ) : Exception(
     if (statusCode != null) "HTTP $statusCode" else cause?.message,
     cause,
