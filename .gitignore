@@ -37,3 +37,14 @@ grooveplayer-tablet-shots/
 !README.md
 !**/README.md
 !.github/pull_request_template.md
+
+# Stale AGP outputs that used to sit next to the module (not app/build/).
+# Distribute and build-*.sh write under app/build/outputs/, which build/ already ignores.
+# There is no baseline-prof.txt source in this repo; the .dm files were release artifacts.
+app/debug/
+app/release/
+*.apk
+*.aab
+*.dm
+*.log
+*_log.txt
