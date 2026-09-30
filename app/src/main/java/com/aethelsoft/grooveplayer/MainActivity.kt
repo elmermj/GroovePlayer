@@ -365,6 +365,9 @@ fun GroovePlayerAppMain() {
         openBackup = {
             navController.navigate(AppRoutes.BACKUP)
         },
+        openRecentUpdates = {
+            navController.navigate(AppRoutes.RECENT_UPDATES)
+        },
     )
 
     val secondaryBottomContent = remember { mutableStateOf<(@Composable () -> Unit)?>(null) }

@@ -92,6 +92,7 @@ fun ProfileDrawer(
                 ) {
                     ProfileDrawerContent(
                         deviceType = deviceType,
+                        isOpen = isOpen,
                         onNavigateToShare = onNavigateToShare,
                         onNavigateToUiStyling = onNavigateToUiStyling,
                         onNavigateToBackup = onNavigateToBackup,
