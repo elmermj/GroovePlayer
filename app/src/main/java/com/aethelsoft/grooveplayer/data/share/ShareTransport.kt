@@ -3,10 +3,11 @@ package com.aethelsoft.grooveplayer.data.share
 import android.content.Context
 import android.net.Uri
 import com.aethelsoft.grooveplayer.domain.model.ShareableItem
+import com.aethelsoft.grooveplayer.domain.transfer.ReceivedTransferIntake
+import java.io.File
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.InputStream
@@ -69,24 +70,42 @@ class ShareTransport @Inject constructor(
         }
     }
 
+    /**
+     * Writes [totalBytes] into [dest] inside the caller's staging directory.
+     * A short read deletes [dest] and returns the count that arrived.
+     * Returns -1 when [totalBytes] is outside the receive limit, without writing.
+     */
     suspend fun receiveFile(
         ins: InputStream,
-        outUri: Uri,
+        dest: File,
         totalBytes: Long,
         onProgress: suspend (bytesTransferred: Long, totalBytes: Long) -> Unit
-    ) = withContext(Dispatchers.IO) {
-        val dis = if (ins is DataInputStream) ins else DataInputStream(ins)
-        context.contentResolver.openOutputStream(outUri, "w")?.use { output ->
-            var total = 0L
-            while (total < totalBytes) {
-                val toRead = minOf(readBuffer.size.toLong(), totalBytes - total).toInt()
-                val n = dis.read(readBuffer, 0, toRead)
-                if (n < 0) break
-                output.write(readBuffer, 0, n)
-                total += n
-                onProgress(total, totalBytes)
-            }
+    ): Long = withContext(Dispatchers.IO) {
+        if (totalBytes <= 0L || totalBytes > ReceivedTransferIntake.MAX_FILE_BYTES) {
+            if (dest.exists()) dest.delete()
+            return@withContext -1L
         }
+        dest.parentFile?.mkdirs()
+        if (dest.exists()) dest.delete()
+        val dis = if (ins is DataInputStream) ins else DataInputStream(ins)
+        var total = 0L
+        try {
+            dest.outputStream().use { output ->
+                while (total < totalBytes) {
+                    val toRead = minOf(readBuffer.size.toLong(), totalBytes - total).toInt()
+                    val n = dis.read(readBuffer, 0, toRead)
+                    if (n < 0) break
+                    output.write(readBuffer, 0, n)
+                    total += n
+                    onProgress(total, totalBytes)
+                }
+            }
+        } catch (e: Exception) {
+            if (dest.exists()) dest.delete()
+            throw e
+        }
+        if (total != totalBytes && dest.exists()) dest.delete()
+        total
     }
 
     fun createServerSocket(port: Int): ServerSocket = ServerSocket(port)

@@ -6,9 +6,9 @@ import com.aethelsoft.grooveplayer.utils.helpers.logShareNearbyP2PTag
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.aethelsoft.grooveplayer.domain.transfer.ReceivedTransferIntake
 import java.io.File
 import java.io.RandomAccessFile
-import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,20 +40,12 @@ class FileChunkReceiver @Inject constructor(
     }
 
     /**
-     * Validate file checksum after transfer.
+     * SHA-256 check after the staged file is complete. Uses [ReceivedTransferIntake],
+     * which hashes through the private-library content hash.
      */
     suspend fun validateChecksum(filePath: String, expectedChecksum: String): Boolean =
         withContext(Dispatchers.IO) {
-            val digest = MessageDigest.getInstance("SHA-256")
-            RandomAccessFile(filePath, "r").use { raf ->
-                val buffer = ByteArray(TransferProtocol.DEFAULT_CHUNK_SIZE)
-                var read: Int
-                while (raf.read(buffer).also { read = it } != -1) {
-                    digest.update(buffer, 0, read)
-                }
-            }
-            val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            actual.equals(expectedChecksum, ignoreCase = true)
+            ReceivedTransferIntake.checksumMatches(File(filePath), expectedChecksum)
         }
 
     /**

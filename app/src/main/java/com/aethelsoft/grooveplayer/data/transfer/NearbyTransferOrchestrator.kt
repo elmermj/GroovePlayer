@@ -7,9 +7,16 @@ import com.google.android.gms.nearby.connection.PayloadCallback
 import com.google.android.gms.nearby.connection.PayloadTransferUpdate
 import java.nio.ByteOrder
 import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
+import com.aethelsoft.grooveplayer.data.library.SongIdentityStore
 import com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySongs
+import com.aethelsoft.grooveplayer.domain.library.SongHashRemap
+import com.aethelsoft.grooveplayer.domain.model.transfer.Transfer
 import com.aethelsoft.grooveplayer.domain.model.transfer.TransferStatus
+import com.aethelsoft.grooveplayer.domain.repository.transfer.IncomingTransferFile
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
+import com.aethelsoft.grooveplayer.domain.transfer.ReceiveFailure
+import com.aethelsoft.grooveplayer.domain.transfer.ReceivedTransferIntake
+import com.aethelsoft.grooveplayer.domain.transfer.userMessage
 import com.aethelsoft.grooveplayer.domain.usecase.home_category.RefreshMusicCatalogUseCase
 import com.aethelsoft.grooveplayer.services.NearbyTransferService
 import com.aethelsoft.grooveplayer.services.TransferServiceState
@@ -40,6 +47,7 @@ class NearbyTransferOrchestrator @Inject constructor(
     private val notificationBridge: TransferNotificationBridge,
     private val grooveDownloads: GrooveDownloadsLocator,
     private val refreshMusicCatalogUseCase: RefreshMusicCatalogUseCase,
+    private val songIdentity: SongIdentityStore,
 ) {
     private val tag = logShareNearbyP2PTag(context)
 
@@ -84,30 +92,42 @@ class NearbyTransferOrchestrator @Inject constructor(
         }
     }
 
-    private fun sendFileMetadata(filePaths: List<String>) {
-        val totalBytes = filePaths.sumOf { java.io.File(it).length() }
-        Log.d(tag, "Sender: sendFileMetadata fileCount=${filePaths.size} totalBytes=$totalBytes")
-        val fileCount = filePaths.size
-        val nameBytes = filePaths.map { it.substringAfterLast('/').toByteArray(Charsets.UTF_8) }
-        val totalSize = 1 + 8 + 4 + nameBytes.sumOf { 2 + it.size + 8 }
-        val message = ByteArray(totalSize)
-        var pos = 0
-        message[pos++] = TransferProtocol.MSG_FILE_METADATA.toByte()
-        java.nio.ByteBuffer.wrap(message, pos, 8).order(ByteOrder.BIG_ENDIAN).putLong(totalBytes)
-        pos += 8
-        java.nio.ByteBuffer.wrap(message, pos, 4).order(ByteOrder.BIG_ENDIAN).putInt(fileCount)
-        pos += 4
-        for (i in filePaths.indices) {
-            val name = nameBytes[i]
-            java.nio.ByteBuffer.wrap(message, pos, 2).order(ByteOrder.BIG_ENDIAN).putShort(name.size.toShort())
-            pos += 2
-            System.arraycopy(name, 0, message, pos, name.size)
-            pos += name.size
-            val size = java.io.File(filePaths[i]).length()
-            java.nio.ByteBuffer.wrap(message, pos, 8).order(ByteOrder.BIG_ENDIAN).putLong(size)
-            pos += 8
+    /** @return false when metadata was refused and the transfer is already marked failed. */
+    private suspend fun sendFileMetadata(transferId: Long, filePaths: List<String>): Boolean {
+        val files = filePaths.map { java.io.File(it) }
+        if (files.isEmpty() || files.any { file ->
+                val size = file.length()
+                size <= 0L || size > ReceivedTransferIntake.MAX_FILE_BYTES
+            }
+        ) {
+            failSenderTransfer(
+                transferId,
+                "Sender: refusing metadata outside the size limit transferId=$transferId",
+            )
+            return false
         }
-        nearbyTransferManager.sendBytes(message)
+        val metas = try {
+            files.map { file ->
+                TransferFileMeta(
+                    name = file.name.ifBlank { "audio.bin" },
+                    sizeBytes = file.length(),
+                    checksum = fileChunkSender.computeChecksum(file.absolutePath),
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Sender: checksum failed transferId=$transferId", e)
+            failSenderTransfer(transferId, "Sender: could not checksum files transferId=$transferId")
+            return false
+        }
+        val totalBytes = metas.sumOf { it.sizeBytes }
+        Log.d(tag, "Sender: sendFileMetadata fileCount=${metas.size} totalBytes=$totalBytes")
+        val transfer = transferRepository.getTransferWithFiles(transferId)
+        transfer?.files?.forEachIndexed { index, file ->
+            val checksum = metas.getOrNull(index)?.checksum ?: return@forEachIndexed
+            transferRepository.updateFileChecksum(file.id, checksum)
+        }
+        nearbyTransferManager.sendBytes(TransferProtocol.encodeFileMetadata(metas))
+        return true
     }
 
     private suspend fun handlePayloadReceived(
@@ -129,7 +149,7 @@ class NearbyTransferOrchestrator @Inject constructor(
                         if (data.size >= 9) {
                             val offset = java.nio.ByteBuffer.wrap(data.copyOfRange(1, 9)).order(ByteOrder.BIG_ENDIAN).long
                             Log.d(tag, "Sender: MSG_OFFSET_RESPONSE received, sending ${filePaths.size} files (${filePaths.sumOf { java.io.File(it).length() }} bytes)")
-                            sendFileMetadata(filePaths)
+                            if (!sendFileMetadata(transferId, filePaths)) return@withContext
                             startSendingChunks(transferId, filePaths, deviceName, 0, offset)
                         }
                     }
@@ -380,57 +400,57 @@ class NearbyTransferOrchestrator @Inject constructor(
             Log.d(tag, "Receiver: handleReceiverPayloadReceived type=$type transferId=$transferId dir=${receiveDir.absolutePath} size=${data.size}")
             when (type) {
                 TransferProtocol.MSG_FILE_METADATA -> {
-                    if (data.size >= 13) {
-                        val totalBytes = java.nio.ByteBuffer.wrap(data.copyOfRange(1, 9)).order(ByteOrder.BIG_ENDIAN).long
-                        val fileCount = java.nio.ByteBuffer.wrap(data.copyOfRange(9, 13)).order(ByteOrder.BIG_ENDIAN).int
-                        Log.d(tag, "Receiver: MSG_FILE_METADATA transferId=$transferId totalBytes=$totalBytes fileCount=$fileCount receiveDir=${receiveDir.absolutePath}")
-                        transferRepository.updateTransferTotalBytes(transferId, totalBytes)
-                        transferRepository.updateTransferStatus(transferId, TransferStatus.TRANSFERRING.name)
-                        val fileInfos = mutableListOf<Pair<String, Long>>()
-                        var pos = 13
-                        for (i in 0 until fileCount) {
-                            if (pos + 2 > data.size) break
-                            val nameLen = java.nio.ByteBuffer.wrap(data.copyOfRange(pos, pos + 2)).order(ByteOrder.BIG_ENDIAN).short.toInt() and 0xFFFF
-                            pos += 2
-                            if (pos + nameLen + 8 > data.size) break
-                            val fileName = data.copyOfRange(pos, pos + nameLen).toString(Charsets.UTF_8)
-                            pos += nameLen
-                            val fileSize = java.nio.ByteBuffer.wrap(data.copyOfRange(pos, pos + 8)).order(ByteOrder.BIG_ENDIAN).long
-                            pos += 8
-                            fileInfos.add(fileName to fileSize)
-                        }
-                        if (fileInfos.isNotEmpty()) {
-                            Log.d(tag, "Receiver: inserting ${fileInfos.size} file entities for transferId=$transferId -> $fileInfos")
-                            transferRepository.insertReceiverFiles(
-                                transferId = transferId,
-                                receiveDirPath = receiveDir.absolutePath,
-                                fileInfos = fileInfos,
-                            )
-                        }
-                        // Cache file paths/sizes so chunk handling needs no per-chunk Room queries.
-                        val transfer = transferRepository.getTransferWithFiles(transferId)
-                        receiverFiles = transfer?.files?.map {
-                            ReceiverFileState(
-                                fileName = it.fileName,
-                                filePath = it.filePath,
-                                fileSize = it.fileSize,
-                                transferredBytes = it.transferredBytes,
-                            )
-                        }?.toMutableList()
-                        receiverDeviceName = transfer?.deviceName ?: "Sender"
-                        receiverTotalBytes = totalBytes
-                        receiverTransferredBytes = transfer?.transferredBytes ?: 0L
-                        receiverStatusCache = TransferStatus.TRANSFERRING
-                        notificationBridge.updateState(
-                            TransferServiceState.Transferring(
-                                deviceName = receiverDeviceName,
-                                currentFileName = fileInfos.firstOrNull()?.first ?: "",
-                                transferredBytes = 0L,
-                                totalBytes = totalBytes,
-                                bytesPerSec = 0L,
-                            )
+                    val decoded = TransferProtocol.decodeFileMetadata(data)
+                    if (decoded == null || decoded.files.isEmpty()) {
+                        failReceiverTransfer(transferId, "File metadata was incomplete")
+                        return@withContext
+                    }
+                    val overLimit = decoded.files.any { file ->
+                        file.sizeBytes <= 0L || file.sizeBytes > ReceivedTransferIntake.MAX_FILE_BYTES
+                    }
+                    if (overLimit) {
+                        failReceiverTransfer(transferId, ReceiveFailure.OVER_LIMIT.userMessage())
+                        return@withContext
+                    }
+                    val totalBytes = decoded.totalBytes
+                    Log.d(tag, "Receiver: MSG_FILE_METADATA transferId=$transferId totalBytes=$totalBytes fileCount=${decoded.files.size} receiveDir=${receiveDir.absolutePath}")
+                    transferRepository.updateTransferTotalBytes(transferId, totalBytes)
+                    transferRepository.updateTransferStatus(transferId, TransferStatus.TRANSFERRING.name)
+                    val fileInfos = decoded.files.map { file ->
+                        IncomingTransferFile(
+                            fileName = file.name,
+                            fileSize = file.sizeBytes,
+                            checksum = file.checksum,
                         )
                     }
+                    Log.d(tag, "Receiver: inserting ${fileInfos.size} file entities for transferId=$transferId")
+                    transferRepository.insertReceiverFiles(
+                        transferId = transferId,
+                        receiveDirPath = receiveDir.absolutePath,
+                        fileInfos = fileInfos,
+                    )
+                    val transfer = transferRepository.getTransferWithFiles(transferId)
+                    receiverFiles = transfer?.files?.map {
+                        ReceiverFileState(
+                            fileName = it.fileName,
+                            filePath = it.filePath,
+                            fileSize = it.fileSize,
+                            transferredBytes = it.transferredBytes,
+                        )
+                    }?.toMutableList()
+                    receiverDeviceName = transfer?.deviceName ?: "Sender"
+                    receiverTotalBytes = totalBytes
+                    receiverTransferredBytes = transfer?.transferredBytes ?: 0L
+                    receiverStatusCache = TransferStatus.TRANSFERRING
+                    notificationBridge.updateState(
+                        TransferServiceState.Transferring(
+                            deviceName = receiverDeviceName,
+                            currentFileName = fileInfos.firstOrNull()?.fileName ?: "",
+                            transferredBytes = 0L,
+                            totalBytes = totalBytes,
+                            bytesPerSec = 0L,
+                        )
+                    )
                 }
                 TransferProtocol.MSG_CHUNK -> {
                     if (data.size >= 17) {
@@ -448,7 +468,8 @@ class NearbyTransferOrchestrator @Inject constructor(
                         }
                         if (receiverStatusCache == TransferStatus.COMPLETED ||
                             receiverStatusCache == TransferStatus.CANCELLED ||
-                            receiverStatusCache == TransferStatus.FAILED
+                            receiverStatusCache == TransferStatus.FAILED ||
+                            receiverStatusCache == TransferStatus.CHECKSUM_VALIDATING
                         ) {
                             return@withContext
                         }
@@ -490,8 +511,7 @@ class NearbyTransferOrchestrator @Inject constructor(
                     }
                 }
                 TransferProtocol.MSG_COMPLETE -> {
-                    Log.d(tag, "Receiver: MSG_COMPLETE transferId=$transferId, marking COMPLETED")
-                    // Flush progress not yet persisted by the 500ms throttle.
+                    Log.d(tag, "Receiver: MSG_COMPLETE transferId=$transferId, validating checksums")
                     if (receiverFiles != null) {
                         transferRepository.updateTransferProgress(
                             transferId,
@@ -499,56 +519,14 @@ class NearbyTransferOrchestrator @Inject constructor(
                             TransferStatus.TRANSFERRING.name,
                         )
                     }
-                    val finalTransfer = transferRepository.getTransferWithFiles(transferId)
-                    // Mark terminal immediately so the notification leaves "Transferring 99%"
-                    // before the files move into the private library.
-                    notificationBridge.updateState(
-                        TransferServiceState.Transferring(
-                            deviceName = finalTransfer?.deviceName ?: "Sender",
-                            currentFileName = "",
-                            transferredBytes = finalTransfer?.totalBytes ?: 0L,
-                            totalBytes = (finalTransfer?.totalBytes ?: 0L).coerceAtLeast(1L),
-                            bytesPerSec = 0L,
-                        )
-                    )
-                    notificationBridge.updateState(TransferServiceState.Completed)
-                    transferRepository.completeTransfer(transferId, TransferStatus.COMPLETED.name)
-
-                    if (finalTransfer != null) {
-                        val libraryRoot = grooveDownloads.directory()
-                        var stored = 0
-                        finalTransfer.files.forEach { fileEntity ->
-                            val staged = java.io.File(fileEntity.filePath)
-                            if (fileEntity.fileSize > 0L && staged.length() != fileEntity.fileSize) {
-                                Log.e(
-                                    tag,
-                                    "Receiver: incomplete ${fileEntity.fileName} " +
-                                        "(${staged.length()}/${fileEntity.fileSize}); removed staging file",
-                                )
-                                staged.delete()
-                                return@forEach
-                            }
-                            val dest = PrivateLibrarySongs.destination(libraryRoot, fileEntity.fileName)
-                            if (PrivateLibrarySongs.promote(staged, dest)) {
-                                stored++
-                            } else {
-                                Log.e(
-                                    tag,
-                                    "Receiver: could not store ${fileEntity.fileName} in the app library",
-                                )
-                                staged.delete()
-                            }
+                    try {
+                        finishVerifiedReceive(transferId)
+                    } catch (e: Exception) {
+                        Log.e(tag, "Receiver: checksum validation failed transferId=$transferId", e)
+                        incomingDir().listFiles()?.forEach { child ->
+                            if (child.isFile) child.delete()
                         }
-                        Log.d(
-                            tag,
-                            "Receiver: stored $stored/${finalTransfer.files.size} files in ${libraryRoot.absolutePath}",
-                        )
-                        try {
-                            refreshMusicCatalogUseCase()
-                            Log.d(tag, "Receiver: library catalog refreshed after transferId=$transferId")
-                        } catch (e: Exception) {
-                            Log.e(tag, "Receiver: catalog refresh failed after transferId=$transferId", e)
-                        }
+                        failReceiverTransfer(transferId, ReceiveFailure.CHECKSUM_MISMATCH.userMessage())
                     }
                 }
                 TransferProtocol.MSG_CANCEL -> {
@@ -582,6 +560,14 @@ class NearbyTransferOrchestrator @Inject constructor(
         }.toMutableList().also { receiverFiles = it }
     }
 
+    private data class PlacedReceive(
+        val index: Int,
+        val fileName: String,
+        val libraryPath: String,
+        val contentHash: String,
+        val fileSize: Long,
+    )
+
     private data class ReceiverFileState(
         val fileName: String,
         val filePath: String,
@@ -601,8 +587,149 @@ class NearbyTransferOrchestrator @Inject constructor(
     }
 
     /**
+     * Hash every staged file before any of them leave `.incoming`. A size or
+     * checksum failure deletes the staged bytes and writes no catalog row.
+     */
+    private suspend fun finishVerifiedReceive(transferId: Long) {
+        val finalTransfer = transferRepository.getTransferWithFiles(transferId)
+        if (finalTransfer == null || finalTransfer.files.isEmpty()) {
+            failReceiverTransfer(transferId, "Transfer could not be finished")
+            return
+        }
+        transferRepository.updateTransferStatus(transferId, TransferStatus.CHECKSUM_VALIDATING.name)
+        receiverStatusCache = TransferStatus.CHECKSUM_VALIDATING
+        notificationBridge.updateState(
+            TransferServiceState.Transferring(
+                deviceName = finalTransfer.deviceName,
+                currentFileName = "",
+                transferredBytes = finalTransfer.transferredBytes,
+                totalBytes = finalTransfer.totalBytes.coerceAtLeast(1L),
+                bytesPerSec = 0L,
+            )
+        )
+        val failure = firstReceiveFailure(transferId, finalTransfer)
+        if (failure != null) {
+            discardStaged(finalTransfer)
+            finalTransfer.files.forEachIndexed { index, file ->
+                transferRepository.updateReceiverFileProgress(
+                    transferId,
+                    index,
+                    file.transferredBytes,
+                    TransferStatus.FAILED.name,
+                )
+            }
+            failReceiverTransfer(transferId, failure.userMessage())
+            return
+        }
+        val libraryRoot = grooveDownloads.directory()
+        val known = SongHashRemap.privateHashes(songIdentity.rows()).toMutableSet()
+        val placed = mutableListOf<PlacedReceive>()
+        for ((index, file) in finalTransfer.files.withIndex()) {
+            val decision = ReceivedTransferIntake.acceptVerified(
+                staged = java.io.File(file.filePath),
+                libraryRoot = libraryRoot,
+                displayName = file.fileName,
+                expectedSize = file.fileSize,
+                contentHash = file.checksum.orEmpty(),
+                knownPrivateHashes = known,
+            )
+            val hash = ReceivedTransferIntake.catalogRowOrNull(decision, libraryRoot)
+            if (hash != null && decision.libraryPath != null) {
+                known += hash
+                placed += PlacedReceive(index, file.fileName, decision.libraryPath, hash, file.fileSize)
+            } else if (decision.alreadyInLibrary) {
+                transferRepository.updateReceiverFileProgress(
+                    transferId,
+                    index,
+                    file.fileSize,
+                    TransferStatus.COMPLETED.name,
+                )
+            } else {
+                placed.forEach { java.io.File(it.libraryPath).delete() }
+                discardStaged(finalTransfer)
+                failReceiverTransfer(
+                    transferId,
+                    decision.failure?.userMessage() ?: ReceiveFailure.UNREADABLE.userMessage(),
+                )
+                return
+            }
+        }
+        var stored = 0
+        for (item in placed) {
+            try {
+                songIdentity.adoptVerifiedCopy(
+                    hash = item.contentHash,
+                    libraryPath = item.libraryPath,
+                    title = item.fileName.substringBeforeLast('.', item.fileName),
+                    durationMs = 0L,
+                )
+                stored++
+                transferRepository.updateReceiverFileProgress(
+                    transferId,
+                    item.index,
+                    item.fileSize,
+                    TransferStatus.COMPLETED.name,
+                )
+            } catch (e: Exception) {
+                Log.e(tag, "Receiver: catalog insert failed for ${item.fileName}", e)
+                placed.forEach { java.io.File(it.libraryPath).delete() }
+                failReceiverTransfer(transferId, ReceiveFailure.UNREADABLE.userMessage())
+                return
+            }
+        }
+        Log.d(tag, "Receiver: stored $stored/${finalTransfer.files.size} files in ${libraryRoot.absolutePath}")
+        transferRepository.completeTransfer(transferId, TransferStatus.COMPLETED.name)
+        notificationBridge.updateState(TransferServiceState.Completed)
+        if (stored > 0) {
+            try {
+                refreshMusicCatalogUseCase()
+                Log.d(tag, "Receiver: library catalog refreshed after transferId=$transferId")
+            } catch (e: Exception) {
+                Log.e(tag, "Receiver: catalog refresh failed after transferId=$transferId", e)
+            }
+        }
+    }
+
+    private suspend fun firstReceiveFailure(transferId: Long, transfer: Transfer): ReceiveFailure? {
+        for ((index, file) in transfer.files.withIndex()) {
+            transferRepository.updateReceiverFileProgress(
+                transferId,
+                index,
+                file.transferredBytes,
+                TransferStatus.CHECKSUM_VALIDATING.name,
+            )
+            val staged = java.io.File(file.filePath)
+            val sizeProblem = ReceivedTransferIntake.sizeFailure(staged, file.fileSize)
+            if (sizeProblem != null) return sizeProblem
+            val expected = file.checksum
+            val checksumOk = !expected.isNullOrBlank() &&
+                fileChunkReceiver.validateChecksum(staged.absolutePath, expected)
+            if (!checksumOk) return ReceiveFailure.CHECKSUM_MISMATCH
+        }
+        return null
+    }
+
+    private fun discardStaged(transfer: Transfer) {
+        transfer.files.forEach { file ->
+            val staged = java.io.File(file.filePath)
+            if (staged.exists()) staged.delete()
+        }
+        incomingDir().listFiles()?.forEach { child ->
+            if (child.isFile) child.delete()
+        }
+    }
+
+    private suspend fun failReceiverTransfer(transferId: Long, message: String) {
+        Log.e(tag, "Receiver: $message transferId=$transferId")
+        receiverStatusCache = TransferStatus.FAILED
+        transferRepository.failTransfer(transferId, TransferStatus.FAILED.name)
+        transferController.setActiveTransfer(null)
+        notificationBridge.updateState(TransferServiceState.Failed(message))
+    }
+
+    /**
      * In-progress chunks stay under the private library's incoming dir.
-     * MSG_COMPLETE moves finished files into the library root. Shared Music is not used.
+     * MSG_COMPLETE moves finished files into the library root after SHA-256 checks.
      */
     private fun incomingDir(): java.io.File {
         return java.io.File(grooveDownloads.directory(), PrivateLibrarySongs.INCOMING_DIR).apply { mkdirs() }

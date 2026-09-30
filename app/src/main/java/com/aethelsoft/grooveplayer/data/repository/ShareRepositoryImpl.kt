@@ -2,16 +2,24 @@ package com.aethelsoft.grooveplayer.data.repository
 
 import android.content.Context
 import android.net.Uri
-import android.os.Environment
+import com.aethelsoft.grooveplayer.data.backup.GrooveDownloadsLocator
+import com.aethelsoft.grooveplayer.data.library.SongIdentityStore
 import com.aethelsoft.grooveplayer.data.share.NsdShareDiscovery
 import com.aethelsoft.grooveplayer.data.share.ShareProtocol
 import com.aethelsoft.grooveplayer.data.share.ShareTransferManager
 import com.aethelsoft.grooveplayer.data.share.ShareTransferState
 import com.aethelsoft.grooveplayer.data.share.ShareTransport
+import com.aethelsoft.grooveplayer.domain.backup.ContentHash
+import com.aethelsoft.grooveplayer.domain.library.PrivateLibrarySongs
+import com.aethelsoft.grooveplayer.domain.library.SongHashRemap
 import com.aethelsoft.grooveplayer.domain.model.ShareableItem
 import com.aethelsoft.grooveplayer.domain.model.ShareSessionInfo
 import com.aethelsoft.grooveplayer.domain.model.Song
+import com.aethelsoft.grooveplayer.domain.repository.MusicRepository
 import com.aethelsoft.grooveplayer.domain.repository.ShareRepository
+import com.aethelsoft.grooveplayer.domain.transfer.ReceiveFailure
+import com.aethelsoft.grooveplayer.domain.transfer.ReceivedTransferIntake
+import com.aethelsoft.grooveplayer.domain.transfer.userMessage
 import com.aethelsoft.grooveplayer.services.ShareTransferService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +38,10 @@ class ShareRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val transport: ShareTransport,
     private val transferManager: ShareTransferManager,
-    private val nsdDiscovery: NsdShareDiscovery
+    private val nsdDiscovery: NsdShareDiscovery,
+    private val grooveDownloads: GrooveDownloadsLocator,
+    private val songIdentity: SongIdentityStore,
+    private val musicRepository: MusicRepository,
 ) : ShareRepository {
 
     override val transferState: StateFlow<ShareTransferState> =
@@ -147,28 +158,109 @@ class ShareRepositoryImpl @Inject constructor(
         ShareTransferService.start(context, isSender = false)
         transport.sendLine(out, ShareProtocol.encodeApprove(approvedIds))
 
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            ?: context.filesDir
-        items.forEachIndexed { index, item ->
-            if (cancelled) return@forEachIndexed
-            val line = transport.receiveLine(ins) ?: return@forEachIndexed
-            val (type, obj) = ShareProtocol.decodeMessage(line) ?: return@forEachIndexed
-            if (type != ShareProtocol.MSG_FILE_START) return@forEachIndexed
-            val id = obj.optString("id")
-            val sizeBytes = obj.optLong("sizeBytes", 0)
-            val safeTitle = item.title.replace(Regex("[\\\\/:*?\"<>|]"), "_")
-            val file = File(dir, "${safeTitle}_${item.id.take(8)}.mp3")
-            val uri = Uri.fromFile(file)
-            transferManager.setTransferring(item, 0, sizeBytes, index, items.size)
-            transport.receiveFile(ins, uri, sizeBytes) { sent, total ->
-                transferManager.setTransferring(item, sent, total, index, items.size)
+        val libraryRoot = grooveDownloads.directory()
+        libraryRoot.mkdirs()
+        val incoming = File(libraryRoot, PrivateLibrarySongs.INCOMING_DIR)
+        incoming.mkdirs()
+        val known = SongHashRemap.privateHashes(songIdentity.rows()).toMutableSet()
+        var failure: String? = null
+        var stored = 0
+        val pendingCatalog = mutableListOf<Triple<String, String, String>>()
+        try {
+            for ((index, item) in items.withIndex()) {
+                if (cancelled) {
+                    failure = "Cancelled"
+                    break
+                }
+                val line = transport.receiveLine(ins) ?: run {
+                    failure = ReceiveFailure.SIZE_MISMATCH.userMessage()
+                    break
+                }
+                val (type, obj) = ShareProtocol.decodeMessage(line) ?: run {
+                    failure = ReceiveFailure.UNREADABLE.userMessage()
+                    break
+                }
+                if (type != ShareProtocol.MSG_FILE_START) {
+                    failure = ReceiveFailure.UNREADABLE.userMessage()
+                    break
+                }
+                val sizeBytes = obj.optLong("sizeBytes", -1L)
+                val checksum = obj.optString("checksum").ifBlank { item.checksum }
+                val sentName = obj.optString("fileName").ifBlank { item.fileName }
+                if (sizeBytes != item.sizeBytes || sizeBytes <= 0L || sizeBytes > ReceivedTransferIntake.MAX_FILE_BYTES) {
+                    failure = if (sizeBytes > ReceivedTransferIntake.MAX_FILE_BYTES) {
+                        ReceiveFailure.OVER_LIMIT.userMessage()
+                    } else {
+                        ReceiveFailure.SIZE_MISMATCH.userMessage()
+                    }
+                    break
+                }
+                val displayName = ReceivedTransferIntake.displayName(sentName, item.title, item.mimeType)
+                val staged = File(incoming, "$displayName.partial")
+                transferManager.setTransferring(item, 0, sizeBytes, index, items.size)
+                val written = transport.receiveFile(ins, staged, sizeBytes) { sent, total ->
+                    transferManager.setTransferring(item, sent, total, index, items.size)
+                }
+                if (written != sizeBytes) {
+                    if (staged.exists()) staged.delete()
+                    failure = if (written < 0L) {
+                        ReceiveFailure.OVER_LIMIT.userMessage()
+                    } else {
+                        ReceiveFailure.SIZE_MISMATCH.userMessage()
+                    }
+                    break
+                }
+                val decision = ReceivedTransferIntake.acceptStaged(
+                    staged = staged,
+                    libraryRoot = libraryRoot,
+                    displayName = displayName,
+                    expectedSize = sizeBytes,
+                    expectedChecksum = checksum,
+                    knownPrivateHashes = known,
+                )
+                val hash = ReceivedTransferIntake.catalogRowOrNull(decision, libraryRoot)
+                if (hash != null && decision.libraryPath != null) {
+                    known += hash
+                    val title = item.title.ifBlank { displayName.substringBeforeLast('.', displayName) }
+                    pendingCatalog += Triple(hash, decision.libraryPath, title)
+                } else if (!decision.alreadyInLibrary) {
+                    failure = decision.failure?.userMessage() ?: ReceiveFailure.CHECKSUM_MISMATCH.userMessage()
+                    break
+                }
             }
+            val reason = failure
+            if (reason != null) {
+                pendingCatalog.forEach { (_, path, _) -> File(path).delete() }
+                incoming.listFiles()?.forEach { child -> if (child.isFile) child.delete() }
+                transferManager.setError(reason)
+            } else {
+                for ((hash, path, title) in pendingCatalog) {
+                    songIdentity.adoptVerifiedCopy(
+                        hash = hash,
+                        libraryPath = path,
+                        title = title,
+                        durationMs = 0L,
+                    )
+                    stored++
+                }
+                transport.receiveLine(ins) // MSG_DONE
+                transferManager.setDone()
+            }
+        } catch (e: Exception) {
+            pendingCatalog.forEach { (_, path, _) -> File(path).delete() }
+            incoming.listFiles()?.forEach { child -> if (child.isFile) child.delete() }
+            stored = 0
+            val message = e.message ?: "Transfer failed"
+            failure = message
+            if (!cancelled) transferManager.setError(message)
+        } finally {
+            clearPendingReceiver()
+            socket.close()
+            ShareTransferService.stop(context)
         }
-        transport.receiveLine(ins) // MSG_DONE
-        clearPendingReceiver()
-        socket.close()
-        transferManager.setDone()
-        ShareTransferService.stop(context)
+        if (stored > 0 && failure == null) {
+            musicRepository.bumpCatalogGeneration()
+        }
     }
 
     override suspend fun rejectOffer() = withContext(Dispatchers.IO) {
@@ -194,21 +286,47 @@ class ShareRepositoryImpl @Inject constructor(
     }
 
     private fun songToShareable(song: Song): ShareableItem {
-        val size = try {
-            context.contentResolver.openFileDescriptor(Uri.parse(song.uri), "r")?.use { pfd ->
+        val file = song.filePath?.let { File(it) }?.takeIf { it.isFile }
+        val uri = Uri.parse(song.uri)
+        val size = file?.length() ?: try {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
                 pfd.statSize
             } ?: 0L
         } catch (_: Exception) {
             0L
         }
+        val checksum = when {
+            file != null -> ContentHash.sha256(file)
+            else -> try {
+                context.contentResolver.openInputStream(uri)?.use { ContentHash.sha256(it) }
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val fileName = file?.name ?: uri.lastPathSegment
         return ShareableItem(
             id = song.id,
             title = song.title,
             artist = song.artist,
             album = song.album?.name,
             sizeBytes = size,
-            mimeType = "audio/mpeg"
+            mimeType = mimeForFileName(fileName),
+            fileName = fileName,
+            checksum = checksum,
         )
+    }
+
+    private fun mimeForFileName(fileName: String?): String {
+        return when (ReceivedTransferIntake.extensionOf(fileName.orEmpty())) {
+            "mp3" -> "audio/mpeg"
+            "flac" -> "audio/flac"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "ogg" -> "audio/ogg"
+            "opus" -> "audio/opus"
+            "wav" -> "audio/wav"
+            else -> "application/octet-stream"
+        }
     }
 
     private suspend fun sendFiles(
@@ -224,7 +342,10 @@ class ShareRepositoryImpl @Inject constructor(
             if (cancelled) return
             val song = songMap[item.id] ?: return@forEachIndexed
             manager.setTransferring(item, 0, item.sizeBytes, index, items.size)
-            transport.sendLine(out, ShareProtocol.encodeFileStart(item.id, item.sizeBytes))
+            transport.sendLine(
+                out,
+                ShareProtocol.encodeFileStart(item.id, item.sizeBytes, item.checksum, item.fileName),
+            )
             transport.sendFile(out, Uri.parse(song.uri), item) { sent, total ->
                 manager.setTransferring(item, sent, total, index, items.size)
             }

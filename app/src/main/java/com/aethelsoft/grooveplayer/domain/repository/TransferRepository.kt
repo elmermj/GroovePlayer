@@ -3,6 +3,13 @@ package com.aethelsoft.grooveplayer.domain.repository.transfer
 import com.aethelsoft.grooveplayer.domain.model.transfer.Transfer
 import kotlinx.coroutines.flow.Flow
 
+/** A file the receiver learned from transfer metadata, including the sender SHA-256. */
+data class IncomingTransferFile(
+    val fileName: String,
+    val fileSize: Long,
+    val checksum: String,
+)
+
 /**
  * Repository for nearby P2P transfers.
  * Handles persistence and business logic for transfer operations.
@@ -32,6 +39,9 @@ interface TransferRepository {
     /** Update file progress */
     suspend fun updateFileProgress(fileId: Long, transferredBytes: Long, status: String, retryCount: Int)
 
+    /** Store the SHA-256 the sender computed for this file. */
+    suspend fun updateFileChecksum(fileId: Long, checksum: String)
+
     /** Complete a transfer */
     suspend fun completeTransfer(transferId: Long, status: String)
 
@@ -51,12 +61,12 @@ interface TransferRepository {
      * Insert file records for receiver when MSG_FILE_METADATA is received.
      * @param transferId Receiver's transfer ID
      * @param receiveDirPath Absolute path to base directory for received files
-     * @param fileInfos List of (fileName, fileSize) parsed from metadata
+     * @param fileInfos Files parsed from metadata, including SHA-256
      */
     suspend fun insertReceiverFiles(
         transferId: Long,
         receiveDirPath: String,
-        fileInfos: List<Pair<String, Long>>,
+        fileInfos: List<IncomingTransferFile>,
     )
 
     /**

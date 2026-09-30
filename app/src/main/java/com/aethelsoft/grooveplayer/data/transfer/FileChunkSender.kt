@@ -6,7 +6,6 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,18 +17,11 @@ import javax.inject.Singleton
 class FileChunkSender @Inject constructor() {
 
     /**
-     * Compute SHA-256 checksum of file for validation.
+     * SHA-256 of the file about to be sent. Uses [TransferProtocol.metadataFor],
+     * which hashes through the private-library [com.aethelsoft.grooveplayer.domain.backup.ContentHash].
      */
     suspend fun computeChecksum(filePath: String): String = withContext(Dispatchers.IO) {
-        val digest = MessageDigest.getInstance("SHA-256")
-        RandomAccessFile(filePath, "r").use { raf ->
-            val buffer = ByteArray(TransferProtocol.DEFAULT_CHUNK_SIZE)
-            var read: Int
-            while (raf.read(buffer).also { read = it } != -1) {
-                digest.update(buffer, 0, read)
-            }
-        }
-        digest.digest().joinToString("") { "%02x".format(it) }
+        TransferProtocol.metadataFor(File(filePath)).checksum
     }
 
     /**

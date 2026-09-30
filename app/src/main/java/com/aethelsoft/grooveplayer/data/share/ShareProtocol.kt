@@ -37,6 +37,8 @@ object ShareProtocol {
                     put("album", item.album ?: "")
                     put("sizeBytes", item.sizeBytes)
                     put("mimeType", item.mimeType)
+                    put("fileName", item.fileName ?: "")
+                    put("checksum", item.checksum ?: "")
                 }
             )
         }
@@ -58,7 +60,9 @@ object ShareProtocol {
                 artist = o.getString("artist"),
                 album = o.optString("album").takeIf { it.isNotEmpty() },
                 sizeBytes = o.getLong("sizeBytes"),
-                mimeType = o.optString("mimeType", "audio/mpeg")
+                mimeType = o.optString("mimeType", "audio/mpeg"),
+                fileName = o.optString("fileName").takeIf { it.isNotEmpty() },
+                checksum = o.optString("checksum").takeIf { it.isNotEmpty() },
             )
         }
     }
@@ -82,11 +86,18 @@ object ShareProtocol {
     fun encodeReject(): String =
         JSONObject().put("type", MSG_REJECT).toString()
 
-    fun encodeFileStart(id: String, sizeBytes: Long): String =
+    fun encodeFileStart(
+        id: String,
+        sizeBytes: Long,
+        checksum: String? = null,
+        fileName: String? = null,
+    ): String =
         JSONObject()
             .put("type", MSG_FILE_START)
             .put("id", id)
             .put("sizeBytes", sizeBytes)
+            .put("checksum", checksum ?: "")
+            .put("fileName", fileName ?: "")
             .toString()
 
     fun encodeProgress(id: String, bytesTransferred: Long, totalBytes: Long): String =

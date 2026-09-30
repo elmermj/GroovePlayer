@@ -7,7 +7,9 @@ import com.aethelsoft.grooveplayer.data.local.db.entity.TransferFileEntity
 import com.aethelsoft.grooveplayer.data.mapper.TransferMapper
 import com.aethelsoft.grooveplayer.domain.model.transfer.Transfer
 import com.aethelsoft.grooveplayer.domain.model.transfer.TransferStatus
+import com.aethelsoft.grooveplayer.domain.repository.transfer.IncomingTransferFile
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
+import com.aethelsoft.grooveplayer.domain.transfer.ReceivedTransferIntake
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -91,6 +93,10 @@ class TransferRepositoryImpl @Inject constructor(
         transferFileDao.updateProgress(fileId, transferredBytes, status, retryCount)
     }
 
+    override suspend fun updateFileChecksum(fileId: Long, checksum: String) {
+        transferFileDao.updateChecksum(fileId, checksum)
+    }
+
     override suspend fun completeTransfer(transferId: Long, status: String) {
         transferDao.complete(transferId, System.currentTimeMillis(), status)
     }
@@ -114,22 +120,18 @@ class TransferRepositoryImpl @Inject constructor(
     override suspend fun insertReceiverFiles(
         transferId: Long,
         receiveDirPath: String,
-        fileInfos: List<Pair<String, Long>>,
+        fileInfos: List<IncomingTransferFile>,
     ) {
-        val files = fileInfos.mapIndexed { index, (fileName, fileSize) ->
-            // Sanitize file name to avoid path traversal and invalid characters
-            val safeName = fileName
-                .replace('/', '_')
-                .replace('\\', '_')
-                .ifBlank { "file_$index" }
+        val files = fileInfos.mapIndexed { index, info ->
+            val safeName = ReceivedTransferIntake.displayName(info.fileName, "file_$index", null)
             val filePath = "$receiveDirPath/$safeName"
             TransferFileEntity(
                 transferId = transferId,
-                fileName = fileName,
+                fileName = safeName,
                 filePath = filePath,
-                fileSize = fileSize,
+                fileSize = info.fileSize,
                 transferredBytes = 0L,
-                checksum = null,
+                checksum = info.checksum,
                 status = TransferStatus.PENDING.name,
                 retryCount = 0,
             )
