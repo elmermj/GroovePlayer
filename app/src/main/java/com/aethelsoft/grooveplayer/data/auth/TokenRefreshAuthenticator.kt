@@ -3,6 +3,7 @@ package com.aethelsoft.grooveplayer.data.auth
 import android.util.Log
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.dto.RefreshRequestDto
+import com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
@@ -33,6 +34,7 @@ class TokenRefreshAuthenticator(
         if (path == "/v1/auth/refresh" || path == "/v1/auth/google" || path == "/healthz") {
             return null
         }
+        if (isAccountDeleted(response)) return null
         val failedToken = bearer(response.request)
         return lock.withLock {
             val current = tokenStore.getAccessToken()
@@ -62,6 +64,15 @@ class TokenRefreshAuthenticator(
         }
     }
 
+    private fun isAccountDeleted(response: Response): Boolean {
+        val body = try {
+            response.peekBody(PEEK_BYTES).string()
+        } catch (_: Exception) {
+            null
+        }
+        return StartupSessionRecovery.isAccountDeletedSignal(response.code, body)
+    }
+
     private fun bearer(request: Request): String? =
         request.header("Authorization")
             ?.removePrefix("Bearer ")
@@ -85,5 +96,6 @@ class TokenRefreshAuthenticator(
 
     private companion object {
         const val TAG = "TokenRefresh"
+        const val PEEK_BYTES = 64L * 1024L
     }
 }

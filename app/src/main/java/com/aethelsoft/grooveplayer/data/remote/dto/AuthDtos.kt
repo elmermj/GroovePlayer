@@ -45,6 +45,19 @@ data class PublicUserDto(
     @param:Json(name = "avatar_url") val avatarUrl: String? = null,
     @param:Json(name = "tier") val tier: String = "free",
     @param:Json(name = "storage") val storage: StorageEntitlementDto? = null,
+    /**
+     * Basic/Premium plan snapshot. Null or absent for free users and older servers.
+     * plan_kind: basic|premium. status: active|grace|expired.
+     */
+    @param:Json(name = "subscription") val subscription: SubscriptionDto? = null,
+)
+
+data class SubscriptionDto(
+    @param:Json(name = "plan_kind") val planKind: String? = null,
+    @param:Json(name = "status") val status: String? = null,
+    @param:Json(name = "current_period_end") val currentPeriodEnd: String? = null,
+    @param:Json(name = "auto_renew") val autoRenew: Boolean? = null,
+    @param:Json(name = "grace_until") val graceUntil: String? = null,
 )
 
 /** Matches backend models.AddonInfo */
@@ -116,4 +129,5 @@ data class CancelAddonResponseDto(
 
 data class ApiErrorDto(
     @param:Json(name = "error") val error: String? = null,
+    @param:Json(name = "code") val code: String? = null,
 )

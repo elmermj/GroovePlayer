@@ -2,6 +2,7 @@ package com.aethelsoft.grooveplayer.presentation.backup
 
 import android.app.Application
 import androidx.lifecycle.viewModelScope
+import com.aethelsoft.grooveplayer.domain.auth.BackendCallGuard
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.BackupObject
 import com.aethelsoft.grooveplayer.domain.model.CloudBackupState
@@ -104,13 +105,16 @@ class BackupViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             authRepository.observeAuthUser().collect { user ->
-                if (user == null) {
+                val paid = user != null &&
+                    BackendCallGuard.allowsPaidApis(hasSession = true, tier = user.privilegeTier)
+                if (!paid) {
                     _rawObjects.value = emptyList()
                     _objectsError.value = null
                     _trimMessage.value = null
                     _lastTrimResult.value = null
                     _librarySnapshot.value = null
                     _restoreMessage.value = null
+                    return@collect
                 }
                 refreshBackupLeaseUseCase()
             }
@@ -135,8 +139,14 @@ class BackupViewModel @Inject constructor(
         if (!refreshMutex.tryLock()) return@launch
         _isRefreshing.value = true
         try {
-            // Always hit network /v1/me (restoreSession) so post-purge Free + used=0 apply
-            // without process death.
+            val tier = authRepository.currentPrivilegeTier()
+            if (!BackendCallGuard.allowsPaidApis(authRepository.isSignedIn(), tier)) {
+                _rawObjects.value = emptyList()
+                _librarySnapshot.value = null
+                _objectsError.value = null
+                return@launch
+            }
+            // Live /v1/me for Basic/Premium so post-purge quota applies without process death.
             restoreAuthSessionUseCase().onFailure { e ->
                 _objectsError.value = e.message?.takeIf { it.isNotBlank() }
                     ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."

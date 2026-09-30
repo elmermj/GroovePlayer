@@ -36,7 +36,9 @@ object ColdStartPresentation {
         if (timedOut) return StartupBlocker.TIMED_OUT
         return when (failure) {
             null -> if (networkInFlight) StartupBlocker.NETWORK else StartupBlocker.NONE
-            StartupSessionRecovery.FailureKind.UNAUTHORIZED -> StartupBlocker.UNAUTHORIZED
+            StartupSessionRecovery.FailureKind.UNAUTHORIZED,
+            StartupSessionRecovery.FailureKind.ACCOUNT_DELETED,
+            -> StartupBlocker.UNAUTHORIZED
             StartupSessionRecovery.FailureKind.UNREACHABLE -> StartupBlocker.OFFLINE
             StartupSessionRecovery.FailureKind.OTHER -> StartupBlocker.SERVER_ERROR
         }

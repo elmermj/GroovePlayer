@@ -4,26 +4,35 @@ import android.app.Activity
 import android.util.Log
 import com.aethelsoft.grooveplayer.data.auth.GoogleIdTokenProvider
 import com.aethelsoft.grooveplayer.data.auth.SecureTokenStore
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.AuthApi
 import com.aethelsoft.grooveplayer.data.remote.dto.GoogleAuthRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.LogoutRequestDto
 import com.aethelsoft.grooveplayer.data.remote.dto.RefreshRequestDto
 import com.aethelsoft.grooveplayer.domain.auth.AuthStatusException
+import com.aethelsoft.grooveplayer.domain.auth.BackendCallGuard
+import com.aethelsoft.grooveplayer.domain.auth.SessionLoadPurpose
 import com.aethelsoft.grooveplayer.domain.auth.StartupSessionRecovery
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.UserRepository
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import retrofit2.HttpException
 import java.util.concurrent.atomic.AtomicInteger
@@ -36,6 +45,7 @@ class AuthRepositoryImpl @Inject constructor(
     private val tokenStore: SecureTokenStore,
     private val googleIdTokenProvider: GoogleIdTokenProvider,
     private val userRepository: UserRepository,
+    private val serverAccess: ServerAccessGate,
 ) : AuthRepository {
 
     private val mutex = Mutex()
@@ -47,6 +57,9 @@ class AuthRepositoryImpl @Inject constructor(
     private val publishedRemoteAttempt = AtomicInteger(0)
     private val _authUser = MutableStateFlow<AuthUser?>(null)
     private val _serverSyncError = MutableStateFlow<String?>(null)
+    private val _accountRemoved = MutableStateFlow(false)
+    /** Credential Manager clear must not join startup. Binder calls can stall. */
+    private val credentialClearScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun observeAuthUser(): Flow<AuthUser?> = _authUser.asStateFlow()
 
@@ -57,6 +70,12 @@ class AuthRepositoryImpl @Inject constructor(
         _authUser.value?.privilegeTier ?: PrivilegeTier.FREE
 
     override fun observeServerSyncError(): Flow<String?> = _serverSyncError.asStateFlow()
+
+    override fun observeAccountRemoved(): Flow<Boolean> = _accountRemoved.asStateFlow()
+
+    override fun acknowledgeAccountRemoved() {
+        _accountRemoved.value = false
+    }
 
     override suspend fun getAuthUser(): AuthUser? = _authUser.value
 
@@ -78,6 +97,7 @@ class AuthRepositoryImpl @Inject constructor(
             persistLocalProfile(user)
             _authUser.value = user
             _serverSyncError.value = null
+            publishServerAccess()
             user
         }.onFailure { e ->
             Log.e(TAG, "Google sign-in failed", e)
@@ -141,6 +161,7 @@ class AuthRepositoryImpl @Inject constructor(
         }
         _authUser.value = null
         _serverSyncError.value = null
+        publishServerAccess()
     }
 
     override suspend fun deleteAccount(): Result<Unit> = mutex.withLock {
@@ -176,7 +197,15 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshSession(): Result<AuthUser> = mutex.withLock {
-        runCatching {
+        if (!tokenStore.hasSession()) {
+            return@withLock Result.failure(IllegalStateException("No refresh token"))
+        }
+        val tier = _authUser.value?.privilegeTier ?: PrivilegeTier.FREE
+        if (!BackendCallGuard.allowsPaidApis(hasSession = true, tier = tier)) {
+            return@withLock Result.failure(IllegalStateException("Server refresh is not used for Free."))
+        }
+        publishServerAccess()
+        try {
             val refresh = tokenStore.getRefreshToken()
                 ?: error("No refresh token")
             val response = authApi.refresh(
@@ -188,19 +217,26 @@ class AuthRepositoryImpl @Inject constructor(
             persistLocalProfile(user)
             _authUser.value = user
             _serverSyncError.value = null
-            user
-        }.onFailure { e ->
+            publishServerAccess()
+            Result.success(user)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             Log.e(TAG, "Refresh failed", e)
-            _serverSyncError.value = humanizeNetworkError(e)
-            if (e is HttpException && e.code() == 401) {
-                sessionGeneration.incrementAndGet()
-                tokenStore.clear()
-                _authUser.value = null
+            when (StartupSessionRecovery.failureKind(asAuthStatus(e))) {
+                StartupSessionRecovery.FailureKind.UNAUTHORIZED,
+                StartupSessionRecovery.FailureKind.ACCOUNT_DELETED,
+                -> dropRejectedSession()
+                else -> _serverSyncError.value = humanizeNetworkError(e)
             }
+            Result.failure(e)
         }
     }
 
-    override suspend fun restoreSession(boundByStartupTimeout: Boolean): Result<AuthUser?> {
+    override suspend fun restoreSession(
+        boundByStartupTimeout: Boolean,
+        purpose: SessionLoadPurpose,
+    ): Result<AuthUser?> {
         // Network runs outside the mutex. Holding it across /v1/me deadlocks
         // the first frame if the UI thread waits on the same lock.
         val generation = mutex.withLock {
@@ -209,33 +245,42 @@ class AuthRepositoryImpl @Inject constructor(
                 // process start cannot rebuild Premium from cached /v1/me.
                 _authUser.value = null
                 _serverSyncError.value = null
+                publishServerAccess()
                 if (userRepository.getUserProfile() != null) {
                     userRepository.deleteUserProfile()
                 }
                 return@withLock null
             }
+            publishServerAccess()
             sessionGeneration.get()
         }
         if (generation == null) return Result.success(null)
 
+        val tier = _authUser.value?.privilegeTier ?: PrivilegeTier.FREE
+        if (!BackendCallGuard.allowSessionLoad(purpose, hasSession = true, tier = tier)) {
+            return Result.success(_authUser.value)
+        }
+
         val attempt = restoreAttempt.incrementAndGet()
         val outcome = try {
-            val recover = suspend {
-                StartupSessionRecovery.restore(
-                    accessToken = tokenStore.getAccessToken(),
-                    refreshToken = { tokenStore.getRefreshToken() },
-                    me = { token -> fetchMe(token) },
-                    refresh = { token -> refreshForStartup(token, generation) },
-                    localUser = { localAuthUser() },
-                )
+            serverAccess.probe {
+                val recover = suspend {
+                    StartupSessionRecovery.restore(
+                        accessToken = tokenStore.getAccessToken(),
+                        refreshToken = { tokenStore.getRefreshToken() },
+                        me = { token -> fetchMe(token) },
+                        refresh = { token -> refreshForStartup(token, generation) },
+                        localUser = { localAuthUser() },
+                    )
+                }
+                val cap = if (boundByStartupTimeout) {
+                    StartupSessionRecovery.NETWORK_TIMEOUT_MS
+                } else {
+                    StartupSessionRecovery.RETRY_TIMEOUT_MS
+                }
+                withTimeoutOrNull(cap) { recover() }
+                    ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
             }
-            val cap = if (boundByStartupTimeout) {
-                StartupSessionRecovery.NETWORK_TIMEOUT_MS
-            } else {
-                StartupSessionRecovery.RETRY_TIMEOUT_MS
-            }
-            withTimeoutOrNull(cap) { recover() }
-                ?: StartupSessionRecovery.Outcome.LocalFallback(localAuthUser())
         } catch (e: CancellationException) {
             throw e
         }
@@ -315,6 +360,7 @@ class AuthRepositoryImpl @Inject constructor(
                 persistLocalProfile(outcome.user)
                 _authUser.value = outcome.user
                 _serverSyncError.value = null
+                publishServerAccess()
                 Result.success(outcome.user)
             }
             is StartupSessionRecovery.Outcome.LocalFallback -> {
@@ -322,6 +368,7 @@ class AuthRepositoryImpl @Inject constructor(
                 // A /v1/me that already returned quota must not be replaced by a
                 // slower startup fallback. That hid Cloud backup after Retry.
                 if (_serverSyncError.value == null && synced?.storage != null) {
+                    publishServerAccess()
                     return Result.success(synced)
                 }
                 _serverSyncError.value =
@@ -330,10 +377,13 @@ class AuthRepositoryImpl @Inject constructor(
                 if (user != null) {
                     _authUser.value = user
                 }
+                publishServerAccess()
                 Result.success(user)
             }
-            StartupSessionRecovery.Outcome.RefreshRejected -> {
-                Log.w(TAG, "Refresh token rejected — signing out locally")
+            StartupSessionRecovery.Outcome.RefreshRejected,
+            StartupSessionRecovery.Outcome.AccountDeleted,
+            -> {
+                Log.w(TAG, "Session rejected — signing out locally")
                 dropRejectedSession()
                 Result.success(null)
             }
@@ -341,11 +391,13 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Refresh token was rejected. Drop tokens and the cached profile so Home
-     * stays usable and Premium is not kept from a dead session. Does not call
-     * Credential Manager — that can block startup on a binder call.
+     * Refresh was rejected or the account is gone. Drop tokens and the cached
+     * profile so Home stays usable. Credential Manager is cleared on a
+     * background scope with a short timeout so a binder call cannot block startup.
+     * The removed-account message is raised only when a session existed.
      */
     private suspend fun dropRejectedSession() {
+        val hadSession = tokenStore.hasSession() || _authUser.value != null
         sessionGeneration.incrementAndGet()
         try {
             tokenStore.clear()
@@ -359,6 +411,27 @@ class AuthRepositoryImpl @Inject constructor(
         }
         _authUser.value = null
         _serverSyncError.value = null
+        publishServerAccess()
+        if (hadSession) {
+            _accountRemoved.value = true
+            clearCredentialSessionInBackground()
+        }
+    }
+
+    private fun clearCredentialSessionInBackground() {
+        credentialClearScope.launch {
+            try {
+                withTimeout(CREDENTIAL_CLEAR_TIMEOUT_MS) {
+                    googleIdTokenProvider.clearCredentialSession()
+                }
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "clearCredentialState timed out", e)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "clearCredentialState failed", e)
+            }
+        }
     }
 
     private suspend fun localAuthUser(): AuthUser? {
@@ -378,7 +451,27 @@ class AuthRepositoryImpl @Inject constructor(
 
     private fun asAuthStatus(error: Throwable): AuthStatusException {
         if (error is AuthStatusException) return error
-        return AuthStatusException(httpStatus(error), error)
+        val status = httpStatus(error)
+        val body = (error as? HttpException)?.let { http ->
+            try {
+                http.response()?.errorBody()?.string()
+            } catch (_: Exception) {
+                null
+            }
+        }
+        val code = if (StartupSessionRecovery.isAccountDeletedSignal(status, body)) {
+            StartupSessionRecovery.ACCOUNT_DELETED
+        } else {
+            null
+        }
+        return AuthStatusException(status, error, code)
+    }
+
+    private fun publishServerAccess() {
+        serverAccess.publish(
+            hasSession = tokenStore.hasSession(),
+            tier = _authUser.value?.privilegeTier ?: PrivilegeTier.FREE,
+        )
     }
 
     private fun httpStatus(error: Throwable): Int? {
@@ -414,10 +507,12 @@ class AuthRepositoryImpl @Inject constructor(
         persistLocalProfile(user)
         _authUser.value = user
         _serverSyncError.value = null
+        publishServerAccess()
     }
 
     companion object {
         private const val TAG = "AuthRepository"
+        private const val CREDENTIAL_CLEAR_TIMEOUT_MS = 3_000L
 
         fun isUnreachable(e: Throwable): Boolean {
             // An HTTP status means the server answered. 401 used to be treated as

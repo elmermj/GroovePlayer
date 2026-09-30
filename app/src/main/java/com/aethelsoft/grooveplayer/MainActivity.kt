@@ -51,8 +51,12 @@ import com.aethelsoft.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelsoft.grooveplayer.presentation.library.importing.LibraryImportHost
 import com.aethelsoft.grooveplayer.presentation.common.NavigationActions
 import com.aethelsoft.grooveplayer.presentation.share.ShareIntentHolder
+import com.aethelsoft.grooveplayer.presentation.auth.AccountRemovedDialog
+import com.aethelsoft.grooveplayer.presentation.auth.AccountRemovedViewModel
 import com.aethelsoft.grooveplayer.presentation.login_restore.LoginRestorePromptDialog
 import com.aethelsoft.grooveplayer.presentation.login_restore.LoginRestorePromptViewModel
+import com.aethelsoft.grooveplayer.presentation.plan.PlanExpiryDialog
+import com.aethelsoft.grooveplayer.presentation.plan.PlanExpiryViewModel
 import com.aethelsoft.grooveplayer.presentation.restore_apply.RestoreLaunchViewModel
 import com.aethelsoft.grooveplayer.presentation.navigation.AppNavHost
 import com.aethelsoft.grooveplayer.presentation.navigation.AppRoutes
@@ -412,6 +416,13 @@ fun GroovePlayerAppMain() {
                 val restoreLaunch: RestoreLaunchViewModel = hiltViewModel()
                 val loginRestorePrompt: LoginRestorePromptViewModel = hiltViewModel()
                 val showLoginRestorePrompt by loginRestorePrompt.visible.collectAsState()
+                val accountRemoved: AccountRemovedViewModel = hiltViewModel()
+                val showAccountRemoved by accountRemoved.visible.collectAsState()
+                val planExpiry: PlanExpiryViewModel = hiltViewModel()
+                val planNotice by planExpiry.notice.collectAsState()
+                LaunchedEffect(planNotice) {
+                    if (planNotice != null) planExpiry.confirmShown()
+                }
                 AppNavHost(
                     navController = navController,
                     startDestination = ColdStartPresentation.startDestination(
@@ -437,6 +448,22 @@ fun GroovePlayerAppMain() {
                                 }
                             }
                         },
+                    )
+                }
+                if (showAccountRemoved) {
+                    AccountRemovedDialog(onDismiss = accountRemoved::dismiss)
+                }
+                val planMessage = planNotice?.message
+                if (planMessage != null) {
+                    PlanExpiryDialog(
+                        message = planMessage,
+                        onManagePlan = {
+                            planExpiry.dismiss()
+                            navController.navigate(AppRoutes.PROFILE) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onDismiss = planExpiry::dismiss,
                     )
                 }
                 val bottomBarState = BottomBarState.resolve(

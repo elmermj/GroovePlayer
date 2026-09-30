@@ -16,6 +16,7 @@ import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.acknowledgePurchase
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.BillingApi
 import com.aethelsoft.grooveplayer.data.remote.dto.AckPurchaseRequestDto
@@ -61,6 +62,7 @@ class BillingRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val billingApi: BillingApi,
     private val authRepository: AuthRepository,
+    private val serverAccess: ServerAccessGate,
 ) : BillingRepository, PurchasesUpdatedListener {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -336,6 +338,11 @@ class BillingRepositoryImpl @Inject constructor(
 
 
     override suspend fun cancelStorageAddon(addonId: String): Result<Unit> = mutex.withLock {
+        if (!serverAccess.allowsPaidApis()) {
+            val message = "Storage add-ons require an active Premium subscription."
+            _error.value = message
+            return@withLock Result.failure(IllegalStateException(message))
+        }
         runCatching {
             _error.value = null
             require(addonId.isNotBlank()) { "addon_id required" }

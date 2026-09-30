@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.domain.usecase.ads_category
 
 import android.app.Activity
+import com.aethelsoft.grooveplayer.domain.auth.SessionLoadPurpose
 import com.aethelsoft.grooveplayer.domain.model.AuthUser
 import com.aethelsoft.grooveplayer.domain.model.PrivilegeTier
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
@@ -139,6 +140,10 @@ private class FakeAuthRepository(
 
     override fun observeServerSyncError(): Flow<String?> = MutableStateFlow(null)
 
+    override fun observeAccountRemoved(): Flow<Boolean> = MutableStateFlow(false)
+
+    override fun acknowledgeAccountRemoved() = Unit
+
     override suspend fun getAuthUser(): AuthUser? = user.value
 
     override suspend fun isSignedIn(): Boolean = false
@@ -151,8 +156,10 @@ private class FakeAuthRepository(
 
     override suspend fun refreshSession(): Result<AuthUser> = error("unused")
 
-    override suspend fun restoreSession(boundByStartupTimeout: Boolean): Result<AuthUser?> =
-        Result.success(user.value)
+    override suspend fun restoreSession(
+        boundByStartupTimeout: Boolean,
+        purpose: SessionLoadPurpose,
+    ): Result<AuthUser?> = Result.success(user.value)
 
     override suspend fun getAccessToken(): String? = token(accessToken)
 

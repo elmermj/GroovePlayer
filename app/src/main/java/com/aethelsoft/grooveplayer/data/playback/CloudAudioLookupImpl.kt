@@ -1,6 +1,7 @@
 package com.aethelsoft.grooveplayer.data.playback
 
 import android.util.Log
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.remote.api.PlaybackApi
 import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackObjectDto
 import com.aethelsoft.grooveplayer.data.remote.dto.PlaybackStreamRequestDto
@@ -21,6 +22,8 @@ import javax.inject.Singleton
 /**
  * GET `/v1/playback/objects`, then POST `/v1/playback/stream-url` only when a
  * track is about to play. Backup object listing and download-url are not used.
+ * Both calls are Basic or Premium only. Signed-out and Free return unknown
+ * without a request, so a skipped lookup does not purge the catalog row.
  *
  * 404 `{exists:false}` is absence. `entitled:false` and stream-url 403 keep the
  * catalog row. Network, 401, and 5xx are unknown.
@@ -30,11 +33,15 @@ class CloudAudioLookupImpl @Inject constructor(
     private val playbackApi: PlaybackApi,
     private val moshi: Moshi,
     private val cloudSongCatalog: CloudSongCatalog,
+    private val serverAccess: ServerAccessGate,
 ) : CloudAudioLookup {
 
     private val bodyAdapter = moshi.adapter(PlaybackObjectDto::class.java)
 
     override suspend fun lookup(song: Song, logicalPath: String?): CloudAudioHit {
+        if (!serverAccess.allowsPaidApis()) {
+            return CloudAudioHit(CloudAudioPresence.UNKNOWN)
+        }
         val path = logicalPath?.takeIf { it.isNotBlank() }
         val size = song.fileSizeBytes?.takeIf { it > 0L }
         // No sha256 on the device catalog. Path + size is the supported fallback.
@@ -68,6 +75,7 @@ class CloudAudioLookupImpl @Inject constructor(
     }
 
     override suspend fun openStream(ticket: PlaybackStreamTicket): CloudStreamOpen {
+        if (!serverAccess.allowsPaidApis()) return CloudStreamOpen.Unknown
         val hash = ticket.contentHash?.takeIf { it.isNotBlank() }
         val path = ticket.logicalPath?.takeIf { it.isNotBlank() }
         val size = ticket.sizeBytes?.takeIf { it > 0L }

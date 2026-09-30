@@ -98,6 +98,23 @@ class ColdStartPresentationTest {
     }
 
     @Test
+    fun deletedAccountDoesNotHoldTheSplash() {
+        val blocker = ColdStartPresentation.blockerFor(
+            failure = StartupSessionRecovery.FailureKind.ACCOUNT_DELETED,
+            timedOut = false,
+            networkInFlight = false,
+        )
+        assertEquals(ColdStartPresentation.StartupBlocker.UNAUTHORIZED, blocker)
+        assertFalse(
+            ColdStartPresentation.keepOnScreen(
+                frameReady = false,
+                elapsedMs = 0,
+                blocker = blocker,
+            ),
+        )
+    }
+
+    @Test
     fun coldStartEntranceDoesNotSlideTheFirstScreenOff() {
         assertFalse(ColdStartPresentation.playEntrance(wasColdStart = true))
         assertTrue(ColdStartPresentation.playEntrance(wasColdStart = false))

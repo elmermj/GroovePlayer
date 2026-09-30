@@ -5,6 +5,7 @@ import android.util.Log
 import com.aethelsoft.grooveplayer.BuildConfig
 import com.aethelsoft.grooveplayer.data.local.db.GroovePlayerDatabase
 import com.aethelsoft.grooveplayer.data.local.db.RoomDbSwapFiles
+import com.aethelsoft.grooveplayer.data.auth.ServerAccessGate
 import com.aethelsoft.grooveplayer.data.mapper.AuthMapper
 import com.aethelsoft.grooveplayer.data.remote.api.BackupApi
 import com.aethelsoft.grooveplayer.data.remote.dto.BackupCompleteRequestDto
@@ -109,6 +110,7 @@ class BackupRepositoryImpl @Inject constructor(
     private val jobGate: BackupJobGate,
     private val musicRepository: MusicRepository,
     private val authRepository: AuthRepository,
+    private val serverAccess: ServerAccessGate,
     private val loginRestorePromptMemory: LoginRestorePromptMemory,
     private val backupApi: BackupApi,
     private val installDeviceId: InstallDeviceId,
@@ -605,7 +607,7 @@ class BackupRepositoryImpl @Inject constructor(
     }
 
     override suspend fun refreshBackupLease() {
-        if (!authRepository.isSignedIn()) {
+        if (!serverAccess.allowsPaidApis()) {
             _state.update { it.copy(otherDeviceHoldingLease = false) }
             return
         }
@@ -821,6 +823,9 @@ class BackupRepositoryImpl @Inject constructor(
         r2Key: String?,
         destFile: File,
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!serverAccess.allowsPaidApis()) {
+            return@withContext Result.failure(paidPlanRequired())
+        }
         runCatching {
             require(!contentHash.isNullOrBlank() || !r2Key.isNullOrBlank()) {
                 "content_hash or r2_key required"
@@ -834,8 +839,9 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun listRemoteObjects(kind: String?): Result<List<BackupObject>> =
-        withContext(Dispatchers.IO) {
+    override suspend fun listRemoteObjects(kind: String?): Result<List<BackupObject>> {
+        if (!serverAccess.allowsPaidApis()) return Result.success(emptyList())
+        return withContext(Dispatchers.IO) {
             runCatching {
                 backupApi.listObjects(kind = kind).objects.map {
                     BackupObject(
@@ -854,11 +860,13 @@ class BackupRepositoryImpl @Inject constructor(
                 if (e is HttpException) throw mapBackupHttp(e) else throw e
             }
         }
+    }
 
 
 
-    override suspend fun deleteRemoteObject(objectId: String): Result<Unit> =
-        withContext(Dispatchers.IO) {
+    override suspend fun deleteRemoteObject(objectId: String): Result<Unit> {
+        if (!serverAccess.allowsPaidApis()) return Result.failure(paidPlanRequired())
+        return withContext(Dispatchers.IO) {
             runCatching {
                 val response = try {
                     backupApi.deleteObject(objectId)
@@ -878,10 +886,13 @@ class BackupRepositoryImpl @Inject constructor(
                 Unit
             }
         }
+    }
 
     override suspend fun trimCloudBackup(
         request: TrimCloudBackupRequest,
-    ): Result<TrimCloudBackupResult> = withContext(Dispatchers.IO) {
+    ): Result<TrimCloudBackupResult> {
+        if (!serverAccess.allowsPaidApis()) return Result.failure(paidPlanRequired())
+        return withContext(Dispatchers.IO) {
         runCatching {
             val resp = try {
                 backupApi.trimBackup(
@@ -908,7 +919,11 @@ class BackupRepositoryImpl @Inject constructor(
                 bytesFreed = resp.bytesFreed,
             )
         }
+        }
     }
+
+    private fun paidPlanRequired(): IllegalStateException =
+        IllegalStateException("Cloud backup requires a Basic or Premium plan.")
 
     private fun putToR2(uploadUrl: String, file: File, contentType: String) {
         val media = contentType.toMediaTypeOrNull()
@@ -1390,8 +1405,9 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun fetchCloudLibraryMetadata(): Result<CloudLibrarySnapshot?> =
-        withContext(Dispatchers.IO) {
+    override suspend fun fetchCloudLibraryMetadata(): Result<CloudLibrarySnapshot?> {
+        if (!serverAccess.allowsPaidApis()) return Result.success(null)
+        return withContext(Dispatchers.IO) {
             runCatching {
                 val resp = try {
                     backupApi.getLibrary()
@@ -1412,8 +1428,12 @@ class BackupRepositoryImpl @Inject constructor(
                 )
             }
         }
+    }
 
     override suspend fun stageLibraryRestore(): Result<Unit> = withContext(Dispatchers.IO) {
+        if (!serverAccess.allowsPaidApis()) {
+            return@withContext Result.failure(paidPlanRequired())
+        }
         if (_state.value.phase.isUploadInProgress()) {
             return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
         }

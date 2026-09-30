@@ -8,6 +8,7 @@ import com.aethelsoft.grooveplayer.data.artwork.EmbeddedArtworkFetcher
 import com.aethelsoft.grooveplayer.data.artwork.EmbeddedArtworkKeyer
 import com.aethelsoft.grooveplayer.data.artwork.SongArtworkFiles
 import com.aethelsoft.grooveplayer.domain.artwork.EmbeddedArtworkCache
+import com.aethelsoft.grooveplayer.domain.auth.SessionLoadPurpose
 import com.aethelsoft.grooveplayer.domain.repository.AuthRepository
 import com.aethelsoft.grooveplayer.domain.repository.transfer.TransferRepository
 import com.aethelsoft.grooveplayer.domain.usecase.ads_category.PublishAdEntitlementUseCase
@@ -54,7 +55,7 @@ class GroovePlayerApp : Application(), SingletonImageLoader.Factory {
         }
         appScope.launch {
             try {
-                authRepository.restoreSession()
+                authRepository.restoreSession(purpose = SessionLoadPurpose.STARTUP)
             } finally {
                 // Opens the ad gate only once the tier is known. Unknown stays closed.
                 publishAdEntitlement()
