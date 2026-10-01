@@ -1,0 +1,157 @@
+# Compile the phone app and run its unit tests before a pull request merges.
+# Targets are devDebug only: the committed app/google-services.json and the
+# debug keystore. No release signing, AdMob production ids, or Firebase secrets.
+# Wear OS stays in wear-remote.yml. Distribute APK is a separate workflow.
+
+name: App PR
+
+on:
+  pull_request:
+    branches:
+      - test
+      - staging-test
+
+permissions:
+  contents: read
+  actions: write
+
+# A newer push to the same pull request cancels the older run.
+# github.ref is refs/pull/<number>/merge, so one PR does not cancel another.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Job-owned SDK. The runner image SDK under /usr/local is not writable, so caching
+      # it reports a hit, fails to extract, then cannot save ("another job may be creating
+      # this cache"). This directory is user-owned and is saved once under a stable key.
+      # The key matches Distribute APK so this job restores that SDK cache.
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
+      ANDROID_HOME: ${{ github.workspace }}/android-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # Writes are limited to the default branch (main) unless this is false.
+          # Pull requests into test and staging-test must restore and write the build cache.
+          # setup-java cache: gradle is intentionally not set; it would freeze caches/build-cache-1
+          # on the first key hit and can disable this action when the Gradle User Home already exists.
+          cache-read-only: false
+
+      - name: Restore Android SDK packages
+        id: android-sdk-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ github.workspace }}/android-sdk
+          # Stable key shared with Distribute APK: no run id, SHA, or file hash.
+          key: ${{ runner.os }}-android-sdk-platform-36-build-tools-36.0.0-cmdline-15859902-v1
+
+      - name: Prepare Android SDK directory
+        run: mkdir -p "${ANDROID_SDK_ROOT}"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          # Empty skips a package install here. Packages are installed below on a cache miss.
+          # cmdline-tools default is 15859902, which is part of the cache key above.
+          packages: ''
+
+      - name: Install Android SDK packages
+        if: steps.android-sdk-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+            echo "ANDROID_SDK_ROOT is not set."
+            exit 1
+          fi
+          missing=0
+          for rel in platforms/android-36 build-tools/36.0.0; do
+            if [ ! -d "${ANDROID_SDK_ROOT}/${rel}" ]; then
+              echo "Missing ${ANDROID_SDK_ROOT}/${rel}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 0 ]; then
+            echo "Android SDK packages already present (cache hit: ${{ steps.android-sdk-cache.outputs.cache-hit }}). Skipping sdkmanager."
+            exit 0
+          fi
+          echo "Installing platform-tools, cmdline-tools;latest, platforms;android-36, build-tools;36.0.0"
+          # Licenses are already accepted by setup-android. Feed y so a prompt cannot hang the job.
+          python3 - << 'PY'
+          import subprocess
+          import sys
+
+          completed = subprocess.run(
+              [
+                  "sdkmanager",
+                  "--install",
+                  "platform-tools",
+                  "cmdline-tools;latest",
+                  "platforms;android-36",
+                  "build-tools;36.0.0",
+              ],
+              input=b"y\n" * 10,
+          )
+          sys.exit(completed.returncode)
+          PY
+
+      - name: Save Android SDK packages
+        if: steps.android-sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}/android-sdk
+          key: ${{ steps.android-sdk-cache.outputs.cache-primary-key }}
+
+      - name: Apply CI Gradle performance overrides
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          from pathlib import Path
+
+          path = Path("gradle.properties")
+          text = path.read_text(encoding="utf-8")
+          # Local Mac keeps the conservative values in git. Replace them on the runner only.
+          replacements = [
+              ("org.gradle.parallel=false", "org.gradle.parallel=true"),
+              ("org.gradle.workers.max=1", "org.gradle.workers.max=4"),
+              ("-Xmx2048m", "-Xmx4g"),
+              ("android.incremental=false", "android.incremental=true"),
+              (
+                  "android.useFullClasspathForDexingTransform=true",
+                  "android.useFullClasspathForDexingTransform=false",
+              ),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f"gradle.properties is missing expected setting: {old}")
+              text = text.replace(old, new, 1)
+          if "org.gradle.caching=true" not in text:
+              raise SystemExit("gradle.properties is missing org.gradle.caching=true")
+          path.write_text(text, encoding="utf-8")
+          print("Applied CI Gradle overrides.")
+          print("parallel=true workers.max=4 heap=4g incremental=true fullClasspathDexing=false")
+          print("Kept daemon=true, caching=true, vfs.watch=false, enableResourceOptimizations=false, enableAsmInstrumentation=false")
+          PY
+
+      - name: Assemble dev debug and run unit tests
+        run: |
+          set -euo pipefail
+          # devDebug does not read VERSION_CODE. Leaving the default version keeps the
+          # Gradle build cache stable across runs on this pull request.
+          ./gradlew :app:assembleDevDebug :app:testDevDebugUnitTest \
+            --stacktrace --build-cache --parallel --max-workers=4 \
+            -Pandroid.incremental=true \
+            -Pandroid.useFullClasspathForDexingTransform=false
