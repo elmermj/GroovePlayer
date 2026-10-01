@@ -13,6 +13,7 @@ import com.aethelworks.grooveplayer.domain.model.TrimCloudBackupResult
 import com.aethelworks.grooveplayer.domain.model.TrimStrategy
 import com.aethelworks.grooveplayer.domain.repository.AuthRepository
 import com.aethelworks.grooveplayer.domain.usecase.auth_category.RestoreAuthSessionUseCase
+import com.aethelworks.grooveplayer.domain.usecase.backup_category.CancelCloudBackupUseCase
 import com.aethelworks.grooveplayer.domain.usecase.backup_category.DeleteBackupObjectUseCase
 import com.aethelworks.grooveplayer.domain.usecase.backup_category.FetchCloudLibraryUseCase
 import com.aethelworks.grooveplayer.domain.usecase.backup_category.ListBackupObjectsUseCase
@@ -22,11 +23,13 @@ import com.aethelworks.grooveplayer.domain.usecase.backup_category.StartCloudBac
 import com.aethelworks.grooveplayer.domain.usecase.backup_category.TrimCloudBackupUseCase
 import com.aethelworks.grooveplayer.presentation.common.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -37,6 +40,7 @@ class BackupViewModel @Inject constructor(
     application: Application,
     observeCloudBackupStateUseCase: ObserveCloudBackupStateUseCase,
     private val startCloudBackupUseCase: StartCloudBackupUseCase,
+    private val cancelCloudBackupUseCase: CancelCloudBackupUseCase,
     private val refreshBackupLeaseUseCase: RefreshBackupLeaseUseCase,
     private val listBackupObjectsUseCase: ListBackupObjectsUseCase,
     private val deleteBackupObjectUseCase: DeleteBackupObjectUseCase,
@@ -58,6 +62,8 @@ class BackupViewModel @Inject constructor(
         authRepository.observePrivilegeTier()
             .stateIn(viewModelScope, SharingStarted.Eagerly, PrivilegeTier.FREE)
 
+    private var backupJob: Job? = null
+
     private val _rawObjects = MutableStateFlow<List<BackupObject>>(emptyList())
     private val _objectsFilter = MutableStateFlow(BackupObjectsFilter.ALL)
     val objectsFilter: StateFlow<BackupObjectsFilter> = _objectsFilter.asStateFlow()
@@ -65,6 +71,14 @@ class BackupViewModel @Inject constructor(
     val objects: StateFlow<List<BackupObject>> =
         combine(_rawObjects, _objectsFilter) { list, filter -> filter.apply(list) }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val cloudSongCount: StateFlow<Int> =
+        _rawObjects.map { it.size }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    val cloudSongBytes: StateFlow<Long> =
+        _rawObjects.map { list -> list.sumOf { it.sizeBytes } }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
 
     private val _objectsLoading = MutableStateFlow(false)
     val objectsLoading: StateFlow<Boolean> = _objectsLoading.asStateFlow()
@@ -123,11 +137,19 @@ class BackupViewModel @Inject constructor(
         refreshEntitlements()
     }
 
-    fun startBackup() = viewModelScope.launch {
-        refreshBackupLeaseUseCase()
-        startCloudBackupUseCase()
-        loadObjects()
-        loadLibrarySnapshot()
+    fun startBackup() {
+        if (backupJob?.isActive == true) return
+        backupJob = viewModelScope.launch {
+            refreshBackupLeaseUseCase()
+            startCloudBackupUseCase()
+            loadObjects()
+            loadLibrarySnapshot()
+        }
+    }
+
+    fun cancelBackup() {
+        cancelCloudBackupUseCase()
+        backupJob?.cancel()
     }
 
     /**

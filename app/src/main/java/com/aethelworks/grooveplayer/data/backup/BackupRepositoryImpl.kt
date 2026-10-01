@@ -41,6 +41,7 @@ import com.aethelworks.grooveplayer.domain.backup.RestoreProgress
 import com.aethelworks.grooveplayer.domain.backup.RestoreProgressLabel
 import com.aethelworks.grooveplayer.domain.backup.RestoreProgressSnapshot
 import com.aethelworks.grooveplayer.domain.backup.StagingVerdict
+import com.aethelworks.grooveplayer.domain.backup.TransferCancel
 import com.aethelworks.grooveplayer.domain.model.BackupJobStep
 import com.aethelworks.grooveplayer.domain.model.BackupKinds
 import com.aethelworks.grooveplayer.domain.model.CloudLibrarySnapshot
@@ -83,8 +84,10 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.zip.GZIPInputStream
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import okhttp3.Call
 import java.util.zip.GZIPOutputStream
 import javax.inject.Inject
 import javax.inject.Named
@@ -136,6 +139,10 @@ class BackupRepositoryImpl @Inject constructor(
     /** Bumped when a backup acquire starts so an in-flight status GET cannot overwrite it. */
     private val leaseRefreshGeneration = AtomicLong(0)
 
+    private val backupCancelRequested = AtomicBoolean(false)
+    private val restoreCancelRequested = AtomicBoolean(false)
+    private val activeTransferCall = AtomicReference<Call?>(null)
+
     private val leaseAdapter by lazy { moshi.adapter(BackupLeaseResponseDto::class.java) }
 
     private val _state = MutableStateFlow(restoredBackupState())
@@ -175,11 +182,39 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun cancelBackup() {
+        backupCancelRequested.set(true)
+        activeTransferCall.get()?.cancel()
+    }
+
+    override fun cancelRestore() {
+        val phase = restoreSession.phase()
+        if (phase == RestorePhase.SWAPPING || phase == RestorePhase.COMMITTED) return
+        restoreCancelRequested.set(true)
+        activeTransferCall.get()?.cancel()
+    }
+
+    override suspend fun abandonCancelledRestore() {
+        withContext(NonCancellable + Dispatchers.IO) {
+            val phase = restoreSession.phase()
+            if (TransferCancel.restorePhaseAfterCancel(phase) == RestorePhase.IDLE) {
+                deletePrivateLibraryScratch()
+                deleteRestoreStagingScratch()
+                restoreSession.discard()
+                jobGate.release(BackupTransfer.RESTORE)
+                restoreProgress.onCancelled()
+                publishRestore()
+            }
+            restoreCancelRequested.set(false)
+        }
+    }
+
     override suspend fun startBackup(
         entitlement: StorageEntitlement?,
         isPremium: Boolean,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            backupCancelRequested.set(false)
             if (!isPremium) {
                 setPhase(
                     CloudBackupPhase.BLOCKED_NOT_PREMIUM,
@@ -333,6 +368,7 @@ class BackupRepositoryImpl @Inject constructor(
             )
 
             for (file in uploadFiles) {
+                throwIfBackupCancelled()
                 throwIfBackupLeaseLost()
                 val size = file.length()
                 if (size <= 0L) {
@@ -341,7 +377,11 @@ class BackupRepositoryImpl @Inject constructor(
                 }
 
                 val logicalPath = file.absolutePath
-                val hash = sha256Hex(file)
+                val hash = sha256Hex(file) { _, _ ->
+                    if (backupCancelRequested.get()) {
+                        throw CancellationException(TransferCancel.BACKUP_CANCELLED)
+                    }
+                }
 
                 fun markSkipped(reason: String) {
                     skippedCount++
@@ -501,6 +541,7 @@ class BackupRepositoryImpl @Inject constructor(
                 uploadCompleted = completed,
                 uploadTotal = uploadFiles.size,
             )
+            throwIfBackupCancelled()
             throwIfBackupLeaseLost()
             val roomResult = uploadRoomDbSnapshot(remainingQuotaHeadroom)
             anyDryRun = anyDryRun || roomResult.anyDryRun
@@ -571,6 +612,17 @@ class BackupRepositoryImpl @Inject constructor(
                 jobGate.release(BackupTransfer.BACKUP)
             }
         }.onFailure { e ->
+            if (TransferCancel.isCancel(e)) {
+                backupCancelRequested.set(false)
+                deleteBackupSnapshotScratch()
+                prefs.edit()
+                    .remove(KEY_LAST_ERROR)
+                    .putBoolean(KEY_CAN_RETRY, false)
+                    .commit()
+                _state.update { TransferCancel.backupState(it) }
+                if (e is CancellationException) throw e
+                return@onFailure
+            }
             if (e is OtherDeviceBackupException) {
                 _state.update { it.copy(otherDeviceHoldingLease = true) }
                 if (_state.value.phase !in ACTIVE_BACKUP_PHASES) return@onFailure
@@ -818,6 +870,54 @@ class BackupRepositoryImpl @Inject constructor(
         }
     }
 
+    private suspend fun throwIfBackupCancelled() {
+        currentCoroutineContext().ensureActive()
+        if (backupCancelRequested.get()) {
+            throw CancellationException(TransferCancel.BACKUP_CANCELLED)
+        }
+    }
+
+    private suspend fun throwIfRestoreCancelled() {
+        currentCoroutineContext().ensureActive()
+        if (restoreCancelRequested.get()) {
+            throw CancellationException(TransferCancel.RESTORE_CANCELLED)
+        }
+    }
+
+    private fun deleteBackupSnapshotScratch() {
+        File(context.cacheDir, TransferCancel.BACKUP_SNAPSHOT_SCRATCH).delete()
+    }
+
+    private fun deletePrivateLibraryScratch() {
+        val dir = runCatching { grooveDownloads.directory() }.getOrNull() ?: return
+        deleteScratchNames(dir)
+    }
+
+    private fun deleteRestoreStagingScratch() {
+        deleteScratchNames(File(context.filesDir, "restore-staging"))
+    }
+
+    private fun deleteScratchNames(dir: File) {
+        if (!dir.isDirectory) return
+        val names = dir.list()?.toList().orEmpty()
+        for (name in TransferCancel.halfWrittenLibraryNames(names)) {
+            File(dir, name).delete()
+        }
+    }
+
+    private fun openTransferCall(request: Request): Call {
+        val call = r2HttpClient.newCall(request)
+        activeTransferCall.set(call)
+        if (backupCancelRequested.get() || restoreCancelRequested.get()) {
+            call.cancel()
+        }
+        return call
+    }
+
+    private fun closeTransferCall(call: Call) {
+        activeTransferCall.compareAndSet(call, null)
+    }
+
     override suspend fun downloadObject(
         contentHash: String?,
         r2Key: String?,
@@ -933,10 +1033,20 @@ class BackupRepositoryImpl @Inject constructor(
             .put(body)
             .header("Content-Type", contentType)
             .build()
-        r2HttpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                error("R2 PUT failed HTTP ${response.code}")
+        val call = openTransferCall(request)
+        try {
+            call.execute().use { response ->
+                if (!response.isSuccessful) {
+                    error("R2 PUT failed HTTP ${response.code}")
+                }
             }
+        } catch (e: IOException) {
+            if (backupCancelRequested.get() || call.isCanceled()) {
+                throw CancellationException(TransferCancel.BACKUP_CANCELLED)
+            }
+            throw e
+        } finally {
+            closeTransferCall(call)
         }
     }
 
@@ -958,8 +1068,9 @@ class BackupRepositoryImpl @Inject constructor(
         check(request.header("Range") == null) {
             "R2 cost rule violated: Range header on GetObject"
         }
+        val call = openTransferCall(request)
         try {
-            r2HttpClient.newCall(request).execute().use { response ->
+            call.execute().use { response ->
                 if (!response.isSuccessful) {
                     throw R2GetException(
                         httpCode = response.code,
@@ -977,16 +1088,24 @@ class BackupRepositoryImpl @Inject constructor(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            destFile.delete()
+            throw e
         } catch (e: R2GetException) {
             destFile.delete()
             throw e
         } catch (e: IOException) {
             destFile.delete()
+            if (restoreCancelRequested.get() || backupCancelRequested.get() || call.isCanceled()) {
+                throw CancellationException(TransferCancel.RESTORE_CANCELLED)
+            }
             throw R2GetException(
                 httpCode = null,
                 message = e.message?.takeIf { it.isNotBlank() } ?: "connection abort",
                 cause = e,
             )
+        } finally {
+            closeTransferCall(call)
         }
     }
 
@@ -1039,6 +1158,10 @@ class BackupRepositoryImpl @Inject constructor(
         var lastError: Exception? = null
         for (attempt in 1..RestoreDownloadRetry.MAX_ATTEMPTS) {
             coroutineContext.ensureActive()
+            if (restoreCancelRequested.get()) {
+                destFile.delete()
+                throw CancellationException(TransferCancel.RESTORE_CANCELLED)
+            }
             try {
                 val url = if (attempt == 1 && !seededUrl.isNullOrBlank()) {
                     seededUrl
@@ -1445,6 +1568,9 @@ class BackupRepositoryImpl @Inject constructor(
         // must still be allowed to continue the persisted SCRUM-67 phase.
         var holdForApply = alreadyHeld
         try {
+            if (restoreCancelRequested.getAndSet(false)) {
+                throw CancellationException(TransferCancel.RESTORE_CANCELLED)
+            }
             restoreProgress.reset()
             publishRestore()
             // Same refresh backup does before upload. Without it, a token older than
@@ -1479,6 +1605,8 @@ class BackupRepositoryImpl @Inject constructor(
             holdForApply = true
             Result.success(Unit)
         } catch (e: CancellationException) {
+            holdForApply = false
+            abandonCancelledRestore()
             throw e
         } catch (e: Exception) {
             if (restoreSession.peekStagingVerdict() != StagingVerdict.VALID) {
@@ -1499,6 +1627,7 @@ class BackupRepositoryImpl @Inject constructor(
             return@withContext Result.failure(IllegalStateException(BackupJobGate.BUSY_MESSAGE))
         }
         try {
+            throwIfRestoreCancelled()
             val phase = restoreSession.phase()
             if (phase != RestorePhase.FILES_READY && phase != RestorePhase.SWAPPING) {
                 val staged = stageLibraryRestore()
@@ -1515,6 +1644,7 @@ class BackupRepositoryImpl @Inject constructor(
                 )
             }
             checkpointLiveDatabase()
+            throwIfRestoreCancelled()
             restoreSession.markSwapping()
             val swap = RoomDbSwapFiles.forContext(context)
             swap.arm(staged)
@@ -1524,6 +1654,7 @@ class BackupRepositoryImpl @Inject constructor(
             suppressLoginPromptForRestoredBackup()
             ProcessRestarter.restart(context)
         } catch (e: CancellationException) {
+            abandonCancelledRestore()
             throw e
         } catch (e: Exception) {
             val swap = RoomDbSwapFiles.forContext(context)
@@ -1702,6 +1833,7 @@ class BackupRepositoryImpl @Inject constructor(
         val placements = mutableListOf<PlacedCloudSong>()
         var downloadIndex = 0
         for (obj in songs) {
+            throwIfRestoreCancelled()
             val hash = obj.contentHash
             val size = obj.sizeBytes
             val cosmetic = obj.logicalPath?.takeIf { it.isNotBlank() }?.let(GrooveDownloadPlacement::fileName)
@@ -1756,8 +1888,10 @@ class BackupRepositoryImpl @Inject constructor(
                     partial.delete()
                     error("Downloaded song hash does not match the cloud catalog")
                 }
+                throwIfRestoreCancelled()
                 RoomDbSwapFiles.copyDurable(partial, dest)
                 partial.delete()
+                File(dest.parentFile, dest.name + ".tmp").delete()
                 existing += HashedAudio(dest.absolutePath, hash, dest.length())
                 if (tracked) {
                     restoreProgress.finishFile(index)
@@ -1880,8 +2014,9 @@ class BackupRepositoryImpl @Inject constructor(
                 remainingQuotaHeadroom = remainingQuotaHeadroom,
             )
         }
-        val gz = File(context.cacheDir, "backup-room.db.gz")
+        val gz = File(context.cacheDir, TransferCancel.BACKUP_SNAPSHOT_SCRATCH)
         gzipFile(dbFile, gz)
+        throwIfBackupCancelled()
         val size = gz.length()
         if (size <= 0L) {
             gz.delete()
