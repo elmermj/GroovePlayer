@@ -50,12 +50,12 @@ val hasReleaseSigning = listOf(
 ).all { it.isNotEmpty() }
 
 android {
-    namespace = "com.aethelsoft.grooveplayer"
+    namespace = "com.aethelworks.grooveplayer"
     compileSdk = 36
 
     defaultConfig {
         // Must match :app for the same variant. The Data Layer pairs on applicationId + signature.
-        applicationId = "com.aethelsoft.grooveplayer"
+        applicationId = "com.aethelworks.grooveplayer"
         minSdk = 30
         targetSdk = 36
         versionCode = versionFromBuild("versionCode", "VERSION_CODE")?.toIntOrNull() ?: 1

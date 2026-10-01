@@ -1,0 +1,37 @@
+package com.aethelworks.grooveplayer.data.local.db.dao
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import com.aethelworks.grooveplayer.data.local.db.entity.SongMetadataEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface SongMetadataDao {
+    @Query("SELECT * FROM song_metadata WHERE songId = :songId")
+    suspend fun getMetadata(songId: String): SongMetadataEntity?
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(metadata: SongMetadataEntity)
+    
+    @Delete
+    suspend fun delete(metadata: SongMetadataEntity)
+    
+    @Query("SELECT * FROM song_metadata")
+    fun getAllMetadata(): Flow<List<SongMetadataEntity>>
+
+    @Query("DELETE FROM song_metadata WHERE songId IN (:songIds)")
+    suspend fun deleteBySongIds(songIds: List<String>)
+
+    @Query("DELETE FROM song_metadata")
+    suspend fun deleteAll()
+
+    @Query("SELECT songId FROM song_metadata")
+    suspend fun allSongIds(): List<String>
+
+    @Query("UPDATE song_metadata SET songId = :toId WHERE songId = :fromId")
+    suspend fun retargetSongId(fromId: String, toId: String)
+}
+

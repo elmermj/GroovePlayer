@@ -1,0 +1,80 @@
+package com.aethelworks.grooveplayer.data.local.db
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.aethelworks.grooveplayer.data.local.db.dao.AlbumDao
+import com.aethelworks.grooveplayer.data.local.db.dao.ArtistDao
+import com.aethelworks.grooveplayer.data.local.db.dao.PlaybackHistoryDao
+import com.aethelworks.grooveplayer.data.local.db.dao.PlaylistDao
+import com.aethelworks.grooveplayer.data.local.db.dao.SearchHistoryDao
+import com.aethelworks.grooveplayer.data.local.db.dao.SongMetadataDao
+import com.aethelworks.grooveplayer.data.local.db.dao.TransferDao
+import com.aethelworks.grooveplayer.data.local.db.dao.TransferFileDao
+import com.aethelworks.grooveplayer.data.local.db.dao.UserProfileDao
+import com.aethelworks.grooveplayer.data.local.db.dao.UserSettingsDao
+import com.aethelworks.grooveplayer.data.local.db.entity.AlbumArtistCrossRef
+import com.aethelworks.grooveplayer.data.local.db.entity.AlbumEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.ArtistEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.GenreEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.PlaybackHistoryEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.PlaylistEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.PlaylistTrackEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.SearchHistoryEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.SongArtistCrossRef
+import com.aethelworks.grooveplayer.data.local.db.entity.TransferEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.TransferFileEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.SongEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.SongGenreCrossRef
+import com.aethelworks.grooveplayer.data.local.db.entity.SongLikeEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.SongMetadataEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.UserProfileEntity
+import com.aethelworks.grooveplayer.data.local.db.entity.UserSettingsEntity
+
+@Database(
+    entities = [
+        PlaybackHistoryEntity::class,
+        SongMetadataEntity::class,
+        ArtistEntity::class,
+        AlbumEntity::class,
+        GenreEntity::class,
+        SongEntity::class,
+        AlbumArtistCrossRef::class,
+        SongArtistCrossRef::class,
+        SongGenreCrossRef::class,
+        UserProfileEntity::class,
+        UserSettingsEntity::class,
+        SearchHistoryEntity::class,
+        TransferEntity::class,
+        TransferFileEntity::class,
+        SongLikeEntity::class,
+        PlaylistEntity::class,
+        PlaylistTrackEntity::class,
+    ],
+    version = 19,
+    exportSchema = false
+)
+@TypeConverters(Converters::class)
+abstract class GroovePlayerDatabase : RoomDatabase() {
+    companion object {
+        /** Room SQLite file name under Context.getDatabasePath. */
+        const val DATABASE_NAME = "grooveplayer_database"
+        /** Must match @Database(version = …). Sent as schema_version on room_db backup. */
+        const val SCHEMA_VERSION = 19
+    }
+
+    abstract fun playbackHistoryDao(): PlaybackHistoryDao
+    abstract fun songMetadataDao(): SongMetadataDao
+    abstract fun artistDao(): ArtistDao
+    abstract fun albumDao(): AlbumDao
+    abstract fun songDao(): com.aethelworks.grooveplayer.data.local.db.dao.SongDao
+    abstract fun genreDao(): com.aethelworks.grooveplayer.data.local.db.dao.GenreDao
+    abstract fun userProfileDao(): UserProfileDao
+    abstract fun userSettingsDao(): UserSettingsDao
+    abstract fun searchHistoryDao(): SearchHistoryDao
+    abstract fun transferDao(): TransferDao
+    abstract fun transferFileDao(): TransferFileDao
+    abstract fun songLikeDao(): com.aethelworks.grooveplayer.data.local.db.dao.SongLikeDao
+    abstract fun playlistDao(): PlaylistDao
+}
+
