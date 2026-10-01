@@ -7,13 +7,9 @@ plugins {
     id("kotlin-kapt")
 }
 
-// Crashlytics / Google Services — only when Elmer drops app/google-services.json.
+// Crashlytics / Google Services — only when app/google-services.json lists this package.
+// The checked-in file still names the previous package. Do not invent client entries.
 val googleServicesJson = file("google-services.json")
-val hasGoogleServices = googleServicesJson.exists()
-if (hasGoogleServices) {
-    apply(plugin = "com.google.gms.google-services")
-    apply(plugin = "com.google.firebase.crashlytics")
-}
 
 
 // Parse local.properties without java.util.Properties (Gradle script classpath quirk).
@@ -51,7 +47,8 @@ fun rawSecret(key: String): String {
 
 val PROD_API_DEFAULT = "https://grooveplayer-backend.fly.dev"
 val STAGING_API_DEFAULT = "https://grooveplayer-backend-staging.fly.dev"
-val STAGING_APPLICATION_ID = "com.aethelsoft.grooveplayer.staging"
+val APPLICATION_ID = "com.aethelworks.grooveplayer"
+val STAGING_APPLICATION_ID = "$APPLICATION_ID.staging"
 
 val releaseStoreFile = rawSecret("RELEASE_STORE_FILE")
 val releaseStorePassword = rawSecret("RELEASE_STORE_PASSWORD")
@@ -103,17 +100,32 @@ fun googleServicesListsPackage(packageName: String): Boolean {
         .containsMatchIn(googleServicesJson.readText())
 }
 
+val hasGoogleServices = googleServicesListsPackage(APPLICATION_ID)
+if (hasGoogleServices) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+} else if (googleServicesJson.exists()) {
+    logger.warn(
+        "app/google-services.json does not list $APPLICATION_ID. " +
+            "Google Services and Crashlytics are skipped until Elmer adds Firebase " +
+            "Android apps for $APPLICATION_ID and $STAGING_APPLICATION_ID and replaces " +
+            "that file. The checked-in clients still use the previous package."
+    )
+}
+
 val devGoogleServicesOverlay = file("src/dev/google-services.json")
 
 fun syncDevGoogleServicesOverlay(env: String) {
     if (!hasGoogleServices) return
-    val useDerivedClient = env == "staging" && !googleServicesListsPackage(STAGING_APPLICATION_ID)
+    val useDerivedClient = env == "staging" &&
+        googleServicesListsPackage(APPLICATION_ID) &&
+        !googleServicesListsPackage(STAGING_APPLICATION_ID)
     if (!useDerivedClient) {
         if (devGoogleServicesOverlay.exists()) devGoogleServicesOverlay.delete()
         return
     }
     val updated = googleServicesJson.readText().replace(
-        Regex("\"package_name\"\\s*:\\s*\"com\\.aethelsoft\\.grooveplayer\""),
+        Regex("\"package_name\"\\s*:\\s*\"" + Regex.escape(APPLICATION_ID) + "\""),
         "\"package_name\": \"$STAGING_APPLICATION_ID\""
     )
     if (!updated.contains(STAGING_APPLICATION_ID)) {
@@ -155,11 +167,11 @@ val resolvedVersionName: String =
         ?: "1.0"
 
 android {
-    namespace = "com.aethelsoft.grooveplayer"
+    namespace = APPLICATION_ID
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aethelsoft.grooveplayer"
+        applicationId = APPLICATION_ID
         minSdk = 24
         targetSdk = 36
         versionCode = resolvedVersionCode
@@ -415,7 +427,7 @@ dependencies {
     // Google Play Billing (subscriptions + storage add-ons)
     implementation(libs.billing.ktx)
 
-    // Firebase Crashlytics — only when app/google-services.json exists.
+    // Firebase Crashlytics — only when google-services.json lists APPLICATION_ID.
     if (hasGoogleServices) {
         implementation(platform(libs.firebase.bom))
         implementation(libs.firebase.crashlytics)
