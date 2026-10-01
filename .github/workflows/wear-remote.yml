@@ -13,8 +13,8 @@ on:
     paths:
       - "wear/**"
       - "wear-contract/**"
-      - "app/src/main/java/com/aethelsoft/grooveplayer/wear/**"
-      - "app/src/test/java/com/aethelsoft/grooveplayer/wear/**"
+      - "app/src/main/java/com/aethelworks/grooveplayer/wear/**"
+      - "app/src/test/java/com/aethelworks/grooveplayer/wear/**"
       - "app/src/main/res/values/wear.xml"
       - "gradle/libs.versions.toml"
       - ".github/workflows/wear-remote.yml"
@@ -47,4 +47,4 @@ jobs:
         run: ./gradlew :wear:assembleDevDebug --stacktrace
 
       - name: Unit tests
-        run: ./gradlew :wear:testDevDebugUnitTest :app:testDevDebugUnitTest --tests 'com.aethelsoft.grooveplayer.wear*' --stacktrace
+        run: ./gradlew :wear:testDevDebugUnitTest :app:testDevDebugUnitTest --tests 'com.aethelworks.grooveplayer.wear*' --stacktrace
