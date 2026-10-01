@@ -22,6 +22,7 @@ import androidx.paging.compose.itemKey
 import com.aethelworks.grooveplayer.domain.model.Song
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
+import com.aethelworks.grooveplayer.presentation.library.ui.AllSongsItemStyle
 import com.aethelworks.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.S_PADDING
@@ -70,6 +71,7 @@ fun PhoneSongsLayout(
                     onEditMetadata = { onEditSong(it) },
                     onLongPress = onLongPress,
                     padding = 0.dp,
+                    style = AllSongsItemStyle,
                     selectionConfig = if (isSelectionMode) {
                         ItemSelectionConfig(
                             isSelected = song.id in selectedIds,
