@@ -27,6 +27,27 @@ interface BackupRepository {
     suspend fun startBackup(entitlement: StorageEntitlement?, isPremium: Boolean): Result<Unit>
 
     /**
+     * Stop a running backup. Releases the in-flight upload call so the worker
+     * can drop the lease, the job gate, and the local snapshot scratch file.
+     * No-op when a backup is not in progress. Does not call the network itself.
+     */
+    fun cancelBackup()
+
+    /**
+     * Stop a running restore. Aborts the in-flight download so the worker can
+     * delete scratch files and return the restore phase to idle.
+     * A swap that has already started is left alone.
+     */
+    fun cancelRestore()
+
+    /**
+     * After cancel, delete half-written library files, drop the staging snapshot,
+     * and release the restore job gate. Safe to call more than once.
+     * Does not call the network.
+     */
+    suspend fun abandonCancelledRestore()
+
+    /**
      * GET /v1/backup/lease.
      * Sets [com.aethelworks.grooveplayer.domain.model.CloudBackupState.otherDeviceHoldingLease]
      * when a different install holds a non-expired lease.

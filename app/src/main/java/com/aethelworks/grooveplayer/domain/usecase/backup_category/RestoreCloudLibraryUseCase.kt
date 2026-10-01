@@ -13,4 +13,8 @@ class RestoreCloudLibraryUseCase @Inject constructor(
     suspend fun stage(): Result<Unit> = backupRepository.stageLibraryRestore()
 
     suspend fun apply(): Result<Unit> = backupRepository.applyStagedLibraryRestore()
+
+    fun cancel() = backupRepository.cancelRestore()
+
+    suspend fun abandon() = backupRepository.abandonCancelledRestore()
 }

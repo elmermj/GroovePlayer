@@ -86,6 +86,8 @@ private fun BackupScrollLayout(
     val libraryLoading by viewModel.libraryLoading.collectAsState()
     val restoreInFlight by viewModel.restoreInFlight.collectAsState()
     val restoreMessage by viewModel.restoreMessage.collectAsState()
+    val cloudSongCount by viewModel.cloudSongCount.collectAsState()
+    val cloudSongBytes by viewModel.cloudSongBytes.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
 
     val products by billingViewModel.products.collectAsState()
@@ -117,6 +119,9 @@ private fun BackupScrollLayout(
                     tier = tier,
                     backupState = backupState,
                     onStartBackup = { viewModel.startBackup() },
+                    onCancelBackup = { viewModel.cancelBackup() },
+                    cloudSongCount = cloudSongCount,
+                    cloudSongBytes = cloudSongBytes,
                     objects = objects,
                     objectsLoading = objectsLoading,
                     objectsError = objectsError,

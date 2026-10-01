@@ -14,6 +14,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
+import com.aethelworks.grooveplayer.domain.backup.BackupProgressTone
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -53,22 +55,41 @@ fun RestoreApplyScreen(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (ui.busy) {
+        if (ui.busy && ui.fraction == null) {
             CircularProgressIndicator(color = GrooveTheme.colors.accent)
             Spacer(Modifier.height(24.dp))
         }
-        Text(
-            text = ui.status,
-            style = GrooveTheme.typography.sectionTitle.toTextStyle(),
-            color = GrooveTheme.colors.onSurface,
-            textAlign = TextAlign.Center,
-        )
+        if (ui.phaseLines.isNotEmpty()) {
+            ui.phaseLines.forEach { line ->
+                Text(
+                    text = line.text,
+                    style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                    color = when (line.tone) {
+                        BackupProgressTone.FAILED -> Color(0xFFFF8A80)
+                        BackupProgressTone.ACTIVE -> GrooveTheme.colors.onSurface
+                        BackupProgressTone.DONE -> GrooveTheme.colors.onSurface.copy(alpha = 0.55f)
+                        BackupProgressTone.PENDING -> GrooveTheme.colors.onSurface.copy(alpha = 0.35f)
+                    },
+                    textAlign = TextAlign.Center,
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        val activeLine = ui.phaseLines.firstOrNull { it.tone == BackupProgressTone.ACTIVE }?.text
+        if (ui.status.isNotBlank() && (activeLine == null || !ui.status.startsWith(activeLine))) {
+            Text(
+                text = ui.status,
+                style = GrooveTheme.typography.sectionTitle.toTextStyle(),
+                color = GrooveTheme.colors.onSurface,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (!ui.retry.isNullOrBlank()) {
             Spacer(Modifier.height(8.dp))
             Text(
                 text = ui.retry.orEmpty(),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                color = GrooveTheme.colors.onSurface,
+                color = Color(0xFFFFCC80),
                 textAlign = TextAlign.Center,
             )
         }
@@ -94,15 +115,32 @@ fun RestoreApplyScreen(
                 trackColor = GrooveTheme.colors.surface,
             )
         }
+        if (ui.busy && ui.canCancel) {
+            Spacer(Modifier.height(16.dp))
+            TextButton(onClick = { viewModel.cancel() }) {
+                Text(
+                    text = "Cancel",
+                    color = GrooveTheme.colors.accent,
+                )
+            }
+        }
         if (!ui.error.isNullOrBlank()) {
             Spacer(Modifier.height(12.dp))
             Text(
                 text = ui.error.orEmpty(),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                color = GrooveTheme.colors.onSurface.copy(alpha = 0.8f),
+                color = Color(0xFFFF8A80),
                 textAlign = TextAlign.Center,
             )
+        }
+        if (!ui.error.isNullOrBlank() || ui.cancelled) {
             Spacer(Modifier.height(16.dp))
+            TextButton(onClick = { viewModel.retry() }) {
+                Text(
+                    text = "Retry",
+                    color = GrooveTheme.colors.accent,
+                )
+            }
             TextButton(onClick = onFinished) {
                 Text(
                     text = "Go to Home",

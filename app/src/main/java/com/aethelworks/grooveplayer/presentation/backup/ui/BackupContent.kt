@@ -52,6 +52,7 @@ import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 import com.aethelworks.grooveplayer.presentation.profile.ui.ProfileSettingsButton
 import com.aethelworks.grooveplayer.domain.backup.BackupPrimaryAction
+import com.aethelworks.grooveplayer.domain.backup.RestoreOfferCopy
 import com.aethelworks.grooveplayer.domain.backup.BackupProgressLabel
 import com.aethelworks.grooveplayer.domain.backup.BackupProgressTone
 import com.aethelworks.grooveplayer.domain.model.CloudBackupState
@@ -70,6 +71,9 @@ fun BackupContent(
     tier: PrivilegeTier,
     backupState: CloudBackupState,
     onStartBackup: () -> Unit,
+    onCancelBackup: () -> Unit = {},
+    cloudSongCount: Int = 0,
+    cloudSongBytes: Long = 0L,
     objects: List<BackupObject>,
     objectsLoading: Boolean,
     objectsError: String?,
@@ -163,6 +167,7 @@ fun BackupContent(
                 tier = tier,
                 backupState = visibleBackupState,
                 onStartBackup = { showConfirmBackup = true },
+                onCancelBackup = onCancelBackup,
             )
         } else {
             Text(
@@ -182,6 +187,7 @@ fun BackupContent(
                 tier = tier,
                 backupState = visibleBackupState,
                 onStartBackup = { showConfirmBackup = true },
+                onCancelBackup = onCancelBackup,
             )
         }
 
@@ -192,6 +198,8 @@ fun BackupContent(
             restoreInFlight = restoreInFlight,
             backupInProgress = visibleBackupState.phase.isUploadInProgress(),
             restoreMessage = restoreMessage,
+            cloudSongCount = cloudSongCount,
+            cloudSongBytes = cloudSongBytes,
             onRestoreLibrary = onRestoreLibrary,
         )
 
@@ -706,6 +714,7 @@ private fun BackupNowSection(
     tier: PrivilegeTier,
     backupState: CloudBackupState,
     onStartBackup: () -> Unit,
+    onCancelBackup: () -> Unit,
 ) {
     val phase = backupState.phase
     val busy = phase == CloudBackupPhase.PREPARING ||
@@ -849,6 +858,9 @@ private fun BackupNowSection(
             color = GrooveTheme.colors.accent,
             trackColor = GrooveTheme.colors.surface,
         )
+        TextButton(onClick = onCancelBackup) {
+            Text("Cancel backup", color = GrooveTheme.colors.accent)
+        }
     }
 
     val status = backupState.message ?: backupState.lastError
@@ -905,6 +917,8 @@ private fun RestoreLibrarySection(
     restoreInFlight: Boolean,
     backupInProgress: Boolean,
     restoreMessage: String?,
+    cloudSongCount: Int,
+    cloudSongBytes: Long,
     onRestoreLibrary: () -> Unit,
 ) {
     Spacer(Modifier.height(8.dp))
@@ -920,16 +934,11 @@ private fun RestoreLibrarySection(
         libraryLoading ->
             "Checking cloud library snapshot…"
         else ->
-            "No cloud library snapshot yet — run Back up now first. " +
-                "(GET /v1/backup/library returns library: null until the first room_db upload.)"
+            "No cloud library snapshot yet. Back up this device first."
     }
     Text(
         text = if (hasSnapshot) {
-            val schema = librarySnapshot?.schemaVersion?.toString() ?: "?"
-            val size = librarySnapshot?.sizeBytes ?: 0L
-            "Cloud Room DB ready · schema $schema · ${StorageFormatUtils.formatBytes(size, size.coerceAtLeast(1L))}. " +
-                "Missing songs download into the app library, then the app reopens on the restored library. " +
-                "Songs that were never backed up stay on this device."
+            RestoreOfferCopy.available(cloudSongCount, cloudSongBytes)
         } else {
             emptyHint
         },

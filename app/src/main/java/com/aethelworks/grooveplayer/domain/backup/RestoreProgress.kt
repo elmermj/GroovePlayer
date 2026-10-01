@@ -4,9 +4,18 @@ import java.util.Locale
 import kotlin.math.max
 
 enum class RestoreUiPhase {
+    PREPARING,
     DOWNLOADING,
     VERIFYING,
     APPLYING,
+}
+
+/** Checklist on the restore screen. Applying is shown as Finishing. */
+enum class RestoreVisiblePhase {
+    PREPARING,
+    DOWNLOADING,
+    VERIFYING,
+    FINISHING,
 }
 
 data class RestoreProgressSnapshot(
@@ -19,10 +28,12 @@ data class RestoreProgressSnapshot(
 )
 
 object RestoreProgressLabel {
+    const val PREPARING = "Preparing restore…"
     const val DOWNLOADING_LIBRARY = "Downloading restored data…"
     const val LIBRARY_SNAPSHOT = "Downloading library snapshot…"
     const val VERIFYING_CATALOG = "Verifying restored data…"
     const val APPLYING = "Applying restored data…"
+    const val FINISHING = "Finishing"
 
     /** Long enough for the applying screen to paint before the process restarts. */
     const val MIN_APPLYING_VISIBLE_MS = 800L
@@ -56,6 +67,57 @@ object RestoreProgressLabel {
         if (mb < 1024.0) return String.format(Locale.US, "%.1f MB", mb)
         return String.format(Locale.US, "%.1f GB", mb / 1024.0)
     }
+
+    private val downloadingCount = Regex("""Downloading (\d+) of (\d+)""")
+    private val verifyingCount = Regex("""Verifying (\d+) of (\d+)""")
+
+    fun visiblePhase(snapshot: RestoreProgressSnapshot): RestoreVisiblePhase = when (snapshot.phase) {
+        RestoreUiPhase.PREPARING -> RestoreVisiblePhase.PREPARING
+        RestoreUiPhase.DOWNLOADING -> {
+            val counting = downloadingCount.containsMatchIn(snapshot.status)
+            if (!counting && snapshot.fraction == null) RestoreVisiblePhase.PREPARING
+            else RestoreVisiblePhase.DOWNLOADING
+        }
+        RestoreUiPhase.VERIFYING -> RestoreVisiblePhase.VERIFYING
+        RestoreUiPhase.APPLYING -> RestoreVisiblePhase.FINISHING
+    }
+
+    /**
+     * Preparing, downloading N of M, verifying, finishing.
+     * [failed] marks the active phase so the screen can offer retry.
+     */
+    fun phaseLines(
+        snapshot: RestoreProgressSnapshot,
+        failed: Boolean = false,
+    ): List<BackupProgressLine> {
+        val current = visiblePhase(snapshot)
+        val labels = listOf(
+            RestoreVisiblePhase.PREPARING to "Preparing",
+            RestoreVisiblePhase.DOWNLOADING to countLine(downloadingCount, snapshot.status, "Downloading"),
+            RestoreVisiblePhase.VERIFYING to countLine(verifyingCount, snapshot.status, "Verifying"),
+            RestoreVisiblePhase.FINISHING to FINISHING,
+        )
+        return labels.map { (stage, text) ->
+            BackupProgressLine(text, phaseTone(stage, current, failed))
+        }
+    }
+
+    private fun countLine(pattern: Regex, status: String, fallback: String): String {
+        val match = pattern.find(status) ?: return fallback
+        return "$fallback ${match.groupValues[1]} of ${match.groupValues[2]}"
+    }
+
+    private fun phaseTone(
+        stage: RestoreVisiblePhase,
+        current: RestoreVisiblePhase,
+        failed: Boolean,
+    ): BackupProgressTone {
+        if (stage.ordinal < current.ordinal) return BackupProgressTone.DONE
+        if (stage == current) {
+            return if (failed) BackupProgressTone.FAILED else BackupProgressTone.ACTIVE
+        }
+        return BackupProgressTone.PENDING
+    }
 }
 
 /**
@@ -87,8 +149,8 @@ class RestoreProgress {
     /** Bytes shown in the detail line. Drops only when a retry deletes a partial. */
     private var displayedBytes = 0L
 
-    private var phase = RestoreUiPhase.DOWNLOADING
-    private var status = RestoreProgressLabel.DOWNLOADING_LIBRARY
+    private var phase = RestoreUiPhase.PREPARING
+    private var status = RestoreProgressLabel.PREPARING
     private var retry: String? = null
     private var detail: String? = null
     private var fraction: Float? = null
@@ -104,8 +166,16 @@ class RestoreProgress {
         byteBased = false
         manifestTotal = 0L
         displayedBytes = 0L
-        phase = RestoreUiPhase.DOWNLOADING
-        status = RestoreProgressLabel.DOWNLOADING_LIBRARY
+        phase = RestoreUiPhase.PREPARING
+        status = RestoreProgressLabel.PREPARING
+        retry = null
+        detail = null
+        fraction = null
+    }
+
+    fun onCancelled() {
+        phase = RestoreUiPhase.PREPARING
+        status = TransferCancel.RESTORE_CANCELLED
         retry = null
         detail = null
         fraction = null
