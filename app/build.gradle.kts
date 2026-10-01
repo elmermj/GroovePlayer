@@ -296,7 +296,9 @@ android {
             // default debug signing
         }
         release {
-            isMinifyEnabled = false
+            // Distribute builds :app:assembleDevRelease and :app:assembleStagingRelease.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
