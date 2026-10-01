@@ -7,4 +7,13 @@
     <string name="tier_free">Free</string>
     <string name="tier_basic">Basic</string>
     <string name="tier_premium">Premium</string>
+    <string name="widget_name">Now playing</string>
+    <string name="widget_description">Play, pause, and skip the current track</string>
+    <string name="widget_nothing_playing">Nothing playing</string>
+    <string name="widget_previous">Previous</string>
+    <string name="widget_next">Next</string>
+    <string name="widget_play">Play</string>
+    <string name="widget_pause">Pause</string>
+    <string name="widget_artwork">Album artwork</string>
+    <string name="widget_open_app">Open app</string>
 </resources>

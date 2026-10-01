@@ -41,6 +41,11 @@ class EmbeddedArtworkCache(
 
     fun file(key: String): File = File(directory, EmbeddedArtworkKeys.fileName(key))
 
+    companion object {
+        /** Same folder the image loader writes. The widget only reads files already here. */
+        const val DIRECTORY = "embedded-artwork"
+    }
+
     private fun remember(key: String, bytes: ByteArray) {
         synchronized(lock) {
             memory[key] = bytes.copyOf()

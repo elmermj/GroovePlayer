@@ -38,7 +38,7 @@ class GroovePlayerApp : Application(), SingletonImageLoader.Factory {
     private val appScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
-        val cache = EmbeddedArtworkCache(File(cacheDir, "embedded-artwork"))
+        val cache = EmbeddedArtworkCache(File(cacheDir, EmbeddedArtworkCache.DIRECTORY))
         return ImageLoader.Builder(context)
             .components {
                 add(EmbeddedArtworkKeyer())
