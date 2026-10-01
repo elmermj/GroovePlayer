@@ -233,7 +233,7 @@ jobs:
               f"RELEASE_KEY_PASSWORD={prop(os.environ['RELEASE_KEY_PASSWORD'])}",
               f"{api_property}={api_url}",
               "GOOGLE_WEB_CLIENT_ID=356328665268-h7p2ct3o1k8358itiecp3h6o4r1tjjgo.apps.googleusercontent.com",
-              "GOOGLE_ANDROID_CLIENT_ID=356328665268-1t80fc2j091cei383co7tncernl4p00c.apps.googleusercontent.com",
+              "GOOGLE_ANDROID_CLIENT_ID=356328665268-qg9julknjhv9o0eka3uu5be4r133v6fa.apps.googleusercontent.com",
           ]
           Path("local.properties").write_text("\n".join(lines) + "\n", encoding="ascii")
           print(f"Wrote local.properties with {api_property}={api_url} (secrets not shown).")

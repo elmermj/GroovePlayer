@@ -8,7 +8,6 @@ plugins {
 }
 
 // Crashlytics / Google Services — only when app/google-services.json lists this package.
-// The checked-in file still names the previous package. Do not invent client entries.
 val googleServicesJson = file("google-services.json")
 
 
@@ -107,9 +106,8 @@ if (hasGoogleServices) {
 } else if (googleServicesJson.exists()) {
     logger.warn(
         "app/google-services.json does not list $APPLICATION_ID. " +
-            "Google Services and Crashlytics are skipped until Elmer adds Firebase " +
-            "Android apps for $APPLICATION_ID and $STAGING_APPLICATION_ID and replaces " +
-            "that file. The checked-in clients still use the previous package."
+            "Google Services and Crashlytics are skipped until that file includes " +
+            "$APPLICATION_ID and $STAGING_APPLICATION_ID."
     )
 }
 
@@ -196,7 +194,7 @@ android {
             "GOOGLE_ANDROID_CLIENT_ID",
             "\"${localProp(
                 "GOOGLE_ANDROID_CLIENT_ID",
-                "356328665268-1t80fc2j091cei383co7tncernl4p00c.apps.googleusercontent.com"
+                "356328665268-qg9julknjhv9o0eka3uu5be4r133v6fa.apps.googleusercontent.com"
             )}\""
         )
     }
