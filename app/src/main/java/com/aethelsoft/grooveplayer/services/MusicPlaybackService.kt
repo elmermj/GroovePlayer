@@ -34,6 +34,7 @@ import com.aethelsoft.grooveplayer.R
 import com.aethelsoft.grooveplayer.data.player.ExoPlayerManager
 import com.aethelsoft.grooveplayer.domain.model.Song
 import com.aethelsoft.grooveplayer.wear.WearStatePublisher
+import com.aethelsoft.grooveplayer.widget.PlaybackWidgetPublisher
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,9 +120,14 @@ class MusicPlaybackService : Service() {
                 currentPosition = state.position
                 duration = state.duration
 
-                // Load artwork if song changed
-                if (state.song != null && songChanged) {
-                    loadArtwork(state.song)
+                // Load artwork if song changed. The widget reuses this bitmap;
+                // it does not fetch artwork on its own.
+                val song = state.song
+                if (song != null && songChanged) {
+                    val artwork = loadArtwork(song)
+                    if (artwork != null) {
+                        PlaybackWidgetPublisher.offerArtwork(applicationContext, song.id, artwork)
+                    }
                 }
 
                 // Update notification only when necessary
@@ -134,8 +140,8 @@ class MusicPlaybackService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun loadArtwork(song: Song) {
-        withContext(Dispatchers.IO) {
+    private suspend fun loadArtwork(song: Song): Bitmap? {
+        return withContext(Dispatchers.IO) {
             try {
                 val deviceWidth = resources.displayMetrics.widthPixels
                 val artworkUrl = song.artworkUrl
@@ -168,20 +174,22 @@ class MusicPlaybackService : Service() {
                         }
                         
                         artworkBitmap = bitmap
-                        
+
                         // Extract dominant color for background
                         artworkBitmap?.let { bmp ->
                             extractDominantColor(bmp)
                         }
-                    } else {
-                        setDefaultArtwork()
+                        return@withContext bitmap
                     }
-                } else {
                     setDefaultArtwork()
+                    return@withContext null
                 }
+                setDefaultArtwork()
+                null
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Failed to load artwork", e)
                 setDefaultArtwork()
+                null
             }
         }
     }

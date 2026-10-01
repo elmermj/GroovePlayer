@@ -44,11 +44,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import com.aethelsoft.grooveplayer.widget.PlaybackWidgetPublisher
+import com.aethelsoft.grooveplayer.widget.PlaybackWidgetState
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -319,6 +323,25 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             while (true) {
                 _position.value = player.currentPosition
                 kotlinx.coroutines.delay(300)
+            }
+        }
+
+        // Home-screen widget. This is the same player; it does not open a second session.
+        scope.launch {
+            combine(_currentSong, _isPlaying) { song, playing ->
+                PlaybackWidgetState.from(
+                    trackId = song?.id,
+                    title = song?.title,
+                    artist = song?.artist,
+                    isPlaying = playing,
+                    artworkUrl = song?.artworkUrl,
+                )
+            }.distinctUntilChanged().collect { state ->
+                try {
+                    PlaybackWidgetPublisher.publish(ctx, state)
+                } catch (e: Exception) {
+                    android.util.Log.e("ExoPlayerManager", "Widget update failed", e)
+                }
             }
         }
         
