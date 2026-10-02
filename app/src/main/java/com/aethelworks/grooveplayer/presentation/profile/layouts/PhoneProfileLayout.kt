@@ -139,7 +139,13 @@ fun PhoneProfileLayout(
                 )
                 Spacer(Modifier.height(S_PADDING))
 
-                // Cross-fade UI hidden until real overlapping crossfade ships (fadeTimer path is stubbed).
+                CrossFadeModeRow(
+                    viewModel = viewModel,
+                    isExpanded = activeRowId == "crossfade",
+                    onExpandedChange = { expanded ->
+                        viewModel.setActiveRowId(if (expanded) "crossfade" else null)
+                    }
+                )
                 Spacer(Modifier.height(S_PADDING))
 
                 MiniPlayerOnStartRow(
