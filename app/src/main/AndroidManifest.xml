@@ -107,6 +107,29 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
 
+        <!-- Android Auto browse. Playback stays on the existing player. -->
+        <service
+            android:name=".services.GrooveMediaLibraryService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <!--  Share transfer (NFC / nearby) Foreground Service  -->
         <service
             android:name=".services.ShareTransferService"
