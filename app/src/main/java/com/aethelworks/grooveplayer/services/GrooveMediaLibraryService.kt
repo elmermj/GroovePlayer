@@ -79,16 +79,28 @@ class GrooveMediaLibraryService : MediaLibraryService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = librarySession
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Media-button resume starts this service in the foreground before the
+        // player is buffering. Post the notification before that deadline.
+        ensureForeground()
+        return super.onStartCommand(intent, flags, startId)
+    }
+
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
         // MusicPlaybackService owns the rich playback notification. This service only
         // stays in the foreground when Android requires it for the Auto session.
-        if (!startInForegroundRequired) {
-            if (inForeground) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                inForeground = false
-            }
+        if (startInForegroundRequired) {
+            ensureForeground()
             return
         }
+        if (inForeground) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            inForeground = false
+        }
+    }
+
+    private fun ensureForeground() {
+        if (inForeground) return
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_transparent)
             .setContentTitle(getString(R.string.app_name))
