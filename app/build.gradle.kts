@@ -297,6 +297,10 @@ android {
         }
         release {
             // Distribute builds :app:assembleDevRelease and :app:assembleStagingRelease.
+            // Native debug symbols in the release bundle (Play Console upload).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
