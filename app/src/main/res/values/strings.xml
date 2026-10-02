@@ -16,4 +16,6 @@
     <string name="widget_pause">Pause</string>
     <string name="widget_artwork">Album artwork</string>
     <string name="widget_open_app">Open app</string>
+    <string name="android_auto_channel">Android Auto</string>
+    <string name="android_auto_playback">Playing on Android Auto</string>
 </resources>
