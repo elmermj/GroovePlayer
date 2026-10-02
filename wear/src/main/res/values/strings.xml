@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Groove Player</string>
+
+    <string name="wear_disconnected">Disconnected</string>
+    <string name="wear_open_phone">Open GroovePlayer on your phone</string>
+    <string name="wear_waiting_title">GroovePlayer</string>
+    <string name="wear_waiting_artist">Waiting for the phone</string>
+    <string name="wear_nothing_playing">Nothing playing</string>
+    <string name="wear_artwork">Album artwork</string>
+    <string name="wear_play">Play</string>
+    <string name="wear_pause">Pause</string>
 </resources>
+

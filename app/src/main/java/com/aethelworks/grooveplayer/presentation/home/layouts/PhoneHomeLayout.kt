@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.padding
@@ -10,7 +12,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.aethelworks.grooveplayer.domain.model.Song
-import com.aethelworks.grooveplayer.domain.model.playlistCountLabel
 import com.aethelworks.grooveplayer.presentation.common.LocalPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.UiState
 import com.aethelworks.grooveplayer.presentation.home.HomeViewModel
@@ -59,7 +60,7 @@ public fun PhoneHomeLayout(
                         .padding(top = S_PADDING, bottom = S_PADDING)
                 ){
                     Text(
-                        text = "Discover More",
+                        text = stringResource(R.string.home_discover_more),
                         style = GrooveTheme.typography.sectionTitle.toTextStyle(),
                         color = GrooveTheme.colors.onSurface,
                     )
@@ -68,8 +69,8 @@ public fun PhoneHomeLayout(
         }
         item {
             LibraryCardComponent(
-                title = "All Songs",
-                subtitle = if (viewModel.songs.isNotEmpty()) "${viewModel.songs.size} songs" else "Tap to browse",
+                title = stringResource(R.string.home_all_songs),
+                subtitle = if (viewModel.songs.isNotEmpty()) stringResource(R.string.count_songs, viewModel.songs.size) else stringResource(R.string.home_tap_to_browse),
                 artworks = viewModel.songs.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
@@ -79,16 +80,16 @@ public fun PhoneHomeLayout(
                         }
                     }
                 },
-                emptyNoticeText = "No songs found",
+                emptyNoticeText = stringResource(R.string.home_no_songs),
                 onClick = onNavigateToSongs
             )
         }
         item {
             LibraryCardComponent(
-                title = "Playlists",
-                subtitle = if (playlists.isNotEmpty()) playlistCountLabel(playlists.size) else "Create or import",
+                title = stringResource(R.string.home_playlists),
+                subtitle = if (playlists.isNotEmpty()) { if (playlists.size == 1) stringResource(R.string.count_playlists_one) else stringResource(R.string.count_playlists_other, playlists.size) } else stringResource(R.string.home_create_or_import),
                 artworks = playlists.flatMap { it.artworkUrls },
-                emptyNoticeText = "No playlists yet",
+                emptyNoticeText = stringResource(R.string.home_no_playlists),
                 onClick = onNavigateToPlaylists,
             )
         }
@@ -100,8 +101,8 @@ public fun PhoneHomeLayout(
         }
         item {
             LibraryCardComponent(
-                title = "Recently Played",
-                subtitle = if (recentlyPlayed.isNotEmpty()) "${recentlyPlayed.size} tracks" else "No recent tracks",
+                title = stringResource(R.string.home_recently_played),
+                subtitle = if (recentlyPlayed.isNotEmpty()) stringResource(R.string.count_tracks, recentlyPlayed.size) else stringResource(R.string.home_no_recent),
                 artworks = recentlyPlayed.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
@@ -111,7 +112,7 @@ public fun PhoneHomeLayout(
                         }
                     }
                 },
-                emptyNoticeText = "No recent tracks",
+                emptyNoticeText = stringResource(R.string.home_no_recent),
                 onClick = onNavigateToRecentlyPlayed
             )
         }
@@ -123,8 +124,8 @@ public fun PhoneHomeLayout(
         }
         item {
             LibraryCardComponent(
-                title = "Favorite Tracks",
-                subtitle = if (favoriteTracks.isNotEmpty()) "${favoriteTracks.size} tracks" else "No favorites yet",
+                title = stringResource(R.string.home_favorite_tracks),
+                subtitle = if (favoriteTracks.isNotEmpty()) stringResource(R.string.count_tracks, favoriteTracks.size) else stringResource(R.string.home_no_favorites),
                 artworks = favoriteTracks.map { item ->
                     item.artworkUrl.let { url ->
                         if (url.isNullOrEmpty()) {
@@ -134,27 +135,27 @@ public fun PhoneHomeLayout(
                         }
                     }
                 },
-                emptyNoticeText = "No favorites yet",
+                emptyNoticeText = stringResource(R.string.home_no_favorites),
                 onClick = onNavigateToFavoriteTracks
             )
         }
         item {
             LibraryCardComponent(
-                title = "Favorite Artists",
-                subtitle = if (favoriteArtists.isNotEmpty()) "${favoriteArtists.size} artists" else "No favorites yet",
+                title = stringResource(R.string.home_favorite_artists),
+                subtitle = if (favoriteArtists.isNotEmpty()) stringResource(R.string.count_artists, favoriteArtists.size) else stringResource(R.string.home_no_favorites),
                 artworks = emptyList(),
-                emptyNoticeText = "No favorites yet",
+                emptyNoticeText = stringResource(R.string.home_no_favorites),
                 onClick = onNavigateToFavoriteArtists
             )
         }
         item {
             LibraryCardComponent(
-                title = "Favorite Albums",
-                subtitle = if (favoriteAlbums.isNotEmpty()) "${favoriteAlbums.size} albums" else "No favorites yet",
+                title = stringResource(R.string.home_favorite_albums),
+                subtitle = if (favoriteAlbums.isNotEmpty()) stringResource(R.string.count_albums, favoriteAlbums.size) else stringResource(R.string.home_no_favorites),
                 artworks = favoriteAlbums.map { item ->
                     if (item.artworkUrl.isNullOrEmpty()) "Unknown" else item.artworkUrl
                 },
-                emptyNoticeText = "No favorites yet",
+                emptyNoticeText = stringResource(R.string.home_no_favorites),
                 onClick = onNavigateToFavoriteAlbums
             )
         }

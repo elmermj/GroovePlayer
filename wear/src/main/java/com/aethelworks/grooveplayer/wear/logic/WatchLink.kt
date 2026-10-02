@@ -39,12 +39,26 @@ data class RemoteUiState(
     val showTransport: Boolean,
 )
 
-fun remoteUi(snapshot: WatchSnapshot?, connected: Boolean, nowMs: Long): RemoteUiState {
+/** English defaults keep unit tests free of Android resources. The watch UI passes strings.xml. */
+data class RemoteStatusCopy(
+    val disconnectedTitle: String = "Disconnected",
+    val disconnectedArtist: String = "Open GroovePlayer on your phone",
+    val waitingTitle: String = "GroovePlayer",
+    val waitingArtist: String = "Waiting for the phone",
+    val nothingPlaying: String = "Nothing playing",
+)
+
+fun remoteUi(
+    snapshot: WatchSnapshot?,
+    connected: Boolean,
+    nowMs: Long,
+    copy: RemoteStatusCopy = RemoteStatusCopy(),
+): RemoteUiState {
     if (!connected) {
         return RemoteUiState(
             connected = false,
-            title = "Disconnected",
-            artist = "Open GroovePlayer on your phone",
+            title = copy.disconnectedTitle,
+            artist = copy.disconnectedArtist,
             isPlaying = false,
             positionMs = 0L,
             durationMs = 0L,
@@ -54,8 +68,8 @@ fun remoteUi(snapshot: WatchSnapshot?, connected: Boolean, nowMs: Long): RemoteU
     if (snapshot == null) {
         return RemoteUiState(
             connected = true,
-            title = "GroovePlayer",
-            artist = "Waiting for the phone",
+            title = copy.waitingTitle,
+            artist = copy.waitingArtist,
             isPlaying = false,
             positionMs = 0L,
             durationMs = 0L,
@@ -71,7 +85,7 @@ fun remoteUi(snapshot: WatchSnapshot?, connected: Boolean, nowMs: Long): RemoteU
     )
     return RemoteUiState(
         connected = true,
-        title = snapshot.title.ifBlank { "Nothing playing" },
+        title = snapshot.title.ifBlank { copy.nothingPlaying },
         artist = snapshot.artist,
         isPlaying = snapshot.isPlaying,
         positionMs = position,

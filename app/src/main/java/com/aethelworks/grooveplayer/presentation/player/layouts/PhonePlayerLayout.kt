@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.graphics.BlurMaskFilter
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -261,7 +263,7 @@ fun PhonePlayerLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
-                    Icon(XBack, contentDescription = "Close")
+                    Icon(XBack, contentDescription = stringResource(R.string.action_close))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PlayerShareButton(song = song)
@@ -476,7 +478,7 @@ fun PhonePlayerLayout(
                     ) {
                         Icon(
                             XAudioLines,
-                            contentDescription = "Equalizer",
+                            contentDescription = stringResource(R.string.cd_equalizer),
                             tint = if (showEqualizer) Color.Black else Color.White
                         )
                     }
@@ -489,7 +491,7 @@ fun PhonePlayerLayout(
                     ) {
                         Icon(
                             XListMusic,
-                            contentDescription = "Queue",
+                            contentDescription = stringResource(R.string.cd_queue),
                             tint = if (showQueue) Color.Black else Color.White
                         )
                     }

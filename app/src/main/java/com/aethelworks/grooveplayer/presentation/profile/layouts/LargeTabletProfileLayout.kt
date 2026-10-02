@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -105,22 +107,22 @@ fun LargeTabletProfileLayout(
              * - Reset account
              */
             ProfileSectionComponent(
-                sectionTitle = "Account",
+                sectionTitle = stringResource(R.string.settings_account),
             ) {
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XShareMusic) },
-                    title = "Share Music",
-                    subtitle = "Share via Tap (NFC) or nearby device",
+                    title = stringResource(R.string.settings_share_music),
+                    subtitle = stringResource(R.string.settings_share_music_sub),
                     actionType = ActionType.EXPANDABLE,
                     onClick = onNavigateToShare
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XUiStyle) },
-                    title = "UI Customisation",
-                    subtitle = "Customize colors, type, spacing, and more",
+                    title = stringResource(R.string.settings_ui_customisation),
+                    subtitle = stringResource(R.string.settings_ui_customisation_sub),
                     actionType = ActionType.LINK,
                     onClick = onNavigateToUiStyling,
                 )
@@ -150,7 +152,7 @@ fun LargeTabletProfileLayout(
              * - Equalizer preset and settings.
              */
             ProfileSectionComponent(
-                sectionTitle = "Playback",
+                sectionTitle = stringResource(R.string.settings_playback),
             ) {
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
@@ -223,40 +225,40 @@ MiniPlayerOnStartRow(
              * - App privacy policy.
              */
             ProfileSectionComponent(
-                sectionTitle = "About",
+                sectionTitle = stringResource(R.string.settings_about),
             ) {
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XAppVersion) },
-                    title = "App version",
-                    subtitle = "Version ${BuildConfig.VERSION_NAME}"
+                    title = stringResource(R.string.settings_app_version),
+                    subtitle = stringResource(R.string.settings_app_version_value, BuildConfig.VERSION_NAME)
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XRecentUpdates) },
-                    title = "Recent updates",
-                    subtitle = "What’s new in GroovePlayer",
+                    title = stringResource(R.string.settings_recent_updates),
+                    subtitle = stringResource(R.string.settings_recent_updates_sub),
                     actionType = ActionType.LINK,
                     onClick = onOpenRecentUpdates,
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XCopyright) },
-                    title = "Copyright & licenses",
-                    subtitle = "Legal information"
+                    title = stringResource(R.string.settings_copyright),
+                    subtitle = stringResource(R.string.settings_legal)
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XPrivacyPolicy) },
-                    title = "Privacy policy",
-                    subtitle = "How we handle your data",
+                    title = stringResource(R.string.settings_privacy),
+                    subtitle = stringResource(R.string.settings_privacy_sub_we),
                     actionType = ActionType.LINK,
                     onClick = { LegalUrls.open(context, LegalUrls.PRIVACY) },
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XPrivacyPolicy) },
-                    title = "Terms of service",
-                    subtitle = "Rules for using GroovePlayer",
+                    title = stringResource(R.string.settings_terms),
+                    subtitle = stringResource(R.string.settings_terms_sub),
                     actionType = ActionType.LINK,
                     onClick = { LegalUrls.open(context, LegalUrls.TERMS) },
                 )
@@ -299,15 +301,15 @@ fun RepeatModeRow(
     ProfileSettingRow(
         icon = { ProfileRowIcon(XRepeatMode) },
         actionType = ActionType.EXPANDABLE,
-        title = "Repeat mode",
-        subtitle = "Toggle repeat mode",
+        title = stringResource(R.string.settings_repeat),
+        subtitle = stringResource(R.string.settings_repeat_sub),
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {
             val modes = listOf(
-                RepeatMode.OFF to "Off",
-                RepeatMode.ALL to "All",
-                RepeatMode.ONE to "One"
+                RepeatMode.OFF to stringResource(R.string.action_off),
+                RepeatMode.ALL to stringResource(R.string.action_all),
+                RepeatMode.ONE to stringResource(R.string.action_one)
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -343,8 +345,8 @@ fun ShuffleModeRow(
     ProfileSettingRow(
         icon = { ProfileRowIcon(XShuffleMode) },
         actionType = ActionType.EXPANDABLE,
-        title = "Shuffle mode",
-        subtitle = "Toggle shuffle mode",
+        title = stringResource(R.string.settings_shuffle),
+        subtitle = stringResource(R.string.settings_shuffle_sub),
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {
@@ -358,7 +360,7 @@ fun ShuffleModeRow(
                         onExpandedChange(false)
                     },
                     modifier = Modifier.weight(1f),
-                    title = "Off",
+                    title = stringResource(R.string.action_off),
                     isActive = !isEnabled
                 )
                 ProfileSettingsButton(
@@ -367,7 +369,7 @@ fun ShuffleModeRow(
                         onExpandedChange(false)
                     },
                     modifier = Modifier.weight(1f),
-                    title = "On",
+                    title = stringResource(R.string.action_on),
                     isActive = isEnabled
                 )
             }
@@ -388,8 +390,8 @@ fun CrossFadeModeRow(
     ProfileSettingRow(
         icon = { ProfileRowIcon(XCrossFade) },
         actionType = ActionType.EXPANDABLE,
-        title = "Cross-fade mode",
-        subtitle = "Enable and set duration for smooth transitions between songs",
+        title = stringResource(R.string.settings_crossfade),
+        subtitle = stringResource(R.string.settings_crossfade_sub),
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {
@@ -414,7 +416,7 @@ fun CrossFadeModeRow(
                     inactiveColor = Color.White.copy(alpha = 0.3f)
                 )
                 Text(
-                    text = "${sliderValue.toInt()} s",
+                    text = stringResource(R.string.settings_crossfade_seconds, sliderValue.toInt()),
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftWhite
                 )
@@ -433,8 +435,8 @@ fun MiniPlayerOnStartRow(
 
     ProfileSettingRow(
         icon = { ProfileRowIcon(XMiniPlayer) },
-        title = "Show mini player on app start",
-        subtitle = "Toggle mini player visibility at launch",
+        title = stringResource(R.string.settings_mini_player),
+        subtitle = stringResource(R.string.settings_mini_player_sub),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
@@ -445,7 +447,7 @@ fun MiniPlayerOnStartRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (isEnabled) "Enabled" else "Disabled",
+                    text = if (isEnabled) stringResource(R.string.settings_enabled) else stringResource(R.string.settings_disabled),
                     style = MaterialTheme.typography.bodyMedium,
                     color = SoftWhite
                 )
@@ -477,15 +479,15 @@ fun NotificationsRow(
     val context = LocalContext.current
     val isEffectivelyEnabled = preferenceEnabled && hasPermission
     val statusText = when {
-        isEffectivelyEnabled -> "Enabled"
-        preferenceEnabled && !hasPermission -> "Permission required"
-        else -> "Disabled"
+        isEffectivelyEnabled -> stringResource(R.string.settings_enabled)
+        preferenceEnabled && !hasPermission -> stringResource(R.string.settings_permission_required)
+        else -> stringResource(R.string.settings_disabled)
     }
 
     ProfileSettingRow(
         icon = { ProfileRowIcon(XNotifications) },
-        title = "Notifications",
-        subtitle = "Playback and transfer alerts · $statusText",
+        title = stringResource(R.string.settings_notifications),
+        subtitle = stringResource(R.string.settings_notifications_sub, statusText),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
@@ -533,7 +535,7 @@ fun NotificationsRow(
                             context.startActivity(intent)
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        title = "Open system settings",
+                        title = stringResource(R.string.settings_open_system),
                         isActive = false,
                     )
                 }
@@ -554,15 +556,15 @@ fun VisualizationModeRow(
     ProfileSettingRow(
         icon = { ProfileRowIcon(XVisualization) },
         actionType = ActionType.EXPANDABLE,
-        title = "Default visualization mode",
-        subtitle = "Choose how the visualizer looks by default",
+        title = stringResource(R.string.settings_visualization),
+        subtitle = stringResource(R.string.settings_visualization_sub),
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {
             val options = listOf(
-                VisualizationMode.OFF to "Off",
-                VisualizationMode.SIMULATED to "Simulated",
-                VisualizationMode.REAL_TIME to "Dynamic"
+                VisualizationMode.OFF to stringResource(R.string.action_off),
+                VisualizationMode.SIMULATED to stringResource(R.string.settings_simulated),
+                VisualizationMode.REAL_TIME to stringResource(R.string.settings_dynamic)
             )
 
             Row(
@@ -596,8 +598,8 @@ fun EqualizerRow(
     ProfileSettingRow(
         icon = { ProfileRowIcon(XEqualizer) },
         actionType = ActionType.EXPANDABLE,
-        title = "Equalizer",
-        subtitle = "Preset & advanced settings",
+        title = stringResource(R.string.settings_equalizer),
+        subtitle = stringResource(R.string.settings_equalizer_sub),
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {

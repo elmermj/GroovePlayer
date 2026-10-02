@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -70,7 +72,7 @@ fun HomeScreen(
         onNavigateToArtist = onNavigateToArtist,
         viewModel = viewModel,
         isSearchEnabled = true,
-        pageTitle = "Your library",
+        pageTitle = stringResource(R.string.home_your_library),
         useSearchBar = true,
     )
 }

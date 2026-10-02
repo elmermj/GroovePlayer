@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +46,7 @@ import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 fun ProfileStorageSection(viewModel: ProfileViewModel) {
     val storageActiveRowId by viewModel.storageActiveRowId.collectAsState()
 
-    ProfileSectionComponent(sectionTitle = "Storage") {
+    ProfileSectionComponent(sectionTitle = stringResource(R.string.settings_storage)) {
         ImportFolderRow()
         Spacer(Modifier.height(S_PADDING))
         StorageUsageRow(
@@ -77,8 +79,8 @@ private fun ImportFolderRow() {
     val import = LocalLibraryImport.current
     ProfileSettingRow(
         icon = { ProfileRowIcon(XExcludedFolder) },
-        title = "Import folder",
-        subtitle = "Copy music into GroovePlayer",
+        title = stringResource(R.string.library_import_folder),
+        subtitle = stringResource(R.string.storage_import_sub),
         actionType = ActionType.LINK,
         onClick = import.pickFolder,
     )
@@ -95,8 +97,8 @@ fun ExcludedFoldersRow(
     }
     ProfileSettingRow(
         icon = { ProfileRowIcon(XExcludedFolder) },
-        title = "Excluded folders",
-        subtitle = "Manage folders that are ignored during scanning",
+        title = stringResource(R.string.storage_excluded_title),
+        subtitle = stringResource(R.string.storage_excluded_sub),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
@@ -117,8 +119,8 @@ fun StorageUsageRow(
     }
     ProfileSettingRow(
         icon = { ProfileRowIcon(XStorageUsage) },
-        title = "Storage usage",
-        subtitle = "View how much space music uses (included vs excluded)",
+        title = stringResource(R.string.storage_usage),
+        subtitle = stringResource(R.string.storage_usage_sub),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
@@ -135,14 +137,14 @@ fun ConsolidateFoldersRow(
 ) {
     ProfileSettingRow(
         icon = { ProfileRowIcon(XConsolidateFolders) },
-        title = "Consolidate music folders",
-        subtitle = "Move scattered music into a single location",
+        title = stringResource(R.string.storage_consolidate),
+        subtitle = stringResource(R.string.storage_consolidate_sub),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
         secondaryContent = {
             Text(
-                text = "Folder consolidation will gather music from multiple locations into one library folder. Coming in a future update.",
+                text = stringResource(R.string.storage_consolidate_body),
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftWhite,
             )
@@ -165,8 +167,8 @@ fun ClearCacheRow(
 
     ProfileSettingRow(
         icon = { ProfileRowIcon(XClearCache) },
-        title = "Clear cache",
-        subtitle = "Remove temporary data",
+        title = stringResource(R.string.storage_clear_cache),
+        subtitle = stringResource(R.string.storage_clear_cache_sub),
         actionType = ActionType.EXPANDABLE,
         isSecondaryVisible = isExpanded,
         onSecondaryVisibleChange = onExpandedChange,
@@ -177,16 +179,16 @@ fun ClearCacheRow(
             ) {
                 Text(
                     text = if (isClearingCache) {
-                        "Clearing…"
+                        stringResource(R.string.storage_clearing)
                     } else {
-                        "Temporary files: ${formatCacheBytes(cacheSizeBytes)}"
+                        stringResource(R.string.storage_temp_files, formatCacheBytes(cacheSizeBytes))
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = SoftWhite,
                 )
                 ProfileSettingsButton(
                     onClick = { viewModel.clearAppCache() },
-                    title = "Clear cache",
+                    title = stringResource(R.string.storage_clear_cache),
                     isActive = !isClearingCache && cacheSizeBytes > 0L,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -214,7 +216,7 @@ private fun StorageUsageContent(viewModel: ProfileViewModel) {
                 trackColor = SoftWhite.copy(alpha = 0.2f),
             )
             Text(
-                text = "Calculating storage…",
+                text = stringResource(R.string.storage_calculating),
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftWhite
             )
@@ -222,7 +224,7 @@ private fun StorageUsageContent(viewModel: ProfileViewModel) {
             val data = storageUsage
             if (data == null) {
                 Text(
-                    text = "Could not load storage data.",
+                    text = stringResource(R.string.storage_load_failed),
                     style = MaterialTheme.typography.bodySmall,
                     color = SoftWhite
                 )
@@ -231,7 +233,7 @@ private fun StorageUsageContent(viewModel: ProfileViewModel) {
                 val includedFraction = data.includedBytes.toFloat() / total
 
                 Text(
-                    text = "Total: ${StorageFormatUtils.formatBytes(data.totalBytes, total)}",
+                    text = stringResource(R.string.storage_total, StorageFormatUtils.formatBytes(data.totalBytes, total)),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White
                 )
@@ -249,19 +251,19 @@ private fun StorageUsageContent(viewModel: ProfileViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Included: ${StorageFormatUtils.formatBytes(data.includedBytes, total)}",
+                        text = stringResource(R.string.storage_included, StorageFormatUtils.formatBytes(data.includedBytes, total)),
                         style = MaterialTheme.typography.bodySmall,
                         color = SoftWhite
                     )
                     Text(
-                        text = "Excluded: ${StorageFormatUtils.formatBytes(data.excludedBytes, total)}",
+                        text = stringResource(R.string.storage_excluded_bytes, StorageFormatUtils.formatBytes(data.excludedBytes, total)),
                         style = MaterialTheme.typography.bodySmall,
                         color = SoftWhite
                     )
                 }
                 Spacer(modifier = Modifier.height(XS_PADDING))
                 Text(
-                    text = "Included folders",
+                    text = stringResource(R.string.storage_included_folders),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White
                 )
@@ -271,7 +273,7 @@ private fun StorageUsageContent(viewModel: ProfileViewModel) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Excluded folders",
+                    text = stringResource(R.string.storage_excluded_folders),
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.White
                 )
@@ -291,7 +293,7 @@ private fun StorageFolderBulletList(
 ) {
     if (entries.isEmpty()) {
         Text(
-            text = "• None",
+            text = stringResource(R.string.storage_none),
             style = MaterialTheme.typography.bodySmall,
             color = SoftWhite
         )
@@ -300,7 +302,7 @@ private fun StorageFolderBulletList(
             entries.forEach { entry ->
                 val displayName = entry.path.substringAfterLast('/', entry.path).ifEmpty { entry.path }
                 Text(
-                    text = "• $displayName — ${StorageFormatUtils.formatBytes(entry.bytes, totalBytes)}",
+                    text = stringResource(R.string.storage_folder_line, displayName, StorageFormatUtils.formatBytes(entry.bytes, totalBytes)),
                     style = MaterialTheme.typography.bodySmall,
                     color = SoftWhite,
                     maxLines = 1
@@ -334,13 +336,13 @@ private fun ExcludedFoldersContent(viewModel: ProfileViewModel) {
         verticalArrangement = Arrangement.spacedBy(S_PADDING)
     ) {
         Text(
-            text = "Suggestions",
+            text = stringResource(R.string.storage_suggestions),
             style = MaterialTheme.typography.labelLarge,
             color = Color.White
         )
         if (rows.isEmpty()) {
             Text(
-                text = "No folders with music found, or all are excluded.",
+                text = stringResource(R.string.storage_no_suggestions),
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftWhite
             )
@@ -368,13 +370,13 @@ private fun ExcludedFoldersContent(viewModel: ProfileViewModel) {
         }
         Spacer(modifier = Modifier.height(XS_PADDING))
         Text(
-            text = "Excluded",
+            text = stringResource(R.string.storage_excluded_heading),
             style = MaterialTheme.typography.labelLarge,
             color = Color.White
         )
         if (excludedFolders.isEmpty()) {
             Text(
-                text = "No excluded folders.",
+                text = stringResource(R.string.storage_no_excluded),
                 style = MaterialTheme.typography.bodySmall,
                 color = SoftWhite
             )

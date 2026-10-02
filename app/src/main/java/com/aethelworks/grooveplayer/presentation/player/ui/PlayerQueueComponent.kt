@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -297,7 +299,7 @@ private fun SideQueueRow(
                         onClick = { import.restoreSong(song) },
                         modifier = Modifier.align(Alignment.End),
                     ) {
-                        Text("Restore", color = HighlightPrimary)
+                        Text(stringResource(R.string.action_restore), color = HighlightPrimary)
                     }
                 }
                 Spacer(modifier = Modifier.height(S_PADDING))
@@ -329,7 +331,7 @@ private fun SideQueueRow(
                 ) {
                     Icon(
                         XGripVertical,
-                        contentDescription = "Drag to reorder",
+                        contentDescription = stringResource(R.string.cd_drag_to_reorder),
                         tint = GrooveTheme.colors.muted,
                     )
                 }

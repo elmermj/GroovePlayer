@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,17 +28,17 @@ fun PermissionRequiredComponent (
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "Permission Required",
+                text = stringResource(R.string.home_permission_title),
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Text(
-                text = "We need access to your music files to play them",
+                text = stringResource(R.string.home_permission_body),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
             Button(onClick = requestPermission) {
-                Text("Grant Permission")
+                Text(stringResource(R.string.home_permission_grant))
             }
         }
     }

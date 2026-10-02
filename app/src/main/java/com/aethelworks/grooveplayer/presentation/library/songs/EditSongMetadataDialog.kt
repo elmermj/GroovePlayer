@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.songs
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -685,12 +687,12 @@ private fun EditorTopBar(
         ) {
             Icon(
                 imageVector = XClose,
-                contentDescription = "Close",
+                contentDescription = stringResource(R.string.action_close),
                 tint = Color.White,
             )
         }
         Text(
-            text = "Edit metadata",
+            text = stringResource(R.string.metadata_edit),
             style = TextStyle(
                 fontFamily = PoppinsFontFamily,
                 fontSize = 16.sp,
@@ -715,6 +717,9 @@ private fun ArtworkHero(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val albumArtworkDescription = stringResource(R.string.cd_album_artwork)
+    val removeArtworkDescription = stringResource(R.string.cd_remove_artwork)
+    val replaceArtworkDescription = stringResource(R.string.cd_replace_artwork)
     val shape = RoundedCornerShape(RadiusCard)
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
@@ -763,7 +768,7 @@ private fun ArtworkHero(
                         onLongPress = { pick() },
                     )
                 }
-                .semantics { contentDescription = "Album artwork" },
+                .semantics { contentDescription = albumArtworkDescription },
         ) {
             if (artworkModel != null) {
                 AsyncImage(
@@ -780,7 +785,7 @@ private fun ArtworkHero(
                     modifier = Modifier.fillMaxSize(),
                     kind = MediaArtworkKind.ALBUM,
                     cornerRadius = RadiusCard,
-                    contentDescription = "No artwork",
+                    contentDescription = stringResource(R.string.cd_no_artwork),
                 )
             }
         }
@@ -790,7 +795,7 @@ private fun ArtworkHero(
                     .align(Alignment.BottomStart)
                     .padding(4.dp)
                     .size(48.dp)
-                    .semantics { contentDescription = "Remove artwork" }
+                    .semantics { contentDescription = removeArtworkDescription }
                     .clickable { onArtworkChange(null, null) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -813,7 +818,7 @@ private fun ArtworkHero(
         }
         if (editingEnabled) {
             Text(
-                text = "Replace",
+                text = stringResource(R.string.metadata_replace),
                 style = TextStyle(
                     fontFamily = PoppinsFontFamily,
                     fontSize = 12.sp,
@@ -829,7 +834,7 @@ private fun ArtworkHero(
                     .border(1.dp, GlassBorderColor, RoundedCornerShape(RadiusControl))
                     .clickable(onClick = ::pick)
                     .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .semantics { contentDescription = "Replace artwork" },
+                    .semantics { contentDescription = replaceArtworkDescription },
             )
         }
     }
@@ -883,7 +888,7 @@ private fun MetadataFields(
 ) {
     if (uiState.isLoading) {
         Text(
-            text = "Reading tags",
+            text = stringResource(R.string.metadata_reading_tags),
             style = LabelStyle,
             modifier = Modifier.padding(vertical = 12.dp),
         )
@@ -894,17 +899,17 @@ private fun MetadataFields(
     val yearFocus = remember { FocusRequester() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         GlassTextField(
-            label = "Title",
+            label = stringResource(R.string.metadata_title),
             value = uiState.title,
             onValueChange = onTitleChange,
-            placeholder = "Title",
+            placeholder = stringResource(R.string.metadata_title),
             enabled = editingEnabled,
             imeAction = ImeAction.Next,
             onNext = { artistFocus.requestFocus() },
         )
         TokenMenuField(
-            label = "Artists",
-            placeholder = "Add an artist",
+            label = stringResource(R.string.metadata_artists),
+            placeholder = stringResource(R.string.metadata_add_artist),
             values = uiState.artists,
             suggestions = uiState.artistSuggestions,
             enabled = editingEnabled,
@@ -932,8 +937,8 @@ private fun MetadataFields(
             onUseAlbumYearChange = onUseAlbumYearChange,
         )
         TokenMenuField(
-            label = "Genres",
-            placeholder = "Add a genre",
+            label = stringResource(R.string.metadata_genres),
+            placeholder = stringResource(R.string.metadata_add_genre),
             values = uiState.genres,
             suggestions = uiState.genreSuggestions,
             enabled = editingEnabled,
@@ -961,9 +966,9 @@ private fun TrackYearRow(
         verticalAlignment = Alignment.Top,
     ) {
         NumberGlassField(
-            label = "Track number",
+            label = stringResource(R.string.metadata_track_number),
             value = trackNumber,
-            placeholder = "Track",
+            placeholder = stringResource(R.string.metadata_track_hint),
             enabled = enabled,
             focusRequester = trackFocus,
             imeAction = ImeAction.Next,
@@ -973,9 +978,9 @@ private fun TrackYearRow(
         )
         Column(modifier = Modifier.weight(1f)) {
             NumberGlassField(
-                label = "Year",
+                label = stringResource(R.string.metadata_year),
                 value = year,
-                placeholder = "Year",
+                placeholder = stringResource(R.string.metadata_year),
                 enabled = enabled && !useAlbumYear,
                 focusRequester = yearFocus,
                 imeAction = ImeAction.Done,
@@ -989,7 +994,7 @@ private fun TrackYearRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = "Use album year",
+                    text = stringResource(R.string.metadata_use_album_year),
                     style = LabelStyle,
                     modifier = Modifier
                         .weight(1f)
@@ -1146,6 +1151,7 @@ private fun TokenMenuField(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 values.forEach { token ->
+                    val removeTokenDescription = stringResource(R.string.cd_remove_token, token)
                     FilterChip(
                         selected = true,
                         onClick = { if (enabled) onValuesChange(values.filterNot { it == token }) },
@@ -1183,7 +1189,7 @@ private fun TokenMenuField(
                         ),
                         modifier = Modifier
                             .heightIn(min = 48.dp)
-                            .semantics { contentDescription = "Remove $token" },
+                            .semantics { contentDescription = removeTokenDescription },
                     )
                 }
             }
@@ -1209,7 +1215,7 @@ private fun TokenMenuField(
             },
         ) {
             if (canAdd) {
-                GlassMenuItem(text = "Add “$pending”", onClick = { commit(pending) })
+                GlassMenuItem(text = stringResource(R.string.metadata_add_pending, pending), onClick = { commit(pending) })
             }
             available.forEach { suggestion ->
                 GlassMenuItem(text = suggestion, onClick = { commit(suggestion) })
@@ -1247,7 +1253,7 @@ private fun AlbumMenuField(
         onDismiss = { menuOpen = false },
         field = {
             GlassTextField(
-                label = "Album",
+                label = stringResource(R.string.metadata_album),
                 value = text,
                 onValueChange = {
                     text = it
@@ -1255,7 +1261,7 @@ private fun AlbumMenuField(
                     onSearch(it)
                     menuOpen = it.isNotBlank()
                 },
-                placeholder = "Album name",
+                placeholder = stringResource(R.string.metadata_album_name),
                 enabled = enabled,
                 imeAction = ImeAction.Next,
                 onNext = onNext,
@@ -1417,7 +1423,7 @@ private fun GlassFooter(
                 ),
             ) {
                 Text(
-                    text = "Discard",
+                    text = stringResource(R.string.metadata_discard),
                     fontFamily = PoppinsFontFamily,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
@@ -1437,7 +1443,7 @@ private fun GlassFooter(
                 ),
             ) {
                 Text(
-                    text = if (isSaving) "Saving…" else "Save",
+                    text = if (isSaving) stringResource(R.string.action_saving) else stringResource(R.string.action_save),
                     fontFamily = PoppinsFontFamily,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1493,7 +1499,7 @@ private fun DiscardConfirmOverlay(
                 .padding(20.dp),
         ) {
                 Text(
-                    text = "Discard changes?",
+                    text = stringResource(R.string.metadata_discard_title),
                     fontFamily = PoppinsFontFamily,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 18.sp,
@@ -1501,7 +1507,7 @@ private fun DiscardConfirmOverlay(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Your edits will be lost.",
+                    text = stringResource(R.string.metadata_discard_body),
                     fontFamily = PoppinsFontFamily,
                     fontSize = 13.sp,
                     color = TokenMuted,
@@ -1518,7 +1524,7 @@ private fun DiscardConfirmOverlay(
                         colors = ButtonDefaults.textButtonColors(contentColor = TokenMuted),
                     ) {
                         Text(
-                            text = "No",
+                            text = stringResource(R.string.action_no),
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.Medium,
                         )
@@ -1534,7 +1540,7 @@ private fun DiscardConfirmOverlay(
                         ),
                     ) {
                         Text(
-                            text = "Yes",
+                            text = stringResource(R.string.action_yes),
                             fontFamily = PoppinsFontFamily,
                             fontWeight = FontWeight.SemiBold,
                         )

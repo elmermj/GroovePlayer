@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -67,9 +69,9 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
 
     // Tier label: Free / Basic. Premium shown as "Premium" without upsell chrome.
     val tierLabel = when (tier) {
-        PrivilegeTier.FREE -> "Free"
-        PrivilegeTier.BASIC -> "Basic"
-        PrivilegeTier.PREMIUM -> "Premium"
+        PrivilegeTier.FREE -> stringResource(R.string.tier_free)
+        PrivilegeTier.BASIC -> stringResource(R.string.tier_basic)
+        PrivilegeTier.PREMIUM -> stringResource(R.string.tier_premium)
     }
 
     if (signedIn) {
@@ -82,7 +84,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
             if (!avatar.isNullOrBlank()) {
                 AsyncImage(
                     model = avatar,
-                    contentDescription = "Profile avatar",
+                    contentDescription = stringResource(R.string.cd_profile_avatar),
                     modifier = Modifier
                         .size(56.dp)
                         .clip(CircleShape),
@@ -93,7 +95,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = displayName?.takeIf { it.isNotBlank() } ?: "Signed in",
+                    text = displayName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.auth_signed_in),
                     style = GrooveTheme.typography.sectionItemTitle.toTextStyle(),
                     color = GrooveTheme.colors.onSurface,
                 )
@@ -107,7 +109,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Tier · $tierLabel",
+                    text = stringResource(R.string.auth_tier_line, tierLabel),
                     style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                     color = SoftWhite,
                 )
@@ -118,7 +120,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
 
     ProfileSettingRow(
         icon = { ProfileRowIcon(XAccountType) },
-        title = "Account type",
+        title = stringResource(R.string.account_type),
         subtitle = tierLabel,
     )
     Spacer(Modifier.height(S_PADDING))
@@ -142,7 +144,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
         ProfileSettingsButton(
             onClick = { showSignOutConfirm = true },
             modifier = Modifier.fillMaxWidth(),
-            title = "Sign out",
+            title = stringResource(R.string.sign_out),
             isActive = true,
             isInverse = true,
         )
@@ -150,7 +152,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
         ProfileSettingsButton(
             onClick = { showDeleteAccountConfirm = true },
             modifier = Modifier.fillMaxWidth(),
-            title = "Delete account",
+            title = stringResource(R.string.auth_delete_account),
             isActive = true,
             isInverse = true,
         )
@@ -160,7 +162,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
                 if (activity != null) viewModel.signInWithGoogle(activity)
             },
             modifier = Modifier.fillMaxWidth(),
-            title = "Sign in with Google",
+            title = stringResource(R.string.sign_in_with_google),
             isActive = activity != null,
         )
     }
@@ -180,7 +182,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
         ProfileSettingsButton(
             onClick = { viewModel.retryServerSync() },
             modifier = Modifier.fillMaxWidth(),
-            title = if (serverRetryInFlight) "Retrying…" else "Retry",
+            title = if (serverRetryInFlight) stringResource(R.string.action_retrying) else stringResource(R.string.action_retry),
             isActive = !serverRetryInFlight && !openRestoreInFlight && !authLoading,
         )
     }
@@ -215,22 +217,18 @@ private fun SignOutConfirmDialog(
         containerColor = colors.surface,
         titleContentColor = colors.onSurface,
         textContentColor = SoftWhite,
-        title = { Text("Sign out?") },
+        title = { Text(stringResource(R.string.auth_sign_out_title)) },
         text = {
-            Text(
-                "This device returns to Free with ads on. Cloud backup and Premium stay on " +
-                    "your account until you sign in again. The next Sign in with Google " +
-                    "will ask which account to use.",
-            )
+            Text(stringResource(R.string.auth_sign_out_body))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Sign out", color = colors.accent)
+                Text(stringResource(R.string.sign_out), color = colors.accent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = colors.muted.copy(alpha = 0.75f))
+                Text(stringResource(R.string.action_cancel), color = colors.muted.copy(alpha = 0.75f))
             }
         },
     )
@@ -247,24 +245,18 @@ private fun DeleteAccountConfirmDialog(
         containerColor = colors.surface,
         titleContentColor = colors.onSurface,
         textContentColor = SoftWhite,
-        title = { Text("Delete account?") },
+        title = { Text(stringResource(R.string.auth_delete_title)) },
         text = {
-            Text(
-                "This permanently deletes your GroovePlayer account, cloud backups, and " +
-                    "signed-in sessions on every device. It cannot be undone.\n\n" +
-                    "If you have an active Play subscription or +20GB add-on, cancel it in " +
-                    "Google Play first (Play Store → Payments & subscriptions). Deleting the " +
-                    "account does not cancel Play Billing — charges can continue until you cancel there.",
-            )
+            Text(stringResource(R.string.auth_delete_body))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Delete account", color = Color(0xFFFF8A80))
+                Text(stringResource(R.string.auth_delete_account), color = Color(0xFFFF8A80))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel", color = colors.muted.copy(alpha = 0.75f))
+                Text(stringResource(R.string.action_cancel), color = colors.muted.copy(alpha = 0.75f))
             }
         },
     )

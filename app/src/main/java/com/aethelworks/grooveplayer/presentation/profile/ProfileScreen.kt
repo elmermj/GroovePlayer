@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,7 +48,7 @@ fun ProfileScreen(
         onNavigateToSearch = onNavigateToSearch,
         viewModel = viewModel,
         isSearchEnabled = false,
-        pageTitle = "Profile",
+        pageTitle = stringResource(R.string.settings_profile),
         useSearchBar = false,
     )
 

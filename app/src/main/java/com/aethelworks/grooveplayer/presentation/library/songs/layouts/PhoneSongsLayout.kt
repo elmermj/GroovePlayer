@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.songs.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -115,12 +117,15 @@ fun PhoneSongsLayout(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = "Error: ${(refresh as LoadState.Error).error.message}",
+                                    text = stringResource(
+                                    R.string.songs_load_error,
+                                    (refresh as LoadState.Error).error.message ?: "null",
+                                ),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
                                 Button(onClick = { songsPagingItems.retry() }) {
-                                    Text("Retry")
+                                    Text(stringResource(R.string.action_retry))
                                 }
                             }
                         }

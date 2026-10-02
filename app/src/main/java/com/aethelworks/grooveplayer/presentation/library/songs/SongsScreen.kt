@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.songs
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -116,9 +118,9 @@ fun SongsScreen(
     }
 
     val title = when {
-        isSelectionMode && selectedIds.isNotEmpty() -> "${selectedIds.size} selected"
-        isSelectionMode -> "Select songs"
-        else -> "All Songs"
+        isSelectionMode && selectedIds.isNotEmpty() -> stringResource(R.string.songs_selected_count, selectedIds.size)
+        isSelectionMode -> stringResource(R.string.songs_select)
+        else -> stringResource(R.string.home_all_songs)
     }
 
     GrooveScreen(
@@ -134,10 +136,10 @@ fun SongsScreen(
         actions = {
             if (!isSelectionMode) {
                 TextButton(onClick = import.pickFolder) {
-                    Text(text = "Import", color = SoftWhite)
+                    Text(text = stringResource(R.string.action_import), color = SoftWhite)
                 }
                 TextButton(onClick = { viewModel.enterSelectionMode() }) {
-                    Text(text = "Select", color = SoftWhite)
+                    Text(text = stringResource(R.string.action_select), color = SoftWhite)
                 }
             }
         },
@@ -196,13 +198,13 @@ fun SongsScreen(
                     verticalArrangement = Arrangement.Center,
                 ) {
                     Text(
-                        text = "Your library is empty",
+                        text = stringResource(R.string.library_empty_title),
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                         modifier = Modifier.padding(bottom = S_PADDING),
                     )
                     GrooveMutedText(
-                        text = "Import a folder to copy songs into GroovePlayer",
+                        text = stringResource(R.string.library_empty_body),
                         modifier = Modifier.padding(bottom = M_PADDING),
                     )
                     Button(
@@ -212,7 +214,7 @@ fun SongsScreen(
                             contentColor = Color.Black,
                         ),
                     ) {
-                        Text("Import folder")
+                        Text(stringResource(R.string.library_import_folder))
                     }
                 }
             }
@@ -267,21 +269,21 @@ private fun SelectionBottomBar(
         ) {
             SelectionBarOption(
                 icon = XNFC,
-                label = "Tap to share",
+                label = stringResource(R.string.library_share_tap),
                 onClick = onTapToShare,
                 enabled = selectedCount > 0,
                 modifier = Modifier.weight(1f)
             )
             SelectionBarOption(
                 icon = XWifiSync,
-                label = "Share with nearby",
+                label = stringResource(R.string.library_share_nearby),
                 onClick = onShareWithNearby,
                 enabled = selectedCount > 0,
                 modifier = Modifier.weight(1f)
             )
             SelectionBarOption(
                 icon = XClose,
-                label = "Cancel",
+                label = stringResource(R.string.action_cancel),
                 onClick = onCancel,
                 enabled = true,
                 modifier = Modifier.weight(1f)

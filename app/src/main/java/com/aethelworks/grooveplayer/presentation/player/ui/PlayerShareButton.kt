@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -42,7 +44,7 @@ fun PlayerShareButton(
         ) {
             Icon(
                 imageVector = XShare,
-                contentDescription = "Share song",
+                contentDescription = stringResource(R.string.cd_share_song),
                 tint = if (enabled) Color.Unspecified else iconTint.copy(alpha = 0.35f),
             )
         }
@@ -54,7 +56,7 @@ fun PlayerShareButton(
             DropdownMenuItem(
                 text = {
                     Text(
-                        "Tap to share",
+                        stringResource(R.string.library_share_tap),
                         style = GrooveTheme.typography.buttonLabel.toTextStyle(),
                         color = colors.onSurface,
                     )
@@ -70,7 +72,7 @@ fun PlayerShareButton(
             DropdownMenuItem(
                 text = {
                     Text(
-                        "Share with nearby device",
+                        stringResource(R.string.player_share_nearby_device),
                         style = GrooveTheme.typography.buttonLabel.toTextStyle(),
                         color = colors.onSurface,
                     )

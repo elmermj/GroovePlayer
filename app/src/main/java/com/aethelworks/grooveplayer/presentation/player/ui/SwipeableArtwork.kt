@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Animatable
@@ -85,7 +87,7 @@ fun SwipeableArtwork(
         MediaArtwork(
             url = url,
             kind = MediaArtworkKind.SONG,
-            contentDescription = "Artwork",
+            contentDescription = stringResource(R.string.cd_artwork),
             cornerRadius = 20.dp,
             modifier = Modifier
                 .size(size)

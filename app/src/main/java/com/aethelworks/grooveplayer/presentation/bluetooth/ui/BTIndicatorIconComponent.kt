@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.bluetooth.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -35,7 +37,7 @@ fun BTIndicatorIconComponent(
         // Main icon
         Icon(
             imageVector = BluetoothHelpers.connectedBtIconFromName(connectedDeviceName),
-            contentDescription = "More",
+            contentDescription = if (isConnected && !connectedDeviceName.isNullOrBlank()) stringResource(R.string.cd_bluetooth_connected, connectedDeviceName) else stringResource(R.string.cd_bluetooth),
             tint = tint,
             modifier = modifier
         )

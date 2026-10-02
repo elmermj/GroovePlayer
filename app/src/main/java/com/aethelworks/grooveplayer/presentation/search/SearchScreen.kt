@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.search
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,10 +55,10 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Search") },
+                title = { Text(stringResource(R.string.search_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(XBack, contentDescription = "Back")
+                        Icon(XBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -82,22 +84,22 @@ fun SearchScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { viewModel.setSelectedTab(0) },
-                    text = { Text("All") }
+                    text = { Text(stringResource(R.string.action_all)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { viewModel.setSelectedTab(1) },
-                    text = { Text("Songs") }
+                    text = { Text(stringResource(R.string.search_songs)) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { viewModel.setSelectedTab(2) },
-                    text = { Text("Albums") }
+                    text = { Text(stringResource(R.string.search_albums)) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { viewModel.setSelectedTab(3) },
-                    text = { Text("Artists") }
+                    text = { Text(stringResource(R.string.search_artists)) }
                 )
             }
             
@@ -208,7 +210,7 @@ fun SearchScreen(
                                     modifier = Modifier.fillMaxWidth().padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("No results found")
+                                    Text(stringResource(R.string.search_no_results))
                                 }
                             }
                         }
@@ -221,7 +223,7 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No songs found")
+                            Text(stringResource(R.string.search_no_songs))
                         }
                     } else {
                         LazyColumn(
@@ -261,7 +263,7 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No albums found")
+                            Text(stringResource(R.string.search_no_albums))
                         }
                     } else {
                         LazyColumn(
@@ -295,7 +297,7 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No artists found")
+                            Text(stringResource(R.string.search_no_artists))
                         }
                     } else {
                         LazyColumn(

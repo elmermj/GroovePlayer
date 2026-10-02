@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.add_playlist
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,7 +45,7 @@ fun AddPlaylistTracksScreen(
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
 
     GrooveScreen(
-        title = "Add tracks",
+        title = stringResource(R.string.playlist_add_tracks),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues(
             start = M_PADDING,
@@ -58,7 +60,7 @@ fun AddPlaylistTracksScreen(
                 onValueChange = viewModel::onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Search songs") },
+                label = { Text(stringResource(R.string.playlist_search_songs)) },
             )
             when {
                 isLoading && songs.isEmpty() -> {
@@ -69,7 +71,7 @@ fun AddPlaylistTracksScreen(
                 songs.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         GrooveMutedText(
-                            if (query.isBlank()) "No songs in your library" else "No matching songs",
+                            if (query.isBlank()) stringResource(R.string.library_no_songs_in_library) else stringResource(R.string.library_no_matching_songs),
                         )
                     }
                 }

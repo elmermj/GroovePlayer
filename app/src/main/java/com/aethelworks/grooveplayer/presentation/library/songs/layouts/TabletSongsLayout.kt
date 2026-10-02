@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aethelworks.grooveplayer.R
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
@@ -100,8 +102,14 @@ fun TabletSongsLayout(
                     item {
                         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Error: ${(refresh as LoadState.Error).error.message}", Modifier.padding(bottom = 16.dp))
-                                Button(onClick = { songsPagingItems.retry() }) { Text("Retry") }
+                                Text(
+                                    stringResource(
+                                        R.string.songs_load_error,
+                                        (refresh as LoadState.Error).error.message ?: "null",
+                                    ),
+                                    Modifier.padding(bottom = 16.dp),
+                                )
+                                Button(onClick = { songsPagingItems.retry() }) { Text(stringResource(R.string.action_retry)) }
                             }
                         }
                     }
