@@ -12,11 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,9 +28,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.data.transfer.NearbyTransferManager
+import com.aethelworks.grooveplayer.presentation.common.GlassWhite
 import com.aethelworks.grooveplayer.presentation.common.GrooveActionButton
+import com.aethelworks.grooveplayer.presentation.common.GrooveDialog
+import com.aethelworks.grooveplayer.presentation.common.GrooveTextButton
 import com.aethelworks.grooveplayer.presentation.common.GrooveCardSubtitle
 import com.aethelworks.grooveplayer.presentation.common.GrooveCardTitle
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
@@ -41,7 +47,7 @@ import com.aethelworks.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.helpers.logShareNearbyP2PTag
-import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.utils.theme.ui.PoppinsFontFamily
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 @Composable
@@ -287,26 +293,40 @@ private fun BatteryOptimizationDialog(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = GrooveTheme.colors.surface,
-        titleContentColor = GrooveTheme.colors.onSurface,
-        textContentColor = SoftWhite.copy(alpha = 0.8f),
-        title = { Text("Battery optimization") },
-        text = {
-            Text(
-                "For reliable transfers in the background, consider disabling battery optimization for this app."
+    GrooveDialog(onDismiss = onDismiss) {
+        Text(
+            text = "Battery optimization",
+            color = GlassWhite,
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 18.sp,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "For reliable transfers in the background, consider disabling battery optimization for this app.",
+            color = GlassWhite.copy(alpha = 0.65f),
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.Normal,
+            fontSize = 14.sp,
+            lineHeight = 22.sp,
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GrooveTextButton(
+                text = "Later",
+                color = GlassWhite.copy(alpha = 0.55f),
+                onClick = onDismiss,
             )
-        },
-        confirmButton = {
-            TextButton(onClick = onOpenSettings) {
-                Text("Open settings", color = SoftWhite)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Later", color = SoftWhite.copy(alpha = 0.65f))
-            }
-        },
-    )
+            Spacer(modifier = Modifier.width(20.dp))
+            GrooveTextButton(
+                text = "Open settings",
+                color = GlassWhite,
+                onClick = onOpenSettings,
+            )
+        }
+    }
 }

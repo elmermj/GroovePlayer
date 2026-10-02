@@ -8,7 +8,7 @@ data class EqualizerState(
     val isAvailable: Boolean = false,
     val numberOfBands: Int = 0,
     val bandLevels: List<Int> = emptyList(), // Levels in millibels (-1500 to 1500)
-    val bandFrequencies: List<Int> = emptyList(), // Center frequencies in Hz
+    val bandFrequencies: List<Int> = emptyList(), // Center frequencies in milliHertz (Equalizer.getCenterFreq)
     val currentPreset: Int = -1, // -1 means custom
     val availablePresets: List<String> = emptyList(),
     val levelRange: Pair<Int, Int> = Pair(-1500, 1500) // Min and max level in millibels
