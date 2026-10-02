@@ -1,46 +1,26 @@
 package com.aethelworks.grooveplayer.presentation.profile.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.presentation.common.OverlineLabel
 
 @Composable
 fun ProfileSectionComponent(
     sectionTitle: String,
+    showOverline: Boolean = false,
     content: (@Composable () -> Unit)? = null,
-){
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Transparent)
-            .padding(vertical = GrooveTheme.spacing.sectionSpacing)
-    ) {
-        Column{
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-            ) {
-                Text(
-                    text = sectionTitle,
-                    style = GrooveTheme.typography.sectionTitle.toTextStyle(),
-                    color = GrooveTheme.colors.onSurface,
-                )
-            }
-            Spacer(Modifier.height(GrooveTheme.spacing.s))
-            content?.invoke()
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (showOverline) {
+            OverlineLabel(sectionTitle)
+        } else {
+            Spacer(Modifier.height(16.dp))
         }
+        content?.invoke()
     }
 }

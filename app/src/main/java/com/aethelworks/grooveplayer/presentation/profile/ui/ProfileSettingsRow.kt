@@ -9,34 +9,25 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
-import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
+import com.aethelworks.grooveplayer.presentation.common.FlatChevron
+import com.aethelworks.grooveplayer.presentation.common.FlatLeadingIcon
+import com.aethelworks.grooveplayer.presentation.common.FlatRow
+import com.aethelworks.grooveplayer.presentation.common.HairlineDivider
 
 enum class ActionType {
     OPTIONS,
@@ -47,11 +38,9 @@ enum class ActionType {
     INACTIVE
 }
 
-/** Accessible minimum height for settings rows. */
-private val MinSettingsRowHeight = 48.dp
-
 /**
  * Renders a multi-color profile icon without applying a monochrome tint.
+ * Kept for the account header, which is outside the flat settings rows.
  */
 @Composable
 fun ProfileRowIcon(
@@ -63,6 +52,18 @@ fun ProfileRowIcon(
         contentDescription = contentDescription,
         tint = Color.Unspecified,
         modifier = Modifier.size(24.dp)
+    )
+}
+
+/** Outlined settings icon at SoftWhite 80%. */
+@Composable
+fun SettingsRowIcon(
+    imageVector: ImageVector,
+    contentDescription: String? = null,
+) {
+    FlatLeadingIcon(
+        imageVector = imageVector,
+        contentDescription = contentDescription,
     )
 }
 
@@ -79,48 +80,10 @@ fun ProfileSettingRow(
     isSecondaryVisible: Boolean? = null,
     onSecondaryVisibleChange: ((Boolean) -> Unit)? = null,
 ) {
-    val localPrimaryContent = primaryContent ?: @Composable {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = MinSettingsRowHeight)
-                .background(Color.Transparent),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Spacer(Modifier.width(4.dp))
-            if (icon != null) {
-                Box(
-                    modifier = Modifier.size(28.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    icon()
-                }
-                Spacer(Modifier.width(12.dp))
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .background(Color.Transparent)
-            ) {
-                Text(
-                    text = title,
-                    style = GrooveTheme.typography.sectionItemTitle.toTextStyle(),
-                    color = GrooveTheme.colors.onSurface
-                )
-                if (subtitle != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = subtitle,
-                        style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
-                        color = SoftWhite
-                    )
-                }
-            }
-        }
-    }
-    // Shared visibility state: controlled from parent when isSecondaryVisible/onSecondaryVisibleChange
-    // are provided, otherwise managed internally per-row.
+    val showChevron = actionType == ActionType.LINK ||
+        actionType == ActionType.EXPANDABLE ||
+        actionType == ActionType.OPTIONS
+
     @Composable
     fun resolveVisibilityState(initial: Boolean = false): Pair<Boolean, (Boolean) -> Unit> {
         return if (isSecondaryVisible != null && onSecondaryVisibleChange != null) {
@@ -131,91 +94,106 @@ fun ProfileSettingRow(
         }
     }
 
-    when (actionType){
-        ActionType.OPTIONS -> {
-            val (showSecondary, setShowSecondary) = resolveVisibilityState(initial = false)
+    @Composable
+    fun RowBody(
+        onClick: (() -> Unit)?,
+        expanded: Boolean,
+    ) {
+        if (primaryContent != null) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = MinSettingsRowHeight)
-                    .clickable {
-                        setShowSecondary(!showSecondary)
-                        onClick()
-                    }
+                    .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
             ) {
-                AnimatedContent(
-                    targetState = showSecondary && secondaryContent != null,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(150)).togetherWith(
-                                fadeOut(animationSpec = tween(150)))
-                    },
-                    label = "ProfileSettingRowOptions"
-                ) { showAlt ->
-                    if (showAlt && secondaryContent != null) {
-                        secondaryContent.invoke()
-                    } else {
-                        localPrimaryContent.invoke()
-                    }
-                }
+                primaryContent()
             }
-        }
-        ActionType.PASSIVE -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MinSettingsRowHeight)
-            ) {
-                localPrimaryContent.invoke()
-            }
-        }
-        ActionType.LINK -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MinSettingsRowHeight)
-                    .clickable(onClick = onClick)
-            ) {
-                localPrimaryContent.invoke()
-            }
-        }
-        ActionType.EXPANDABLE -> {
-            val (expanded, setExpanded) = resolveVisibilityState(initial = false)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        setExpanded(!expanded)
-                        onClick()
-                    }
-            ) {
-                localPrimaryContent.invoke()
-                AnimatedVisibility(
-                    visible = expanded && secondaryContent != null,
-                    enter = expandVertically(animationSpec = tween(200)) + fadeIn(
-                        animationSpec = tween(200)
-                    ),
-                    exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(
-                        animationSpec = tween(200)
-                    ),
-                    label = "ProfileSettingRowExpandable"
-                ) {
-                    Column {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        secondaryContent?.invoke()
-                    }
-                }
-            }
-        }
-        ActionType.INACTIVE -> {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = MinSettingsRowHeight)
-                    .alpha(0.4f)
-            ) {
-                localPrimaryContent.invoke()
-            }
+        } else {
+            FlatRow(
+                title = title,
+                subtitle = subtitle,
+                leading = icon,
+                trailing = if (showChevron) {
+                    { FlatChevron(expanded = expanded) }
+                } else {
+                    null
+                },
+                onClick = onClick,
+                showDivider = false,
+            )
         }
     }
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (actionType == ActionType.INACTIVE) 0.4f else 1f),
+    ) {
+        when (actionType) {
+            ActionType.OPTIONS -> {
+                val (showSecondary, setShowSecondary) = resolveVisibilityState(initial = false)
+                val showingAlt = showSecondary && secondaryContent != null
+                val toggle = {
+                    setShowSecondary(!showSecondary)
+                    onClick()
+                }
+                AnimatedContent(
+                    targetState = showingAlt,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(150)).togetherWith(
+                            fadeOut(animationSpec = tween(150)),
+                        )
+                    },
+                    label = "ProfileSettingRowOptions",
+                ) { showAlt ->
+                    if (showAlt && secondaryContent != null) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = toggle)
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                        ) {
+                            secondaryContent()
+                        }
+                    } else {
+                        RowBody(onClick = toggle, expanded = false)
+                    }
+                }
+                HairlineDivider()
+            }
+            ActionType.PASSIVE -> {
+                RowBody(onClick = null, expanded = false)
+                HairlineDivider()
+            }
+            ActionType.LINK -> {
+                RowBody(onClick = onClick, expanded = false)
+                HairlineDivider()
+            }
+            ActionType.EXPANDABLE -> {
+                val (expanded, setExpanded) = resolveVisibilityState(initial = false)
+                val open = expanded && secondaryContent != null
+                RowBody(
+                    onClick = {
+                        setExpanded(!expanded)
+                        onClick()
+                    },
+                    expanded = open,
+                )
+                AnimatedVisibility(
+                    visible = open,
+                    enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)),
+                    exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)),
+                    label = "ProfileSettingRowExpandable",
+                ) {
+                    Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 12.dp)) {
+                        secondaryContent?.invoke()
+                    }
+                }
+                HairlineDivider()
+            }
+            ActionType.INACTIVE -> {
+                RowBody(onClick = null, expanded = false)
+                HairlineDivider()
+            }
+        }
+    }
 }

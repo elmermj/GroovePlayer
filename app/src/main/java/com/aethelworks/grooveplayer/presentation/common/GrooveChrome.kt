@@ -3,6 +3,8 @@ package com.aethelworks.grooveplayer.presentation.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,8 @@ fun GrooveScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues? = null,
+    centerTitle: Boolean = false,
+    flatBackdrop: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -55,10 +59,19 @@ fun GrooveScreen(
         end = spacing.l,
         bottom = spacing.l + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
     )
+    val backdrop = if (flatBackdrop) {
+        Modifier.background(
+            Brush.verticalGradient(
+                colors = listOf(Color(0xFF0A0A0A), Color(0xFF000000)),
+            ),
+        )
+    } else {
+        Modifier.background(colors.canvas)
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(colors.canvas)
+            .then(backdrop)
     ) {
         Box(
             modifier = Modifier
@@ -76,6 +89,7 @@ fun GrooveScreen(
             title = title,
             deviceType = deviceType,
             onBackClick = onBackClick,
+            centerTitle = centerTitle,
             actions = actions,
         )
     }

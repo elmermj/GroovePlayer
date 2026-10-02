@@ -26,9 +26,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aethelworks.grooveplayer.R
 import com.aethelworks.grooveplayer.utils.DeviceType
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
@@ -122,37 +127,68 @@ fun GradientAppBar(
     modifier: Modifier = Modifier,
     /** Override back action (e.g. close drawer). When null, uses navigation.goBack(). */
     onBackClick: (() -> Unit)? = null,
+    centerTitle: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val navigation = rememberNavigationActions()
+    val goBack = onBackClick ?: { navigation.goBack() }
 
     Box(
         modifier = modifier.grooveTopBarContainer(deviceType),
         contentAlignment = Alignment.CenterStart
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        if (centerTitle) {
+            Text(
+                text = title,
+                style = flatBarTitleStyle(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 108.dp)
+                    .semantics { heading() },
+            )
             IconButton(
-                onClick = { (onBackClick ?: { navigation.goBack() })() }
+                onClick = goBack,
+                modifier = Modifier.align(Alignment.CenterStart),
             ) {
                 Icon(
                     imageVector = XBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.action_back),
                     tint = GrooveTheme.colors.onSurface,
                 )
             }
-            Spacer(modifier = Modifier.size(S_PADDING))
-            Text(
-                text = title,
-                style = GrooveTheme.typography.pageTitle.toTextStyle(),
-                color = GrooveTheme.colors.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically,
+                content = actions,
             )
-            actions()
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = goBack,
+                ) {
+                    Icon(
+                        imageVector = XBack,
+                        contentDescription = "Back",
+                        tint = GrooveTheme.colors.onSurface,
+                    )
+                }
+                Spacer(modifier = Modifier.size(S_PADDING))
+                Text(
+                    text = title,
+                    style = GrooveTheme.typography.pageTitle.toTextStyle(),
+                    color = GrooveTheme.colors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                actions()
+            }
         }
     }
 }

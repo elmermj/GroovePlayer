@@ -115,6 +115,7 @@ fun ProfileDrawerContent(
             title = if (showRecentUpdates) recentUpdatesViewModel.updates.title else stringResource(R.string.settings_profile),
             deviceType = deviceType,
             modifier = Modifier,
+            centerTitle = !showRecentUpdates,
             onBackClick = {
                 if (showRecentUpdates) showRecentUpdates = false else onClose()
             },

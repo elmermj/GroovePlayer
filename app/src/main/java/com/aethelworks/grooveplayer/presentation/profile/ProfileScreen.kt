@@ -50,6 +50,7 @@ fun ProfileScreen(
         isSearchEnabled = false,
         pageTitle = stringResource(R.string.settings_profile),
         useSearchBar = false,
+        centerPageTitle = true,
     )
 
 }

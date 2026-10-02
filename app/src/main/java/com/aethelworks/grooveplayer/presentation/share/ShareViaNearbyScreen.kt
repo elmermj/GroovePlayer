@@ -1,16 +1,14 @@
 package com.aethelworks.grooveplayer.presentation.share
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,20 +16,26 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.data.share.ShareProtocol
 import com.aethelworks.grooveplayer.domain.model.ShareSessionInfo
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardSubtitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardTitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelworks.grooveplayer.presentation.common.FlatCentered
+import com.aethelworks.grooveplayer.presentation.common.FlatChevron
+import com.aethelworks.grooveplayer.presentation.common.FlatLeadingIcon
+import com.aethelworks.grooveplayer.presentation.common.FlatRow
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
-import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
-import com.aethelworks.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
+import com.aethelworks.grooveplayer.presentation.common.PulsingRing
+import com.aethelworks.grooveplayer.presentation.common.flatBarTitleStyle
+import com.aethelworks.grooveplayer.presentation.common.flatSubtitleStyle
+import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
+import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
+import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.getLocalIpAddress
-import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
+import com.aethelworks.grooveplayer.utils.theme.icons.XSmartphone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -66,21 +70,27 @@ fun ShareViaNearbyScreen(
     GrooveScreen(
         title = "Share with nearby",
         onBackClick = onNavigateBack,
+        centerTitle = true,
+        flatBackdrop = true,
+        contentPadding = PaddingValues(
+            bottom = 12.dp + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
+        ),
     ) {
-        GrooveBelowAppBarSpacer()
-        if (isSender) {
-            WaitingState(
-                title = "Waiting for receiver…",
-                subtitle = "Make sure both devices are on the same Wi‑Fi network",
-            )
-        } else {
-            NearbyDeviceList(
-                viewModel = viewModel,
-                onDeviceSelected = { info ->
-                    viewModel.connectAndReceiveOffer(info)
-                    onOfferReceived()
-                }
-            )
+        FlatCentered(Modifier.fillMaxSize()) {
+            if (isSender) {
+                WaitingState(
+                    title = "Waiting for receiver…",
+                    subtitle = "Make sure both devices are on the same Wi‑Fi network",
+                )
+            } else {
+                NearbyDeviceList(
+                    viewModel = viewModel,
+                    onDeviceSelected = { info ->
+                        viewModel.connectAndReceiveOffer(info)
+                        onOfferReceived()
+                    }
+                )
+            }
         }
     }
 }
@@ -90,20 +100,30 @@ private fun WaitingState(
     title: String,
     subtitle: String,
 ) {
-    Column(
+    Box(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = Color.White,
-        )
-        Spacer(modifier = Modifier.height(S_PADDING))
-        GrooveMutedText(text = subtitle)
-        Spacer(modifier = Modifier.height(M_PADDING * 2))
-        CircularProgressIndicator(color = SoftWhite)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        ) {
+            PulsingRing()
+            Spacer(modifier = Modifier.height(M_PADDING))
+            Text(
+                text = title,
+                style = flatBarTitleStyle(),
+                textAlign = TextAlign.Center,
+            )
+            if (subtitle.isNotBlank()) {
+                Spacer(modifier = Modifier.height(S_PADDING))
+                Text(
+                    text = subtitle,
+                    style = flatSubtitleStyle(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 
@@ -119,26 +139,24 @@ private fun NearbyDeviceList(
     }
 
     if (devices.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = SoftWhite)
-                Spacer(modifier = Modifier.height(S_PADDING))
-                GrooveMutedText("Searching for nearby devices…")
-            }
-        }
+        WaitingState(
+            title = "Searching for nearby devices…",
+            subtitle = "",
+        )
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(S_PADDING),
+            contentPadding = PaddingValues(top = topBarContentInset()),
         ) {
             items(devices) { info ->
-                GrooveSurfaceCard(onClick = { onDeviceSelected(info) }) {
-                    GrooveCardTitle(info.deviceName)
-                    GrooveCardSubtitle("${info.host}:${info.port}")
-                }
+                FlatRow(
+                    title = info.deviceName,
+                    subtitle = "${info.host}:${info.port}",
+                    leading = { FlatLeadingIcon(XSmartphone) },
+                    trailing = { FlatChevron() },
+                    onClick = { onDeviceSelected(info) },
+                    showDivider = true,
+                )
             }
         }
     }

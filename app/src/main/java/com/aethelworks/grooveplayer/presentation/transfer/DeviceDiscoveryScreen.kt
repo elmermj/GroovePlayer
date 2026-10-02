@@ -3,18 +3,17 @@ package com.aethelworks.grooveplayer.presentation.transfer
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,20 +27,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.data.transfer.NearbyTransferManager
-import com.aethelworks.grooveplayer.presentation.common.GrooveActionButton
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardSubtitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardTitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelworks.grooveplayer.presentation.common.FlatCentered
+import com.aethelworks.grooveplayer.presentation.common.FlatChevron
+import com.aethelworks.grooveplayer.presentation.common.FlatLeadingIcon
+import com.aethelworks.grooveplayer.presentation.common.FlatPillButton
+import com.aethelworks.grooveplayer.presentation.common.FlatRow
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
-import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
-import com.aethelworks.grooveplayer.presentation.common.GrooveTinySpacer
-import com.aethelworks.grooveplayer.presentation.common.GrooveBelowAppBarSpacer
+import com.aethelworks.grooveplayer.presentation.common.PulsingRing
+import com.aethelworks.grooveplayer.presentation.common.flatBarTitleStyle
+import com.aethelworks.grooveplayer.presentation.common.flatSubtitleStyle
+import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
+import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
+import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.helpers.logShareNearbyP2PTag
-import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.utils.theme.icons.XSmartphone
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 @Composable
@@ -116,33 +121,46 @@ fun DeviceDiscoveryScreen(
     GrooveScreen(
         title = if (isSender) "Share with nearby" else "Receive from nearby",
         onBackClick = onNavigateBack,
+        centerTitle = true,
+        flatBackdrop = true,
+        contentPadding = PaddingValues(
+            bottom = 12.dp + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
+        ),
     ) {
-        GrooveBelowAppBarSpacer()
-        DeviceCapabilityCard(capability = deviceCapability)
+        FlatCentered(Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (deviceCapability.hasMissingCapability) {
+                    Spacer(Modifier.height(topBarContentInset()))
+                    DeviceCapabilityRow(
+                        capability = deviceCapability,
+                        visibleWhenReady = false,
+                    )
+                }
 
-        Spacer(modifier = Modifier.height(M_PADDING))
-
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            when {
-                !hasPermissions -> PermissionRequiredView(
-                    onRequestPermissions = {
-                        Log.d(tag, "User requested permissions")
-                        permissionLauncher.launch(viewModel.getMissingPermissions())
-                    },
-                )
-                isSender && filePaths.isEmpty() -> SenderEmptyStateView(
-                    onNavigateBack = onNavigateBack,
-                )
-                isSender && filePaths.isNotEmpty() -> SenderView(
-                    viewModel = viewModel,
-                    filePaths = filePaths,
-                    onConnectionAccepted = onDeviceSelected,
-                )
-                else -> ReceiverView(
-                    tag = tag,
-                    viewModel = viewModel,
-                    onDeviceSelected = onDeviceSelected,
-                )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    when {
+                        !hasPermissions -> PermissionRequiredView(
+                            onRequestPermissions = {
+                                Log.d(tag, "User requested permissions")
+                                permissionLauncher.launch(viewModel.getMissingPermissions())
+                            },
+                        )
+                        isSender && filePaths.isEmpty() -> SenderEmptyStateView(
+                            onNavigateBack = onNavigateBack,
+                        )
+                        isSender && filePaths.isNotEmpty() -> SenderView(
+                            viewModel = viewModel,
+                            filePaths = filePaths,
+                            onConnectionAccepted = onDeviceSelected,
+                        )
+                        else -> ReceiverView(
+                            tag = tag,
+                            viewModel = viewModel,
+                            onDeviceSelected = onDeviceSelected,
+                            reserveTopInset = !deviceCapability.hasMissingCapability,
+                        )
+                    }
+                }
             }
         }
     }
@@ -156,19 +174,26 @@ private fun SenderEmptyStateView(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        ) {
             Text(
                 text = "No files selected",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                style = flatBarTitleStyle(),
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(S_PADDING))
-            GrooveMutedText("Go back and select files to share.")
+            Text(
+                text = "Go back and select files to share.",
+                style = flatSubtitleStyle(),
+                textAlign = TextAlign.Center,
+            )
             Spacer(modifier = Modifier.height(M_PADDING))
-            GrooveActionButton(
+            FlatPillButton(
                 label = "Go back",
                 onClick = onNavigateBack,
-                isPrimary = true,
+                filled = true,
             )
         }
     }
@@ -196,6 +221,7 @@ private fun ReceiverView(
     tag: String,
     viewModel: DiscoveryViewModel,
     onDeviceSelected: (String, String) -> Unit,
+    reserveTopInset: Boolean,
 ) {
     val discoveredEndpoints by viewModel.discoveredEndpoints.collectAsState()
 
@@ -217,19 +243,22 @@ private fun ReceiverView(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(S_PADDING),
+            contentPadding = PaddingValues(
+                top = if (reserveTopInset) topBarContentInset() else 0.dp,
+            ),
         ) {
             items(discoveredEndpoints) { endpoint ->
-                GrooveSurfaceCard(
+                FlatRow(
+                    title = endpoint.name,
+                    subtitle = "Tap to connect",
+                    leading = { FlatLeadingIcon(XSmartphone) },
+                    trailing = { FlatChevron() },
                     onClick = {
                         viewModel.requestConnection(endpoint.endpointId, endpoint.name)
                         onDeviceSelected(endpoint.endpointId, endpoint.name)
-                    }
-                ) {
-                    GrooveCardTitle(endpoint.name)
-                    GrooveTinySpacer()
-                    GrooveCardSubtitle("Tap to connect")
-                }
+                    },
+                    showDivider = true,
+                )
             }
         }
     }
@@ -244,16 +273,23 @@ private fun WaitingState(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = SoftWhite)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 32.dp),
+        ) {
+            PulsingRing()
             Spacer(modifier = Modifier.height(M_PADDING))
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                style = flatBarTitleStyle(),
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(S_PADDING))
-            GrooveMutedText(subtitle)
+            Text(
+                text = subtitle,
+                style = flatSubtitleStyle(),
+                textAlign = TextAlign.Center,
+            )
         }
     }
 }
@@ -266,17 +302,26 @@ private fun PermissionRequiredView(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        GrooveSurfaceCard {
-            GrooveCardTitle("Permissions required")
-            GrooveTinySpacer()
-            GrooveCardSubtitle(
-                "Nearby sharing needs Bluetooth and location (or nearby devices) access to discover and connect."
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        ) {
+            Text(
+                text = "Permissions required",
+                style = flatBarTitleStyle(),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(S_PADDING))
+            Text(
+                text = "Nearby sharing needs Bluetooth and location (or nearby devices) access to discover and connect.",
+                style = flatSubtitleStyle(),
+                textAlign = TextAlign.Center,
             )
             Spacer(modifier = Modifier.height(M_PADDING))
-            GrooveActionButton(
+            FlatPillButton(
                 label = "Grant permissions",
                 onClick = onRequestPermissions,
-                isPrimary = true,
+                filled = true,
             )
         }
     }
@@ -289,8 +334,8 @@ private fun BatteryOptimizationDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = GrooveTheme.colors.surface,
-        titleContentColor = GrooveTheme.colors.onSurface,
+        containerColor = Color.Black,
+        titleContentColor = SoftWhite,
         textContentColor = SoftWhite.copy(alpha = 0.8f),
         title = { Text("Battery optimization") },
         text = {

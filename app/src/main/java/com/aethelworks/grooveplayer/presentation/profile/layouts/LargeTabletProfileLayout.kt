@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import com.aethelworks.grooveplayer.domain.model.RepeatMode
 import com.aethelworks.grooveplayer.domain.model.VisualizationMode
+import com.aethelworks.grooveplayer.presentation.common.FlatPage
 import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
@@ -46,7 +47,7 @@ import com.aethelworks.grooveplayer.presentation.player.ui.CustomSlider
 import com.aethelworks.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent
 import com.aethelworks.grooveplayer.presentation.profile.ProfileViewModel
 import com.aethelworks.grooveplayer.presentation.profile.ui.ActionType
-import com.aethelworks.grooveplayer.presentation.profile.ui.ProfileRowIcon
+import com.aethelworks.grooveplayer.presentation.profile.ui.SettingsRowIcon
 import com.aethelworks.grooveplayer.presentation.profile.ui.ProfileSectionComponent
 import com.aethelworks.grooveplayer.presentation.profile.ui.ProfileSettingRow
 import com.aethelworks.grooveplayer.presentation.profile.ui.ProfileSettingsButton
@@ -85,21 +86,12 @@ fun LargeTabletProfileLayout(
     onOpenRecentUpdates: () -> Unit = {},
 ){
     val context = LocalContext.current
-    val canvas = GrooveTheme.colors.canvas
+    FlatPage {
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(canvas)
-            .padding(horizontal = M_PADDING)
+        modifier = Modifier.fillMaxSize()
     ) {
         item {
-            Spacer(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(420.dp)
-                    .background(canvas)
-                    .height(topBarContentInset())
-            )
+            Spacer(modifier = Modifier.height(topBarContentInset()))
         }
         item {
             /** xdev
@@ -114,21 +106,19 @@ fun LargeTabletProfileLayout(
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XShareMusic) },
+                    icon = { SettingsRowIcon(XShareMusic) },
                     title = stringResource(R.string.settings_share_music),
                     subtitle = stringResource(R.string.settings_share_music_sub),
                     actionType = ActionType.EXPANDABLE,
                     onClick = onNavigateToShare
                 )
-                Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XUiStyle) },
+                    icon = { SettingsRowIcon(XUiStyle) },
                     title = stringResource(R.string.settings_ui_customisation),
                     subtitle = stringResource(R.string.settings_ui_customisation_sub),
                     actionType = ActionType.LINK,
                     onClick = onNavigateToUiStyling,
                 )
-                Spacer(Modifier.height(S_PADDING))
                 NotificationsRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "notifications",
@@ -136,11 +126,11 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "notifications" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-                AccountSection(viewModel = viewModel, onNavigateToBackup = onNavigateToBackup)
-                Spacer(Modifier.height(S_PADDING))
-                // FREE-tier only; no-op when Basic/Premium.
-                com.aethelworks.grooveplayer.presentation.ads.BannerAdSlot()
+                Column(Modifier.padding(horizontal = M_PADDING)) {
+                    AccountSection(viewModel = viewModel, onNavigateToBackup = onNavigateToBackup)
+                    // FREE-tier only; no-op when Basic/Premium.
+                    com.aethelworks.grooveplayer.presentation.ads.BannerAdSlot()
+                }
             }
         }
 
@@ -155,6 +145,7 @@ fun LargeTabletProfileLayout(
              */
             ProfileSectionComponent(
                 sectionTitle = stringResource(R.string.settings_playback),
+                showOverline = true,
             ) {
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
@@ -165,8 +156,6 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "repeat" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-
                 ShuffleModeRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "shuffle",
@@ -174,8 +163,6 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "shuffle" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-
                 CrossFadeModeRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "crossfade",
@@ -183,8 +170,6 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "crossfade" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-
                 MiniPlayerOnStartRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "mini_player",
@@ -192,8 +177,6 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "mini_player" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-
                 VisualizationModeRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "visualization",
@@ -201,8 +184,6 @@ fun LargeTabletProfileLayout(
                         viewModel.setActiveRowId(if (expanded) "visualization" else null)
                     }
                 )
-                Spacer(Modifier.height(S_PADDING))
-
                 EqualizerRow(
                     isExpanded = activeRowId == "equalizer",
                     onExpandedChange = { expanded ->
@@ -236,35 +217,31 @@ fun LargeTabletProfileLayout(
                 sectionTitle = stringResource(R.string.settings_about),
             ) {
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XAppVersion) },
+                    icon = { SettingsRowIcon(XAppVersion) },
                     title = stringResource(R.string.settings_app_version),
                     subtitle = stringResource(R.string.settings_app_version_value, BuildConfig.VERSION_NAME)
                 )
-                Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XRecentUpdates) },
+                    icon = { SettingsRowIcon(XRecentUpdates) },
                     title = stringResource(R.string.settings_recent_updates),
                     subtitle = stringResource(R.string.settings_recent_updates_sub),
                     actionType = ActionType.LINK,
                     onClick = onOpenRecentUpdates,
                 )
-                Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XCopyright) },
+                    icon = { SettingsRowIcon(XCopyright) },
                     title = stringResource(R.string.settings_copyright),
                     subtitle = stringResource(R.string.settings_legal)
                 )
-                Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XPrivacyPolicy) },
+                    icon = { SettingsRowIcon(XPrivacyPolicy) },
                     title = stringResource(R.string.settings_privacy),
                     subtitle = stringResource(R.string.settings_privacy_sub_we),
                     actionType = ActionType.LINK,
                     onClick = { LegalUrls.open(context, LegalUrls.PRIVACY) },
                 )
-                Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
-                    icon = { ProfileRowIcon(XPrivacyPolicy) },
+                    icon = { SettingsRowIcon(XPrivacyPolicy) },
                     title = stringResource(R.string.settings_terms),
                     subtitle = stringResource(R.string.settings_terms_sub),
                     actionType = ActionType.LINK,
@@ -275,10 +252,10 @@ fun LargeTabletProfileLayout(
         item {
             Spacer(
                 modifier = Modifier
-                    .height(M_PADDING + grooveBottomContentInset(includeMiniPlayer = true) + 134.dp)
-                    .width(420.dp)
+                    .height(M_PADDING + grooveBottomContentInset(includeMiniPlayer = true) + 134.dp + 12.dp)
             )
         }
+    }
     }
 }
 
@@ -307,7 +284,7 @@ fun RepeatModeRow(
     val currentRepeat by playerViewModel.repeat.collectAsState()
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XRepeatMode) },
+        icon = { SettingsRowIcon(XRepeatMode) },
         actionType = ActionType.EXPANDABLE,
         title = stringResource(R.string.settings_repeat),
         subtitle = stringResource(R.string.settings_repeat_sub),
@@ -351,7 +328,7 @@ fun ShuffleModeRow(
     val isEnabled by playerViewModel.shuffle.collectAsState()
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XShuffleMode) },
+        icon = { SettingsRowIcon(XShuffleMode) },
         actionType = ActionType.EXPANDABLE,
         title = stringResource(R.string.settings_shuffle),
         subtitle = stringResource(R.string.settings_shuffle_sub),
@@ -396,7 +373,7 @@ fun CrossFadeModeRow(
     var sliderValue by remember(fadeSeconds) { mutableFloatStateOf(fadeSeconds.toFloat()) }
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XCrossFade) },
+        icon = { SettingsRowIcon(XCrossFade) },
         actionType = ActionType.EXPANDABLE,
         title = stringResource(R.string.settings_crossfade),
         subtitle = stringResource(R.string.settings_crossfade_sub),
@@ -442,7 +419,7 @@ fun MiniPlayerOnStartRow(
     val isEnabled by viewModel.isMiniPlayerOnStartEnabled.collectAsState()
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XMiniPlayer) },
+        icon = { SettingsRowIcon(XMiniPlayer) },
         title = stringResource(R.string.settings_mini_player),
         subtitle = stringResource(R.string.settings_mini_player_sub),
         actionType = ActionType.EXPANDABLE,
@@ -493,7 +470,7 @@ fun NotificationsRow(
     }
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XNotifications) },
+        icon = { SettingsRowIcon(XNotifications) },
         title = stringResource(R.string.settings_notifications),
         subtitle = stringResource(R.string.settings_notifications_sub, statusText),
         actionType = ActionType.EXPANDABLE,
@@ -562,7 +539,7 @@ fun VisualizationModeRow(
     val mode = settings.visualizationMode
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XVisualization) },
+        icon = { SettingsRowIcon(XVisualization) },
         actionType = ActionType.EXPANDABLE,
         title = stringResource(R.string.settings_visualization),
         subtitle = stringResource(R.string.settings_visualization_sub),
@@ -604,7 +581,7 @@ fun EqualizerRow(
     onExpandedChange: (Boolean) -> Unit,
 ) {
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XEqualizer) },
+        icon = { SettingsRowIcon(XEqualizer) },
         actionType = ActionType.EXPANDABLE,
         title = stringResource(R.string.settings_equalizer),
         subtitle = stringResource(R.string.settings_equalizer_sub),

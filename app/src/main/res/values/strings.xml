@@ -318,4 +318,16 @@
     <string name="metadata_add_genre">Add a genre</string>
     <string name="metadata_track_hint">Track</string>
     <string name="metadata_album_name">Album name</string>
+
+    <!-- Flat transfer status -->
+    <string name="transfer_waiting">Waiting</string>
+    <string name="cd_transfer_waiting">Waiting</string>
+    <string name="transfer_empty">No transfers yet</string>
+    <string name="cd_transfer_empty">No transfers yet</string>
+    <string name="transfer_clear_completed">Clear completed</string>
+    <string name="cd_transfer_clear_completed">Clear completed</string>
+    <string name="transfer_section_active">Active</string>
+    <string name="transfer_section_completed">Completed</string>
+    <string name="cd_capability_ready">Ready</string>
+    <string name="cd_capability_missing">Missing</string>
 </resources>

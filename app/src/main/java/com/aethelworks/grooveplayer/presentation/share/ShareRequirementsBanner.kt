@@ -4,26 +4,20 @@ import android.content.Intent
 import android.net.wifi.WifiManager
 import android.nfc.NfcAdapter
 import android.provider.Settings
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import com.aethelworks.grooveplayer.presentation.common.GrooveActionButton
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardTitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
-import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
-import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import androidx.compose.ui.text.font.FontWeight
+import com.aethelworks.grooveplayer.presentation.common.FlatRow
+import com.aethelworks.grooveplayer.presentation.common.OverlineLabel
+import com.aethelworks.grooveplayer.utils.theme.ui.PoppinsFontFamily
+import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 data class ShareRequirementsStatus(
     val isNfcAvailable: Boolean,
@@ -60,22 +54,22 @@ fun ShareRequirementsBanner(
 
     if (!needsNfc && !needsWifi) return
 
-    GrooveSurfaceCard(modifier = modifier) {
-        GrooveCardTitle("Enable features for sharing")
-        Spacer(modifier = Modifier.height(S_PADDING))
+    Column(modifier = modifier.fillMaxWidth()) {
+        OverlineLabel("Enable features for sharing")
         if (needsNfc) {
             RequirementRow(
                 message = "NFC is off — needed for Tap to Share",
                 actionLabel = "Turn on NFC",
-                onAction = { context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) }
+                onAction = { context.startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
+                showDivider = needsWifi,
             )
         }
         if (needsWifi) {
-            if (needsNfc) Spacer(modifier = Modifier.height(S_PADDING))
             RequirementRow(
                 message = "Wi‑Fi is off — nearby discovery works better with Wi‑Fi on",
                 actionLabel = "Turn on Wi‑Fi",
-                onAction = { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
+                onAction = { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) },
+                showDivider = true,
             )
         }
     }
@@ -86,21 +80,23 @@ private fun RequirementRow(
     message: String,
     actionLabel: String,
     onAction: () -> Unit,
+    showDivider: Boolean,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(XS_PADDING),
-    ) {
-        GrooveMutedText(
-            text = message,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.weight(1f),
-        )
-        GrooveActionButton(
-            label = actionLabel,
-            onClick = onAction,
-            isPrimary = true,
-        )
-    }
+    FlatRow(
+        title = message,
+        titleMaxLines = 3,
+        trailing = {
+            TextButton(
+                onClick = onAction,
+                colors = ButtonDefaults.textButtonColors(contentColor = SoftWhite),
+            ) {
+                Text(
+                    text = actionLabel,
+                    fontFamily = PoppinsFontFamily,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        showDivider = showDivider,
+    )
 }

@@ -48,7 +48,6 @@ fun ProfileStorageSection(viewModel: ProfileViewModel) {
 
     ProfileSectionComponent(sectionTitle = stringResource(R.string.settings_storage)) {
         ImportFolderRow()
-        Spacer(Modifier.height(S_PADDING))
         StorageUsageRow(
             viewModel = viewModel,
             isExpanded = storageActiveRowId == "storage_usage",
@@ -56,14 +55,12 @@ fun ProfileStorageSection(viewModel: ProfileViewModel) {
                 viewModel.setStorageActiveRowId(if (expanded) "storage_usage" else null)
             }
         )
-        Spacer(modifier = Modifier.height(S_PADDING))
         ConsolidateFoldersRow(
             isExpanded = storageActiveRowId == "consolidate_folders",
             onExpandedChange = { expanded ->
                 viewModel.setStorageActiveRowId(if (expanded) "consolidate_folders" else null)
             }
         )
-        Spacer(modifier = Modifier.height(S_PADDING))
         ClearCacheRow(
             viewModel = viewModel,
             isExpanded = storageActiveRowId == "clear_cache",
@@ -78,7 +75,7 @@ fun ProfileStorageSection(viewModel: ProfileViewModel) {
 private fun ImportFolderRow() {
     val import = LocalLibraryImport.current
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XExcludedFolder) },
+        icon = { SettingsRowIcon(XExcludedFolder) },
         title = stringResource(R.string.library_import_folder),
         subtitle = stringResource(R.string.storage_import_sub),
         actionType = ActionType.LINK,
@@ -96,7 +93,7 @@ fun ExcludedFoldersRow(
         if (isExpanded) viewModel.loadFolderSuggestions()
     }
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XExcludedFolder) },
+        icon = { SettingsRowIcon(XExcludedFolder) },
         title = stringResource(R.string.storage_excluded_title),
         subtitle = stringResource(R.string.storage_excluded_sub),
         actionType = ActionType.EXPANDABLE,
@@ -118,7 +115,7 @@ fun StorageUsageRow(
         if (isExpanded) viewModel.loadStorageUsage()
     }
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XStorageUsage) },
+        icon = { SettingsRowIcon(XStorageUsage) },
         title = stringResource(R.string.storage_usage),
         subtitle = stringResource(R.string.storage_usage_sub),
         actionType = ActionType.EXPANDABLE,
@@ -136,7 +133,7 @@ fun ConsolidateFoldersRow(
     onExpandedChange: (Boolean) -> Unit,
 ) {
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XConsolidateFolders) },
+        icon = { SettingsRowIcon(XConsolidateFolders) },
         title = stringResource(R.string.storage_consolidate),
         subtitle = stringResource(R.string.storage_consolidate_sub),
         actionType = ActionType.EXPANDABLE,
@@ -166,7 +163,7 @@ fun ClearCacheRow(
     }
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XClearCache) },
+        icon = { SettingsRowIcon(XClearCache) },
         title = stringResource(R.string.storage_clear_cache),
         subtitle = stringResource(R.string.storage_clear_cache_sub),
         actionType = ActionType.EXPANDABLE,

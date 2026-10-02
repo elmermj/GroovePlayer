@@ -84,6 +84,7 @@ fun BasePageTemplate(
      * If this value is true, this page template will use XAppBar
      */
     useSearchBar: Boolean,
+    centerPageTitle: Boolean = false,
 ) {
     val (hasPermission, requestPermission) = rememberAudioPermissionState()
     val uiState by viewModel.uiState.collectAsState()
@@ -257,6 +258,7 @@ fun BasePageTemplate(
             GradientAppBar(
                 title = pageTitle,
                 deviceType = deviceType,
+                centerTitle = centerPageTitle,
             )
         }
 

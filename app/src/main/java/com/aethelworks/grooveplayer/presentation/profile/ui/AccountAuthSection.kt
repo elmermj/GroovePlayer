@@ -119,7 +119,7 @@ fun AccountAuthHeader(viewModel: ProfileViewModel) {
     }
 
     ProfileSettingRow(
-        icon = { ProfileRowIcon(XAccountType) },
+        icon = { SettingsRowIcon(XAccountType) },
         title = stringResource(R.string.account_type),
         subtitle = tierLabel,
     )
