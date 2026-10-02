@@ -31,7 +31,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelworks.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
@@ -79,7 +79,7 @@ fun AddPlaylistTracksScreen(
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = M_PADDING),
-                        verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                     ) {
                         items(songs, key = { it.id }) { song ->
                             SongItemComponent(

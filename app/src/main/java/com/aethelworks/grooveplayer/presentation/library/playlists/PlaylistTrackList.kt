@@ -2,25 +2,15 @@ package com.aethelworks.grooveplayer.presentation.library.playlists
 
 import androidx.compose.ui.res.stringResource
 import com.aethelworks.grooveplayer.R
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,33 +21,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.draw.alpha
 import com.aethelworks.grooveplayer.domain.model.PlaylistTrack
 import com.aethelworks.grooveplayer.presentation.library.importing.LocalLibraryImport
 import com.aethelworks.grooveplayer.presentation.library.importing.rememberTrackPresence
 import com.aethelworks.grooveplayer.utils.theme.ui.HighlightPrimary
-import com.aethelworks.grooveplayer.presentation.common.MediaArtwork
-import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelworks.grooveplayer.presentation.common.SongListItem
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
+import com.aethelworks.grooveplayer.presentation.common.SongListOverflowIcon
+import com.aethelworks.grooveplayer.presentation.common.SongListSlots
 import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
 import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
-import com.aethelworks.grooveplayer.utils.theme.icons.XGripVertical
-import com.aethelworks.grooveplayer.utils.theme.icons.XMore
-import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
-import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 @Composable
 fun PlaylistTrackList(
@@ -99,7 +80,7 @@ fun PlaylistTrackList(
             top = topBarContentInset() + M_PADDING,
             bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
         ),
-        verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
     ) {
         item { header() }
         itemsIndexed(entries, key = { _, track -> track.entryId }) { index, track ->
@@ -212,94 +193,57 @@ private fun PlaylistTrackRow(
     val presence = rememberTrackPresence(song)
     val import = LocalLibraryImport.current
     val playable = track.available && presence.playable
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .alpha(if (playable) 1f else 0.45f)
-            .clip(GrooveTheme.radii.cardShape)
-            .background(GrooveTheme.colors.surface)
-            .padding(vertical = XS_PADDING, horizontal = S_PADDING),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-    ) {
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .clickable(onClick = {
-                    if (!playable) return@clickable
-                    onPlay()
-                }),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-        ) {
-            MediaArtwork(
-                url = song.artworkUrl,
-                kind = MediaArtworkKind.SONG,
-                contentDescription = song.title,
-                modifier = Modifier.size(48.dp),
-                cornerRadius = 12.dp,
+    SongListItem(
+        title = song.title,
+        artist = if (playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
+        artworkUrl = song.artworkUrl,
+        artworkContentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
+        modifier = modifier,
+        slots = SongListSlots.Playlist,
+        contentAlpha = if (playable) 1f else 0.45f,
+        onClick = if (playable) onPlay else null,
+        dragHandleModifier = dragHandle,
+        extraTrailing = if (presence.canRestore) {
+            {
+                TextButton(onClick = { import.restoreSong(song) }) {
+                    Text(stringResource(R.string.action_restore), color = HighlightPrimary)
+                }
+            }
+        } else {
+            null
+        },
+        menu = {
+            SongListOverflowIcon(
+                contentDescription = stringResource(R.string.cd_track_options),
+                onClick = { menuOpen = true },
+                dropdown = {
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.playlist_move_up)) },
+                            enabled = canMoveUp,
+                            onClick = {
+                                menuOpen = false
+                                onMoveUp()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.playlist_move_down)) },
+                            enabled = canMoveDown,
+                            onClick = {
+                                menuOpen = false
+                                onMoveDown()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_remove)) },
+                            onClick = {
+                                menuOpen = false
+                                onRemove()
+                            },
+                        )
+                    }
+                },
             )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = song.title,
-                    style = GrooveTheme.typography.body.toTextStyle(),
-                    color = GrooveTheme.colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
-                    style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
-                    color = SoftWhite,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        if (presence.canRestore) {
-            TextButton(onClick = { import.restoreSong(song) }) {
-                Text(stringResource(R.string.action_restore), color = HighlightPrimary)
-            }
-        }
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(XMore, contentDescription = stringResource(R.string.cd_track_options), tint = SoftWhite)
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.playlist_move_up)) },
-                    enabled = canMoveUp,
-                    onClick = {
-                        menuOpen = false
-                        onMoveUp()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.playlist_move_down)) },
-                    enabled = canMoveDown,
-                    onClick = {
-                        menuOpen = false
-                        onMoveDown()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.action_remove)) },
-                    onClick = {
-                        menuOpen = false
-                        onRemove()
-                    },
-                )
-            }
-        }
-        Box(
-            modifier = dragHandle.size(48.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                XGripVertical,
-                contentDescription = stringResource(R.string.cd_drag_to_reorder),
-                tint = GrooveTheme.colors.muted,
-            )
-        }
-    }
+        },
+    )
 }

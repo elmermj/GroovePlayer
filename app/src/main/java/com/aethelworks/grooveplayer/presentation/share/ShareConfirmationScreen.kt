@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.data.share.NfcShareDiscovery
@@ -44,18 +45,15 @@ import com.aethelworks.grooveplayer.data.share.ShareProtocol
 import com.aethelworks.grooveplayer.domain.model.ShareSessionInfo
 import com.aethelworks.grooveplayer.domain.model.Song
 import com.aethelworks.grooveplayer.presentation.common.GrooveActionButton
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardSubtitle
-import com.aethelworks.grooveplayer.presentation.common.GrooveCardTitle
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
-import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
-import com.aethelworks.grooveplayer.presentation.common.MediaArtwork
-import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelworks.grooveplayer.presentation.common.SongListItem
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
+import com.aethelworks.grooveplayer.presentation.common.SongListSlots
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.L_PADDING
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
 import com.aethelworks.grooveplayer.utils.getLocalIpAddress
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftBlack
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
@@ -89,7 +87,7 @@ fun ShareConfirmationScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                 contentPadding = PaddingValues(
                     top = topBarContentInset() + M_PADDING,
                     bottom = M_PADDING,
@@ -161,22 +159,13 @@ fun ShareConfirmationScreen(
 
 @Composable
 private fun ShareConfirmationSongItem(song: Song) {
-    GrooveSurfaceCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MediaArtwork(
-                url = song.artworkUrl,
-                kind = MediaArtworkKind.SONG,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                cornerRadius = XS_PADDING,
-            )
-            Spacer(modifier = Modifier.size(S_PADDING))
-            Column(modifier = Modifier.weight(1f)) {
-                GrooveCardTitle(song.title)
-                GrooveCardSubtitle(song.artist)
-            }
-        }
-    }
+    SongListItem(
+        title = song.title,
+        artist = song.artist,
+        artworkUrl = song.artworkUrl,
+        artworkContentDescription = stringResource(com.aethelworks.grooveplayer.R.string.cd_song_by_artist, song.title, song.artist),
+        slots = SongListSlots.None,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

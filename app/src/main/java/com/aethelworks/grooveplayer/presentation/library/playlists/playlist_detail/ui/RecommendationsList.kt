@@ -3,6 +3,7 @@ package com.aethelworks.grooveplayer.presentation.library.playlists.playlist_det
 import androidx.compose.ui.res.stringResource
 import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
@@ -87,7 +89,9 @@ fun RecommendationsList(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = M_PADDING, vertical = SongListItemDefaults.rowSpacing),
+            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
         ) {
             recommends.forEach { song ->
                 key(song.id) {

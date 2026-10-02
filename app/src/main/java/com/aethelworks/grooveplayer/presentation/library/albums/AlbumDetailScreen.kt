@@ -30,7 +30,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 @Composable
@@ -65,7 +65,7 @@ fun AlbumDetailScreen(
                 top = topBarContentInset() + M_PADDING,
                 bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
             ),
-            verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
         ) {
             items(
                 count = songsPagingItems.itemCount,

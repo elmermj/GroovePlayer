@@ -22,12 +22,11 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
-import com.aethelworks.grooveplayer.presentation.library.ui.AllSongsItemStyle
 import com.aethelworks.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
-import com.aethelworks.grooveplayer.utils.S_PADDING
 
 @Composable
 fun PhoneSongsLayout(
@@ -53,7 +52,7 @@ fun PhoneSongsLayout(
             top = topBarContentInset() + 16.dp,
             bottom = 16.dp + bottomPaddingForSelectionBar
         ),
-        verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
+        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
     ) {
         items(
             count = songsPagingItems.itemCount,
@@ -72,8 +71,6 @@ fun PhoneSongsLayout(
                     onPlayNext = { playerViewModel.playNext(it) },
                     onEditMetadata = { onEditSong(it) },
                     onLongPress = onLongPress,
-                    padding = 0.dp,
-                    style = AllSongsItemStyle,
                     selectionConfig = if (isSelectionMode) {
                         ItemSelectionConfig(
                             isSelected = song.id in selectedIds,
