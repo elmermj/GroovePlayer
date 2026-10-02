@@ -1,0 +1,50 @@
+# Builds the Wear OS remote and runs its unit tests.
+# This job does not upload an APK and does not set the App Tester version.
+# Distribute APK still publishes the phone APK only.
+
+name: Wear remote
+
+on:
+  pull_request:
+  push:
+    branches:
+      - test
+      - staging-test
+    paths:
+      - "wear/**"
+      - "wear-contract/**"
+      - "app/src/main/java/com/aethelworks/grooveplayer/wear/**"
+      - "app/src/test/java/com/aethelworks/grooveplayer/wear/**"
+      - "app/src/main/res/values/wear.xml"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/wear-remote.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  wear:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: platforms;android-36 build-tools;36.0.0
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble wear debug
+        run: ./gradlew :wear:assembleDevDebug --stacktrace
+
+      - name: Unit tests
+        run: ./gradlew :wear:testDevDebugUnitTest :app:testDevDebugUnitTest --tests 'com.aethelworks.grooveplayer.wear*' --stacktrace

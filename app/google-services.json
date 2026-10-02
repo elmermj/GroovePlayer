@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:922639144158:android:b80b9574abcce0de265e4f",
+        "mobilesdk_app_id": "1:922639144158:android:a9d3688663c95003265e4f",
         "android_client_info": {
-          "package_name": "com.aethelsoft.grooveplayer"
+          "package_name": "com.aethelworks.grooveplayer"
         }
       },
       "oauth_client": [],
@@ -26,9 +26,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:922639144158:android:8c602b9d5f6ac513265e4f",
+        "mobilesdk_app_id": "1:922639144158:android:7c1979ff84d34fa8265e4f",
         "android_client_info": {
-          "package_name": "com.aethelsoft.grooveplayer.staging"
+          "package_name": "com.aethelworks.grooveplayer.staging"
         }
       },
       "oauth_client": [],

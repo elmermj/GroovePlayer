@@ -36,8 +36,8 @@ from pathlib import Path
 
 config = json.loads(Path("app/google-services.json").read_text())
 wanted = {
-    "com.aethelsoft.grooveplayer": "FIREBASE_APP_ID",
-    "com.aethelsoft.grooveplayer.staging": "FIREBASE_APP_ID_STAGING",
+    "com.aethelworks.grooveplayer": "FIREBASE_APP_ID",
+    "com.aethelworks.grooveplayer.staging": "FIREBASE_APP_ID_STAGING",
 }
 found = {}
 for client in config.get("client", []):

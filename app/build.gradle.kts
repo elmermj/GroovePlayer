@@ -7,13 +7,8 @@ plugins {
     id("kotlin-kapt")
 }
 
-// Crashlytics / Google Services — only when Elmer drops app/google-services.json.
+// Crashlytics / Google Services — only when app/google-services.json lists this package.
 val googleServicesJson = file("google-services.json")
-val hasGoogleServices = googleServicesJson.exists()
-if (hasGoogleServices) {
-    apply(plugin = "com.google.gms.google-services")
-    apply(plugin = "com.google.firebase.crashlytics")
-}
 
 
 // Parse local.properties without java.util.Properties (Gradle script classpath quirk).
@@ -51,7 +46,8 @@ fun rawSecret(key: String): String {
 
 val PROD_API_DEFAULT = "https://grooveplayer-backend.fly.dev"
 val STAGING_API_DEFAULT = "https://grooveplayer-backend-staging.fly.dev"
-val STAGING_APPLICATION_ID = "com.aethelsoft.grooveplayer.staging"
+val APPLICATION_ID = "com.aethelworks.grooveplayer"
+val STAGING_APPLICATION_ID = "$APPLICATION_ID.staging"
 
 val releaseStoreFile = rawSecret("RELEASE_STORE_FILE")
 val releaseStorePassword = rawSecret("RELEASE_STORE_PASSWORD")
@@ -103,17 +99,31 @@ fun googleServicesListsPackage(packageName: String): Boolean {
         .containsMatchIn(googleServicesJson.readText())
 }
 
+val hasGoogleServices = googleServicesListsPackage(APPLICATION_ID)
+if (hasGoogleServices) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+} else if (googleServicesJson.exists()) {
+    logger.warn(
+        "app/google-services.json does not list $APPLICATION_ID. " +
+            "Google Services and Crashlytics are skipped until that file includes " +
+            "$APPLICATION_ID and $STAGING_APPLICATION_ID."
+    )
+}
+
 val devGoogleServicesOverlay = file("src/dev/google-services.json")
 
 fun syncDevGoogleServicesOverlay(env: String) {
     if (!hasGoogleServices) return
-    val useDerivedClient = env == "staging" && !googleServicesListsPackage(STAGING_APPLICATION_ID)
+    val useDerivedClient = env == "staging" &&
+        googleServicesListsPackage(APPLICATION_ID) &&
+        !googleServicesListsPackage(STAGING_APPLICATION_ID)
     if (!useDerivedClient) {
         if (devGoogleServicesOverlay.exists()) devGoogleServicesOverlay.delete()
         return
     }
     val updated = googleServicesJson.readText().replace(
-        Regex("\"package_name\"\\s*:\\s*\"com\\.aethelsoft\\.grooveplayer\""),
+        Regex("\"package_name\"\\s*:\\s*\"" + Regex.escape(APPLICATION_ID) + "\""),
         "\"package_name\": \"$STAGING_APPLICATION_ID\""
     )
     if (!updated.contains(STAGING_APPLICATION_ID)) {
@@ -155,11 +165,11 @@ val resolvedVersionName: String =
         ?: "1.0"
 
 android {
-    namespace = "com.aethelsoft.grooveplayer"
+    namespace = APPLICATION_ID
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.aethelsoft.grooveplayer"
+        applicationId = APPLICATION_ID
         minSdk = 24
         targetSdk = 36
         versionCode = resolvedVersionCode
@@ -184,7 +194,7 @@ android {
             "GOOGLE_ANDROID_CLIENT_ID",
             "\"${localProp(
                 "GOOGLE_ANDROID_CLIENT_ID",
-                "356328665268-1t80fc2j091cei383co7tncernl4p00c.apps.googleusercontent.com"
+                "356328665268-qg9julknjhv9o0eka3uu5be4r133v6fa.apps.googleusercontent.com"
             )}\""
         )
     }
@@ -286,7 +296,9 @@ android {
             // default debug signing
         }
         release {
-            isMinifyEnabled = false
+            // Distribute builds :app:assembleDevRelease and :app:assembleStagingRelease.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -313,6 +325,10 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+    }
+
+    sourceSets.named("main") {
+        kotlin.srcDir(rootProject.file("wear-contract/src/main/kotlin"))
     }
 }
 
@@ -387,6 +403,8 @@ dependencies {
 
     // Nearby Connections (P2P transfer without internet)
     implementation(libs.play.services.nearby)
+    implementation(libs.play.services.wearable)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Google Sign-In (Credential Manager + Google ID)
     implementation(libs.androidx.credentials)
@@ -409,7 +427,7 @@ dependencies {
     // Google Play Billing (subscriptions + storage add-ons)
     implementation(libs.billing.ktx)
 
-    // Firebase Crashlytics — only when app/google-services.json exists.
+    // Firebase Crashlytics — only when google-services.json lists APPLICATION_ID.
     if (hasGoogleServices) {
         implementation(platform(libs.firebase.bom))
         implementation(libs.firebase.crashlytics)
@@ -438,6 +456,7 @@ dependencies {
 // app/google-services.json. Fail here with the setup that unblocks GroovePlayer Staging.
 gradle.taskGraph.whenReady {
     val shippingStaging = allTasks.any { task ->
+        if (task.project.path != ":app") return@any false
         val n = task.name
         n.contains("Staging") && (
             n.startsWith("assemble") ||
@@ -460,6 +479,7 @@ gradle.taskGraph.whenReady {
 // Fail closed for Play-bound builds: no sample AdMob IDs, no debug-signed release.
 gradle.taskGraph.whenReady {
     val runningProdRelease = allTasks.any { task ->
+        if (task.project.path != ":app") return@any false
         val n = task.name
         n.contains("ProdRelease", ignoreCase = true) ||
             (n.contains("prod", ignoreCase = true) && n.contains("Release", ignoreCase = true) &&

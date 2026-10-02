@@ -1,0 +1,630 @@
+package com.aethelworks.grooveplayer.presentation.player.layouts
+
+import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.imageLoader
+import coil3.request.ImageRequest
+import coil3.request.SuccessResult
+import coil3.request.allowHardware
+import coil3.toBitmap
+import com.aethelworks.grooveplayer.data.player.AudioVisualizationData
+import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.domain.model.RepeatMode
+import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.domain.model.VisualizationMode
+import com.aethelworks.grooveplayer.presentation.player.PlayerSongDetailsSheetState
+import com.aethelworks.grooveplayer.presentation.player.PlayerViewModel
+import com.aethelworks.grooveplayer.presentation.player.formatMillis
+import com.aethelworks.grooveplayer.presentation.bluetooth.ui.BTIndicatorIconComponent
+import com.aethelworks.grooveplayer.presentation.bluetooth.ui.BluetoothEllipticalLazyScroll
+import com.aethelworks.grooveplayer.presentation.player.ui.CustomSlider
+import com.aethelworks.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent
+import com.aethelworks.grooveplayer.presentation.player.ui.GlowingArtworkContainer
+import com.aethelworks.grooveplayer.presentation.player.ui.PlayerControls
+import com.aethelworks.grooveplayer.presentation.player.ui.PlayerShareButton
+import com.aethelworks.grooveplayer.presentation.player.ui.PhoneUpNextPeekRow
+import com.aethelworks.grooveplayer.presentation.player.ui.PlayerQueueComponent
+import com.aethelworks.grooveplayer.presentation.player.ui.SwipeableArtwork
+import com.aethelworks.grooveplayer.presentation.player.ui.VisualizationControl
+import com.aethelworks.grooveplayer.presentation.player.ui.VolumeSlider
+import com.aethelworks.grooveplayer.presentation.player.ui.detectPullUpToSongDetails
+import com.aethelworks.grooveplayer.presentation.player.ui.extractDominantColor
+import com.aethelworks.grooveplayer.utils.APP_BAR_HEIGHT
+import com.aethelworks.grooveplayer.utils.DeviceType
+import com.aethelworks.grooveplayer.utils.rememberAdaptiveWindowInfo
+import com.aethelworks.grooveplayer.utils.L_PADDING
+import com.aethelworks.grooveplayer.utils.M_PADDING
+import com.aethelworks.grooveplayer.utils.S_PADDING
+import com.aethelworks.grooveplayer.presentation.common.navigationBarsInset
+import com.aethelworks.grooveplayer.presentation.common.rememberBluetoothViewModel
+import com.aethelworks.grooveplayer.presentation.bluetooth.BluetoothViewModel
+import com.aethelworks.grooveplayer.presentation.common.FullPlayerSongAvailability
+import com.aethelworks.grooveplayer.presentation.common.FullPlayerSongLike
+import com.aethelworks.grooveplayer.utils.rememberBluetoothPermissionState
+import com.aethelworks.grooveplayer.utils.rememberRecordAudioPermissionState
+import com.aethelworks.grooveplayer.utils.theme.icons.XAudioLines
+import com.aethelworks.grooveplayer.utils.theme.icons.XBack
+import com.aethelworks.grooveplayer.utils.theme.icons.XListMusic
+import com.aethelworks.grooveplayer.utils.theme.ui.ToggledIconButton
+import kotlinx.coroutines.delay
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class,
+    ExperimentalLayoutApi::class
+)
+@Composable
+fun LargeTabletPlayerLayout(
+    song: Song?,
+    pos: Long,
+    dur: Long,
+    isPlaying: Boolean,
+    shuffle: Boolean,
+    repeat: RepeatMode,
+    playerViewModel: PlayerViewModel,
+    bg: Color? = null,
+    onClose: () -> Unit
+) {
+    val pageBackground = bg ?: GrooveTheme.colors.canvas
+    var showQueue by remember { mutableStateOf(false) }
+    var showEqualizer by remember { mutableStateOf(false) }
+    var showBluetoothSheet by remember { mutableStateOf(false) }
+    val queue by playerViewModel.queue.collectAsState()
+    val audioVisualization by playerViewModel.audioVisualization.collectAsState()
+    val visualizationMode by playerViewModel.visualizationMode.collectAsState()
+    val glowEffectConfig by playerViewModel.glowEffectConfig.collectAsState()
+    val songDetailsSheetState by playerViewModel.songDetailsSheetState.collectAsState()
+    val overlaysBlockingPullUp = showQueue || showBluetoothSheet || showEqualizer
+    val bottomSafeInset = navigationBarsInset()
+    val currentQueueIndex = queue.indexOfFirst { it.id == song?.id }
+    val nextSong = if (currentQueueIndex >= 0) queue.getOrNull(currentQueueIndex + 1) else null
+
+    fun hideSongDetails() {
+        if (playerViewModel.songDetailsSheetState.value != PlayerSongDetailsSheetState.Hidden) {
+            playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Hidden)
+        }
+    }
+
+    // Queue, equalizer and Bluetooth are mutually exclusive. Song Details stays closed while any is open.
+    fun toggleQueue() {
+        val open = !showQueue
+        if (open) {
+            showEqualizer = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
+        showQueue = open
+    }
+    fun toggleEqualizer() {
+        val open = !showEqualizer
+        if (open) {
+            showQueue = false
+            showBluetoothSheet = false
+            hideSongDetails()
+        }
+        showEqualizer = open
+    }
+    fun toggleBluetooth() {
+        val open = !showBluetoothSheet
+        if (open) {
+            showQueue = false
+            showEqualizer = false
+            hideSongDetails()
+        }
+        showBluetoothSheet = open
+    }
+
+    // Waveform / glow visualization toggle
+    val (hasRecordAudioPermission, requestRecordAudioPermission) = rememberRecordAudioPermissionState()
+    var isWaveformVisualizationEnabled by rememberSaveable { mutableStateOf(true) }
+    val effectiveVisualization =
+        when (visualizationMode) {
+            VisualizationMode.OFF -> AudioVisualizationData()
+            VisualizationMode.SIMULATED,
+            VisualizationMode.REAL_TIME -> {
+                if (hasRecordAudioPermission) audioVisualization else AudioVisualizationData()
+            }
+        }
+    
+    // Bluetooth ViewModel
+    val bluetoothViewModel: BluetoothViewModel = rememberBluetoothViewModel()
+    val (hasBluetoothPermissions, requestBluetoothPermissions) = rememberBluetoothPermissionState()
+    val availableDevices by bluetoothViewModel.availableDevices.collectAsState()
+    val isScanning by bluetoothViewModel.isScanning.collectAsState()
+    val connectedDevice by bluetoothViewModel.connectedDevice.collectAsStateWithLifecycle()
+    val connectingDeviceAddress by bluetoothViewModel.connectingDeviceAddress.collectAsState()
+    val connectionSuccessDisplay by bluetoothViewModel.connectionSuccessDisplay.collectAsState()
+    val connectionFailedDisplay by bluetoothViewModel.connectionFailedDisplay.collectAsState()
+    val isBluetoothEnabledNow = bluetoothViewModel.isBluetoothEnabled()
+
+    LaunchedEffect(connectionSuccessDisplay, showBluetoothSheet) {
+        if (connectionSuccessDisplay && showBluetoothSheet) {
+            // Allow BluetoothEllipticalLazyScroll to show the green success UI and settle
+            delay(2000)
+            if (showBluetoothSheet) {
+                showBluetoothSheet = false
+            }
+        }
+    }
+
+    // Auto-start scanning when Bluetooth sheet is opened
+    LaunchedEffect(showBluetoothSheet, hasBluetoothPermissions) {
+        if (showBluetoothSheet &&
+            hasBluetoothPermissions &&
+            bluetoothViewModel.isBluetoothEnabled() &&
+            !isScanning &&
+            availableDevices.isEmpty()) {
+            bluetoothViewModel.startScanning()
+        }
+    }
+    val windowInfo = rememberAdaptiveWindowInfo()
+    val screenHeight = windowInfo.heightDp.dp
+    val screenWidth = windowInfo.widthDp.dp
+    val maxArtworkHeight = minOf(screenHeight * 0.4f, screenWidth * 0.5f)
+    val context = LocalContext.current
+    var dominantColor by remember { mutableStateOf(Color.White) }
+
+    LaunchedEffect(song?.artworkUrl) {
+        song?.artworkUrl?.let { url ->
+            try {
+                val request = ImageRequest.Builder(context)
+                    .data(url)
+                    .allowHardware(false) // Required for Palette API
+                    .build()
+                val result = context.imageLoader.execute(request)
+                if (result is SuccessResult) {
+                    val bitmap = result.image.toBitmap()
+                    dominantColor = extractDominantColor(bitmap)
+                    Log.d("LargeTablet", "✨ Extracted dominant color: $dominantColor from ${song.title}")
+                }
+            } catch (e: Exception) {
+                Log.e("LargeTablet", "Failed to extract color: ${e.message}")
+                dominantColor = Color.White
+            }
+        } ?: run {
+            dominantColor = Color.White
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(pageBackground)
+            .statusBarsPadding()
+            .padding(
+                start = M_PADDING * 2,
+                end = M_PADDING * 2,
+                bottom = M_PADDING * 2 + bottomSafeInset,
+            )
+            .detectPullUpToSongDetails(
+                enabled = !overlaysBlockingPullUp &&
+                    (songDetailsSheetState == PlayerSongDetailsSheetState.Hidden ||
+                        songDetailsSheetState == PlayerSongDetailsSheetState.Peek),
+                sheetState = songDetailsSheetState,
+                onOpenPeek = {
+                    playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Peek)
+                },
+                onExpandDetails = {
+                    playerViewModel.setSongDetailsSheetState(PlayerSongDetailsSheetState.Expanded)
+                },
+            ),
+        horizontalArrangement = Arrangement.spacedBy(48.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(APP_BAR_HEIGHT),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(XBack, contentDescription = "Close")
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PlayerShareButton(song = song)
+                    ToggledIconButton(
+                        state = showBluetoothSheet,
+                        onClick = { toggleBluetooth() },
+                        activeBackground = Color.White,
+                        inactiveBackground = Color.Transparent,
+                    ) {
+                        BTIndicatorIconComponent(
+                            connectedDeviceName = connectedDevice?.name,
+                            isConnected = connectedDevice != null,
+                            tint = if (showBluetoothSheet || connectedDevice != null) Color.Black else Color.White,
+                        )
+                    }
+                }
+            }
+            val density = LocalDensity.current
+
+            val screenWidthPx = with(density) { screenWidth.toPx() }
+            val sidePanelWidthPx = with(density) { 360.dp.toPx() }
+            val safeMarginPx = screenWidthPx * 0.05f
+
+            // How far artwork can move without leaving viewport
+            // val maxShiftPx = (screenWidthPx / 2f) - sidePanelWidthPx - safeMarginPx
+
+            // Target offset based on visible panels
+            val artworkTargetOffsetPx = when {
+                showQueue && !showEqualizer && !showBluetoothSheet -> -(sidePanelWidthPx / 2f + safeMarginPx)        // queue only → left
+                showEqualizer && !showQueue && !showBluetoothSheet -> +(sidePanelWidthPx / 2f + safeMarginPx)        // equalizer only → right
+                showBluetoothSheet && !showQueue && !showEqualizer -> -(sidePanelWidthPx / 2f + safeMarginPx)        // bluetooth only → left
+                else -> 0f                                       // none or both → center
+            }
+
+            val artworkScale by animateFloatAsState(
+                targetValue = if (showQueue || showEqualizer || showBluetoothSheet) 0.85f else 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = 300f
+                ),
+                label = "ArtworkScale"
+            )
+
+            val artworkOffsetXPx by animateFloatAsState(
+                targetValue = artworkTargetOffsetPx,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "ArtworkOffsetXPx"
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = maxArtworkHeight + L_PADDING)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    GlowingArtworkContainer(
+                        dominantColor = dominantColor,
+                        visualization = effectiveVisualization,
+                        modifier = Modifier
+                            .graphicsLayer {
+                                translationX = artworkOffsetXPx
+                                scaleX = artworkScale
+                                scaleY = artworkScale
+                            }
+                            .fillMaxHeight()
+                            .aspectRatio(1f)
+                            .padding(M_PADDING),
+                        deviceType = DeviceType.LARGE_TABLET,
+                        config = glowEffectConfig,
+                        content = {
+                            SwipeableArtwork(
+                                size = maxArtworkHeight - S_PADDING,
+                                artworkUrl = song?.artworkUrl,
+                                onTap = { playerViewModel.playPauseToggle() },
+                                onSwipePrevious = { playerViewModel.previous() },
+                                onSwipeNext = { playerViewModel.next() },
+                                onDismiss = onClose
+                            )
+                        }
+                    )
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showQueue,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .height(maxArtworkHeight)
+                            .width(360.dp),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = if (queue.isNotEmpty()) "Queue · ${queue.size}" else "Queue",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(S_PADDING * 2),
+                            textAlign = TextAlign.End,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+
+                        PlayerQueueComponent(
+                            currentSong = song,
+                            queue = queue,
+                            onItemClick = { index -> playerViewModel.skipToQueueItem(index) },
+                            maxHeight = maxArtworkHeight,
+                            onRemove = { index -> playerViewModel.removeQueueItem(index) },
+                            onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
+                            onRestore = { index, removed -> playerViewModel.restoreQueueItem(index, removed) },
+                        )
+                    }
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showBluetoothSheet,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(32.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(maxArtworkHeight)
+                            .width(360.dp + 32.dp)
+                            .align(Alignment.CenterEnd)
+                    ) {
+                        BluetoothEllipticalLazyScroll(
+                            availableDevices = availableDevices,
+                            connectedDevice = connectedDevice,
+                            onDeviceClick = { device ->
+                                if (connectedDevice?.address == device.address) {
+                                    bluetoothViewModel.disconnectDevice()
+                                    showBluetoothSheet = false
+                                    playerViewModel.playPauseToggle()
+                                } else {
+                                    bluetoothViewModel.connectToDevice(device)
+                                }
+                            },
+                            maxHeight = maxArtworkHeight,
+                            connectingDeviceAddress = connectingDeviceAddress,
+                            connectionSuccessDisplay = connectionSuccessDisplay,
+                            connectionFailedDisplay = connectionFailedDisplay,
+                            isBluetoothEnabled = isBluetoothEnabledNow,
+                            hasBluetoothPermissions = hasBluetoothPermissions,
+                            onRequestBluetoothPermission = requestBluetoothPermissions,
+                            onBluetoothEnabledResult = { bluetoothViewModel.refreshConnectionState() },
+                            onShaderClicked = { showBluetoothSheet = false }
+                        )
+                    }
+                }
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showEqualizer,
+                    enter = slideInHorizontally(
+                        initialOffsetX = { -it },
+                        animationSpec = spring(
+                            dampingRatio = 0.85f,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(),
+                    exit = slideOutHorizontally(
+                        targetOffsetX = { -it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeOut(),
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) {
+                    EqualizerControlsComponent(
+                        modifier = Modifier
+                            .width(360.dp)
+                            .padding(top = 24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(L_PADDING))
+            Text(
+                song?.title ?: "",
+                style = GrooveTheme.typography.playerSongTitle.toTextStyle(),
+                color = GrooveTheme.colors.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                song?.artist ?: "",
+                style = GrooveTheme.typography.playerSongArtist.toTextStyle(),
+                color = GrooveTheme.colors.muted,
+                textAlign = TextAlign.Center
+            )
+            FullPlayerSongLike(song)
+            FullPlayerSongAvailability(song)
+
+            Spacer(modifier = Modifier.height(L_PADDING))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                ) {
+                    CustomSlider(
+                        value = if (dur > 0) pos.toFloat() / dur else 0f,
+                        onValueChange = { frac ->
+                            val target = (frac * dur).toLong()
+                            playerViewModel.seekTo(target)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 8.dp,
+                        activeColor = Color.White,
+                        inactiveColor = Color.White.copy(alpha = 0.3f)
+                    )
+
+                    Spacer(modifier = Modifier.height(S_PADDING))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(formatMillis(pos), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            formatMillis(dur - pos),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(S_PADDING))
+                    // Transport row: volume | controls | eq/queue.
+                    // Visualization sits on its own row below so the "Simulated" chip
+                    // never z-order-overlaps transport (BUG-001 on mid LargeTablet widths).
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        VolumeSlider(
+                            playerViewModel = playerViewModel,
+                            modifier = Modifier
+                                .align(alignment = Alignment.CenterStart)
+                                .width(180.dp),
+                            backgroundColor = pageBackground,
+                        )
+                        PlayerControls(
+                            modifier = Modifier.align(alignment = Alignment.Center),
+                            isMiniPlayer = false,
+                            isPlaying = isPlaying,
+                            shuffle = shuffle,
+                            repeat = repeat,
+                            playerViewModel = playerViewModel
+                        )
+                        Row(
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ToggledIconButton(
+                                state = showEqualizer,
+                                onClick = { toggleEqualizer() },
+                                activeBackground = Color.White,
+                                inactiveBackground = Color.Transparent,
+                            ) {
+                                Icon(
+                                    XAudioLines,
+                                    contentDescription = "Equalizer",
+                                    tint = if (showEqualizer) Color.Black else Color.White
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(L_PADDING * 2))
+                            ToggledIconButton(
+                                state = showQueue,
+                                onClick = { toggleQueue() },
+                                activeBackground = Color.White,
+                                inactiveBackground = Color.Transparent,
+                            ){
+                                Icon(
+                                    XListMusic,
+                                    contentDescription = "Queue",
+                                    tint = if (showQueue) Color.Black else Color.White
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(S_PADDING))
+                    PhoneUpNextPeekRow(
+                        nextSong = nextSong,
+                        onClick = { if (!showQueue) toggleQueue() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(S_PADDING))
+                    VisualizationControl(
+                        currentMode = visualizationMode,
+                        onModeSelected = { mode ->
+                            when (mode) {
+                                VisualizationMode.REAL_TIME -> {
+                                    if (!hasRecordAudioPermission) {
+                                        requestRecordAudioPermission()
+                                    }
+                                    if (!hasRecordAudioPermission) {
+                                        false
+                                    } else {
+                                        playerViewModel.setVisualizationMode(mode)
+                                        true
+                                    }
+                                }
+                                VisualizationMode.OFF,
+                                VisualizationMode.SIMULATED -> {
+                                    playerViewModel.setVisualizationMode(mode)
+                                    true
+                                }
+                            }
+                        }
+                    )
+                }
+
+            }
+            Spacer(modifier = Modifier.height(S_PADDING))
+        }
+    }
+
+    }
+}
