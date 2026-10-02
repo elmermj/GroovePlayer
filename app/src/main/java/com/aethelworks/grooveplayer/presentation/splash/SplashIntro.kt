@@ -145,20 +145,20 @@ private fun SplashLottie(
         clipSpec = clipSpec,
         iterations = iterations,
         ignoreSystemAnimatorScale = true,
-        useCompositionFrameRate = true,
     )
     var sawPlayback by remember { mutableStateOf(false) }
     var reportedIntro by remember { mutableStateOf(false) }
-    LaunchedEffect(animation.isPlaying) {
+    // isAtEnd compares rounded progress to the clip end and can stay false after
+    // the intro clip has stopped. Playback that has started and then stopped is
+    // the end of the one-shot intro.
+    LaunchedEffect(animation.isPlaying, animation.progress, phase) {
         if (animation.isPlaying) sawPlayback = true
-    }
-    LaunchedEffect(sawPlayback, animation.isAtEnd, animation.isPlaying, phase) {
         if (
             !reportedIntro &&
             phase == SplashIntroPresentation.Phase.INTRO &&
             sawPlayback &&
-            animation.isAtEnd &&
-            !animation.isPlaying
+            !animation.isPlaying &&
+            animation.progress > 0f
         ) {
             reportedIntro = true
             Log.d(TAG, "intro clip finished; ${SplashIntroPresentation.clipPlan()}")
