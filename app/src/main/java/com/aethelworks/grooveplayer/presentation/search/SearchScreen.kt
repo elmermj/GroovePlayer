@@ -23,6 +23,7 @@ import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelworks.grooveplayer.domain.model.makeAlbumId
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.library.ui.AlbumItemComponent
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.theme.icons.XBack
@@ -118,7 +119,7 @@ fun SearchScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                     ) {
                         if (songs.isNotEmpty()) {
                             item {
@@ -229,7 +230,7 @@ fun SearchScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(songs) { song ->
                                 SongItemComponent(
@@ -269,7 +270,7 @@ fun SearchScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(albums) { albumName ->
                                 SearchAlbumItem(
@@ -303,7 +304,7 @@ fun SearchScreen(
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(artists) { artistName ->
                                 SearchArtistItem(

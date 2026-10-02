@@ -112,6 +112,8 @@
     <string name="count_songs">%1$d songs</string>
     <string name="count_tracks">%1$d tracks</string>
     <string name="count_tracks_one">1 track</string>
+    <string name="count_plays">%1$d plays</string>
+    <string name="count_plays_one">1 play</string>
     <string name="count_artists">%1$d artists</string>
     <string name="count_albums">%1$d albums</string>
     <string name="count_genres">%1$d genres</string>

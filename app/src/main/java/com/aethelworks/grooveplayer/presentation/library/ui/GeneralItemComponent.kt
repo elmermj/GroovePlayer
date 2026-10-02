@@ -46,10 +46,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -66,12 +63,11 @@ import com.aethelworks.grooveplayer.domain.model.Artist
 import com.aethelworks.grooveplayer.domain.model.Song
 import com.aethelworks.grooveplayer.presentation.common.MediaArtwork
 import com.aethelworks.grooveplayer.presentation.common.SongAvailabilityBadge
-import com.aethelworks.grooveplayer.presentation.common.StretchedGlassworkCorner
-import com.aethelworks.grooveplayer.presentation.common.StretchedGlassworkThumbnail
-import com.aethelworks.grooveplayer.presentation.common.StretchedGlassworkThumbnailSize
-import com.aethelworks.grooveplayer.presentation.common.rememberStretchedGlasswork
-import com.aethelworks.grooveplayer.presentation.common.stretchedGlasswork
 import com.aethelworks.grooveplayer.presentation.common.SongLikeButton
+import com.aethelworks.grooveplayer.presentation.common.SongListItem
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
+import com.aethelworks.grooveplayer.presentation.common.SongListOverflowIcon
+import com.aethelworks.grooveplayer.presentation.common.SongListSlots
 import com.aethelworks.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelworks.grooveplayer.presentation.common.rememberNavigationActions
@@ -89,7 +85,6 @@ import com.aethelworks.grooveplayer.utils.theme.icons.XWifiSync
 import com.aethelworks.grooveplayer.utils.theme.ui.GroovePlayerTheme
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelworks.grooveplayer.utils.theme.ui.HighlightPrimary
-import com.aethelworks.grooveplayer.utils.theme.ui.PoppinsFontFamily
 import com.aethelworks.grooveplayer.utils.theme.ui.SingleLineMarqueeText
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
@@ -114,29 +109,12 @@ data class ItemSelectionConfig(
     val isSelectionMode: Boolean = true,
 )
 
-/** Visual treatment for [GeneralItemComponent]. [Classic] is the original row. */
-enum class GeneralItemStyle {
-    Classic,
-    StretchedGlasswork,
-}
-
 /**
- * All Songs list rows.
- * Set this to [GeneralItemStyle.Classic] to restore the previous list.
- */
-val AllSongsItemStyle: GeneralItemStyle = GeneralItemStyle.StretchedGlasswork
-
-/**
- * Generic, reusable item component (artwork + title + subtitle + optional meta + optional menu)
- * that can be used for Song, Album, Artist, etc.
+ * Generic row for albums and artists.
+ * Song rows use [SongListItem] via [SongItemComponent].
  *
- * When [optionsConfig] is provided, clicking the more icon expands options like ProfileSettingRow (EXPANDABLE).
- * Supports: Edit metadata (songs only), Share via tap, Share with nearby device.
- *
+ * When [optionsConfig] is provided, clicking the more icon expands options.
  * When [selectionConfig] is provided, shows a checkbox for multi-select.
- *
- * [style] defaults to [GeneralItemStyle.Classic]. Pass [AllSongsItemStyle] for the
- * stretched-glasswork rows. [artworkBitmap] is only used by that style (previews).
  */
 @Composable
 fun GeneralItemComponent(
@@ -155,45 +133,23 @@ fun GeneralItemComponent(
     /** Decorative trailing content drawn before [metaText]. Null draws nothing and no spacer. */
     beforeMeta: (@Composable () -> Unit)? = null,
     contentAlpha: Float = 1f,
-    style: GeneralItemStyle = GeneralItemStyle.Classic,
-    artworkBitmap: ImageBitmap? = null,
 ) {
-    if (style == GeneralItemStyle.Classic) {
-        ClassicGeneralItem(
-            title = title,
-            subtitle = subtitle,
-            artworkUrl = artworkUrl,
-            metaText = metaText,
-            onClick = onClick,
-            padding = padding,
-            artworkKind = artworkKind,
-            contentDescription = contentDescription,
-            optionsConfig = optionsConfig,
-            selectionConfig = selectionConfig,
-            secondaryContent = secondaryContent,
-            onLongClick = onLongClick,
-            beforeMeta = beforeMeta,
-            contentAlpha = contentAlpha,
-        )
-    } else {
-        StretchedGlassworkItem(
-            title = title,
-            subtitle = subtitle,
-            artworkUrl = artworkUrl,
-            artworkBitmap = artworkBitmap,
-            metaText = metaText,
-            onClick = onClick,
-            padding = padding,
-            artworkKind = artworkKind,
-            contentDescription = contentDescription,
-            optionsConfig = optionsConfig,
-            selectionConfig = selectionConfig,
-            secondaryContent = secondaryContent,
-            onLongClick = onLongClick,
-            beforeMeta = beforeMeta,
-            contentAlpha = contentAlpha,
-        )
-    }
+    ClassicGeneralItem(
+        title = title,
+        subtitle = subtitle,
+        artworkUrl = artworkUrl,
+        metaText = metaText,
+        onClick = onClick,
+        padding = padding,
+        artworkKind = artworkKind,
+        contentDescription = contentDescription,
+        optionsConfig = optionsConfig,
+        selectionConfig = selectionConfig,
+        secondaryContent = secondaryContent,
+        onLongClick = onLongClick,
+        beforeMeta = beforeMeta,
+        contentAlpha = contentAlpha,
+    )
 }
 
 @Composable
@@ -480,7 +436,7 @@ private fun SlimTrackActionButton(
 }
 
 /**
- * Song → GeneralItemComponent.
+ * Song row. Layout comes from [SongListItem]; this wires library actions.
  */
 @Composable
 fun SongItemComponent(
@@ -489,59 +445,146 @@ fun SongItemComponent(
     onEditMetadata: (Song) -> Unit = {},
     onPlayNext: ((Song) -> Unit)? = null,
     onLongPress: (Song) -> Unit = {},
-    padding: Dp = DefaultSPadding,
     selectionConfig: ItemSelectionConfig? = null,
-    metaText: String? = null,
+    playCount: String? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
-    style: GeneralItemStyle = GeneralItemStyle.Classic,
 ) {
     val navigation = rememberNavigationActions()
     val availability = rememberSongAvailabilityMark(song)
     val presence = rememberTrackPresence(song)
     val import = LocalLibraryImport.current
-    GeneralItemComponent(
+    val selection = selectionConfig
+    val inSelection = selection != null && selection.isSelectionMode
+    val isSelected = selection?.isSelected == true
+    var isExpanded by remember { mutableStateOf(false) }
+    val stepAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(isSelected) {
+        if (inSelection) {
+            stepAnimatable.snapTo(0f)
+            stepAnimatable.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessHigh,
+                ),
+            )
+            stepAnimatable.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            )
+        }
+    }
+    val options = ItemOptionsConfig(
+        onPlayNext = if (presence.playable) onPlayNext?.let { cb -> { cb(song) } } else null,
+        onEditMetadata = { onEditMetadata(song) },
+        onShareViaTap = if (presence.playable) {
+            { navigation.openShareViaNfcWithSongs(listOf(song)) }
+        } else {
+            null
+        },
+        onShareViaNearby = if (presence.playable) {
+            { navigation.openShareViaNearbyWithSongs(listOf(song)) }
+        } else {
+            null
+        },
+    )
+    val baseSlots = if (playCount != null) SongListSlots.MostPlayed else SongListSlots.Library
+    val slots = if (inSelection) baseSlots.copy(menu = false, selection = true) else baseSlots
+    val effectiveClick: (() -> Unit)? = when {
+        inSelection -> {
+            { selection.onSelectedChange(!selection.isSelected) }
+        }
+        presence.playable -> onClick
+        else -> null
+    }
+    SongListItem(
         title = song.title,
-        subtitle = if (presence.playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
+        artist = if (presence.playable) {
+            song.artist
+        } else {
+            stringResource(R.string.library_unavailable, song.artist)
+        },
         artworkUrl = song.artworkUrl,
-        metaText = metaText ?: formatDuration(song.durationMs),
-        onClick = { if (presence.playable) onClick() },
+        artworkContentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
+        modifier = Modifier.graphicsLayer {
+            rotationX = -stepAnimatable.value * 4f
+            scaleY = 1f - stepAnimatable.value * 0.2f
+            transformOrigin = TransformOrigin.Center
+        },
+        slots = slots,
+        duration = if (playCount == null) formatDuration(song.durationMs) else null,
+        playCount = playCount,
+        selected = inSelection && isSelected,
         contentAlpha = if (presence.playable) 1f else 0.45f,
-        padding = padding,
-        artworkKind = MediaArtworkKind.SONG,
-        contentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
-        optionsConfig = ItemOptionsConfig(
-            onPlayNext = if (presence.playable) onPlayNext?.let { cb -> { cb(song) } } else null,
-            onEditMetadata = { onEditMetadata(song) },
-            onShareViaTap = if (presence.playable) {
-                { navigation.openShareViaNfcWithSongs(listOf(song)) }
-            } else {
-                null
-            },
-            onShareViaNearby = if (presence.playable) {
-                { navigation.openShareViaNearbyWithSongs(listOf(song)) }
-            } else {
-                null
-            },
-        ),
-        selectionConfig = selectionConfig,
-        onLongClick = { onLongPress(song) },
-        secondaryContent = secondaryContent,
-        style = style,
-        beforeMeta = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SongLikeButton(song = song, iconSize = 20.dp)
-                if (presence.canRestore) {
-                    TextButton(onClick = { import.restoreSong(song) }) {
-                        Text(stringResource(R.string.action_restore), color = HighlightPrimary)
-                    }
-                }
-                if (availability != null) {
-                    SongAvailabilityBadge(mark = availability, iconSize = 16.dp)
+        onClick = effectiveClick,
+        onLongClick = if (!inSelection) {
+            { onLongPress(song) }
+        } else {
+            null
+        },
+        favorite = { SongLikeButton(song = song, iconSize = SongListItemDefaults.iconSize) },
+        artworkBadge = if (availability != null) {
+            { SongAvailabilityBadge(mark = availability, iconSize = 16.dp) }
+        } else {
+            null
+        },
+        extraTrailing = if (presence.canRestore) {
+            {
+                TextButton(onClick = { import.restoreSong(song) }) {
+                    Text(stringResource(R.string.action_restore), color = HighlightPrimary)
                 }
             }
+        } else {
+            null
+        },
+        menu = {
+            SongListOverflowIcon(
+                contentDescription = stringResource(R.string.cd_more_options),
+                onClick = { isExpanded = !isExpanded },
+            )
+        },
+        selection = {
+            AnimatedContent(
+                targetState = isSelected,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
+                },
+                label = "SelectionIcon",
+            ) { selected ->
+                Icon(
+                    imageVector = if (selected) XCheckCircle else XCircle,
+                    contentDescription = if (selected) {
+                        stringResource(R.string.cd_selected)
+                    } else {
+                        stringResource(R.string.cd_unselected)
+                    },
+                    tint = GrooveTheme.colors.onSurface,
+                )
+            }
+        },
+        below = if (!inSelection) {
+            {
+                AnimatedVisibility(
+                    visible = isExpanded,
+                    enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)),
+                    exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)),
+                    label = "SongListItemOptions",
+                ) {
+                    if (secondaryContent != null) {
+                        secondaryContent()
+                    } else {
+                        DefaultOptionsContent(
+                            optionsConfig = options,
+                            horizontalPadding = SongListItemDefaults.horizontalPadding,
+                        )
+                    }
+                }
+            }
+        } else {
+            null
         },
     )
 }
@@ -610,308 +653,16 @@ private fun formatDuration(ms: Long): String {
     return "%d:%02d".format(minutes, seconds)
 }
 
-/**
- * Same actions as [ClassicGeneralItem]: click, long-click, selection, and the
- * overflow row. The card is the stretched-glasswork treatment.
- */
-@Composable
-private fun StretchedGlassworkItem(
-    title: String,
-    subtitle: String?,
-    artworkUrl: String?,
-    artworkBitmap: ImageBitmap?,
-    metaText: String?,
-    onClick: () -> Unit,
-    padding: Dp,
-    artworkKind: MediaArtworkKind,
-    contentDescription: String?,
-    optionsConfig: ItemOptionsConfig?,
-    selectionConfig: ItemSelectionConfig?,
-    secondaryContent: (@Composable () -> Unit)?,
-    onLongClick: (() -> Unit)?,
-    beforeMeta: (@Composable () -> Unit)?,
-    contentAlpha: Float,
-) {
-    var isExpanded by remember { mutableStateOf(false) }
-    val hasOptions = optionsConfig != null && (
-        optionsConfig.onPlayNext != null ||
-        optionsConfig.onEditMetadata != null ||
-        optionsConfig.onShareViaTap != null ||
-        optionsConfig.onShareViaNearby != null
-    )
-    val effectiveOnClick = if (selectionConfig != null && selectionConfig.isSelectionMode) {
-        { selectionConfig.onSelectedChange(!selectionConfig.isSelected) }
-    } else {
-        onClick
-    }
-    val inSelectionMode = selectionConfig != null && selectionConfig.isSelectionMode
-    val isSelected = selectionConfig?.isSelected == true
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            inSelectionMode && isSelected -> HighlightPrimary.copy(alpha = 0.55f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(durationMillis = 200),
-        label = "ItemBackground",
-    )
-    val stepAnimatable = remember { Animatable(0f) }
-    LaunchedEffect(isSelected) {
-        if (inSelectionMode) {
-            stepAnimatable.snapTo(0f)
-            stepAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessHigh,
-                ),
-            )
-            stepAnimatable.animateTo(
-                targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium,
-                ),
-            )
-        }
-    }
-    val stepRotationX = -stepAnimatable.value * 4f
-    val stepScaleY = 1f - stepAnimatable.value * 0.2f
-    val glass = rememberStretchedGlasswork(
-        model = artworkUrl,
-        bitmap = artworkBitmap,
-    )
-    val shape = RoundedCornerShape(StretchedGlassworkCorner)
-    val fallbackTint = GrooveTheme.colors.surface.copy(alpha = 0.9f).compositeOver(Color.Black)
-    val optionsPadding = if (padding > 0.dp) padding else 12.dp
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .alpha(contentAlpha)
-            .graphicsLayer {
-                rotationX = stepRotationX
-                scaleY = stepScaleY
-                transformOrigin = TransformOrigin.Center
-            }
-            .clip(shape)
-            .stretchedGlasswork(
-                state = glass,
-                cornerRadius = StretchedGlassworkCorner,
-                fallbackTint = fallbackTint,
-                highlight = backgroundColor,
-            )
-            .combinedClickable(
-                onClick = effectiveOnClick,
-                onLongClick = if (selectionConfig == null && onLongClick != null) onLongClick else null,
-            ),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 72.dp)
-                .padding(start = 8.dp, end = 2.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StretchedGlassworkThumbnail(
-                state = glass,
-                kind = artworkKind,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(StretchedGlassworkThumbnailSize),
-            )
-            Box(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                SingleLineMarqueeText(
-                    text = title,
-                    style = GrooveTheme.typography.menuSongTitle.toTextStyle().copy(
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = Color.White,
-                )
-                if (subtitle != null) {
-                    SingleLineMarqueeText(
-                        text = subtitle,
-                        style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
-                        color = Color.White.copy(alpha = 0.68f),
-                    )
-                }
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                beforeMeta?.invoke()
-                if (metaText != null) {
-                    Text(
-                        text = metaText,
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = PoppinsFontFamily,
-                            fontWeight = FontWeight.Light,
-                            fontSize = 12.sp,
-                        ),
-                        color = Color.White.copy(alpha = 0.78f),
-                    )
-                }
-                when {
-                    selectionConfig != null && selectionConfig.isSelectionMode -> {
-                        Box(
-                            modifier = Modifier.size(40.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            AnimatedContent(
-                                targetState = selectionConfig.isSelected,
-                                transitionSpec = {
-                                    fadeIn(animationSpec = tween(150)) togetherWith
-                                        fadeOut(animationSpec = tween(150))
-                                },
-                                label = "SelectionIcon",
-                            ) { selected ->
-                                Icon(
-                                    imageVector = if (selected) XCheckCircle else XCircle,
-                                    contentDescription = if (selected) stringResource(R.string.cd_selected) else stringResource(R.string.cd_unselected),
-                                    tint = Color.White,
-                                )
-                            }
-                        }
-                    }
-                    hasOptions -> {
-                        IconButton(onClick = { isExpanded = !isExpanded }) {
-                            Icon(
-                                XMore,
-                                contentDescription = stringResource(R.string.cd_more_options),
-                                tint = Color.White.copy(alpha = 0.85f),
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        if (!inSelectionMode && (secondaryContent != null || hasOptions)) {
-            AnimatedVisibility(
-                visible = isExpanded && (secondaryContent != null || hasOptions),
-                enter = expandVertically(animationSpec = tween(200)) + fadeIn(animationSpec = tween(200)),
-                exit = shrinkVertically(animationSpec = tween(200)) + fadeOut(animationSpec = tween(200)),
-                label = "GeneralItemExpandable",
-            ) {
-                if (secondaryContent != null) {
-                    secondaryContent()
-                } else if (optionsConfig != null) {
-                    DefaultOptionsContent(
-                        optionsConfig = optionsConfig,
-                        horizontalPadding = optionsPadding,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 390, name = "Classic")
+@Preview(showBackground = true, backgroundColor = 0xFF000000, widthDp = 390, name = "Album row")
 @Composable
 private fun GeneralItemClassicPreview() {
     GroovePlayerTheme {
-        GeneralItemPreviewRow(style = GeneralItemStyle.Classic, artwork = null)
-    }
-}
-
-@Preview(
-    showBackground = true,
-    backgroundColor = 0xFF000000,
-    widthDp = 390,
-    name = "Stretched glasswork warm",
-    apiLevel = 33,
-)
-@Composable
-private fun GeneralItemStretchedGlassworkWarmPreview() {
-    GroovePlayerTheme {
-        GeneralItemPreviewRow(
-            style = GeneralItemStyle.StretchedGlasswork,
-            artwork = rememberGlassPreviewArt(warm = true),
+        GeneralItemComponent(
+            title = "Origins",
+            subtitle = "Imagine Dragons",
+            artworkUrl = null,
+            onClick = {},
+            artworkKind = MediaArtworkKind.ALBUM,
         )
-    }
-}
-
-@Preview(
-    showBackground = true,
-    backgroundColor = 0xFF000000,
-    widthDp = 390,
-    name = "Stretched glasswork cool",
-    apiLevel = 33,
-)
-@Composable
-private fun GeneralItemStretchedGlassworkCoolPreview() {
-    GroovePlayerTheme {
-        GeneralItemPreviewRow(
-            style = GeneralItemStyle.StretchedGlasswork,
-            artwork = rememberGlassPreviewArt(warm = false),
-        )
-    }
-}
-
-@Preview(
-    showBackground = true,
-    backgroundColor = 0xFF000000,
-    widthDp = 390,
-    name = "Stretched glasswork without artwork",
-)
-@Composable
-private fun GeneralItemStretchedGlassworkEmptyPreview() {
-    GroovePlayerTheme {
-        GeneralItemPreviewRow(style = GeneralItemStyle.StretchedGlasswork, artwork = null)
-    }
-}
-
-@Composable
-private fun GeneralItemPreviewRow(
-    style: GeneralItemStyle,
-    artwork: ImageBitmap?,
-) {
-    GeneralItemComponent(
-        title = "Golden Hour",
-        subtitle = "Amber Line",
-        artworkUrl = null,
-        artworkBitmap = artwork,
-        metaText = "3:19",
-        onClick = {},
-        padding = 0.dp,
-        style = style,
-        optionsConfig = ItemOptionsConfig(onPlayNext = {}),
-        beforeMeta = {
-            Icon(
-                imageVector = XHeart,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.size(20.dp),
-            )
-        },
-    )
-}
-
-@Composable
-private fun rememberGlassPreviewArt(warm: Boolean): ImageBitmap {
-    return remember(warm) {
-        val size = 64
-        val bitmap = android.graphics.Bitmap.createBitmap(
-            size,
-            size,
-            android.graphics.Bitmap.Config.ARGB_8888,
-        )
-        val pixels = IntArray(size * size)
-        for (y in 0 until size) {
-            for (x in 0 until size) {
-                pixels[y * size + x] = if (warm) {
-                    val red = (170 + x * 80 / size).coerceAtMost(255)
-                    val green = (48 + y * 80 / size).coerceAtMost(160)
-                    val blue = 24
-                    android.graphics.Color.rgb(red, green, blue)
-                } else {
-                    val red = (140 + y * 30 / size).coerceAtMost(200)
-                    val green = (165 + x * 25 / size).coerceAtMost(215)
-                    val blue = (190 + x * 55 / size).coerceAtMost(250)
-                    android.graphics.Color.rgb(red, green, blue)
-                }
-            }
-        }
-        bitmap.setPixels(pixels, 0, size, 0, 0, size, size)
-        bitmap.asImageBitmap()
     }
 }

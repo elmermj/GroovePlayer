@@ -14,16 +14,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.aethelworks.grooveplayer.domain.model.playCountLabel
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
 import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
 
 @Composable
 fun MostPlayedScreen(
@@ -55,7 +54,7 @@ fun MostPlayedScreen(
                     top = topBarContentInset() + M_PADDING,
                     bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
                 ),
-                verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
             ) {
                 itemsIndexed(
                     items = mostPlayed,
@@ -63,7 +62,11 @@ fun MostPlayedScreen(
                 ) { index, track ->
                     SongItemComponent(
                         song = track.song,
-                        metaText = playCountLabel(track.playCount),
+                        playCount = if (track.playCount == 1) {
+                            stringResource(R.string.count_plays_one)
+                        } else {
+                            stringResource(R.string.count_plays, track.playCount)
+                        },
                         onClick = {
                             playerViewModel.setQueue(songs, index)
                         },

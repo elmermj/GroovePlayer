@@ -14,6 +14,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -67,12 +68,15 @@ import androidx.compose.ui.zIndex
 import com.aethelworks.grooveplayer.domain.model.Song
 import com.aethelworks.grooveplayer.presentation.common.MediaArtwork
 import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelworks.grooveplayer.presentation.common.SongAvailabilityBadge
+import com.aethelworks.grooveplayer.presentation.common.SongListItem
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
+import com.aethelworks.grooveplayer.presentation.common.SongListSlots
+import com.aethelworks.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelworks.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.theme.animations.AudioWaveAnimation
 import com.aethelworks.grooveplayer.utils.theme.icons.XChevronUp
-import com.aethelworks.grooveplayer.utils.theme.icons.XGripVertical
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 import kotlinx.coroutines.launch
 
@@ -230,7 +234,7 @@ fun PhoneQueueSheet(
                         isNowPlaying = true,
                         onClick = null,
                         handle = null,
-                        pinned = true,
+                        modifier = Modifier.padding(horizontal = M_PADDING),
                     )
                 }
 
@@ -241,6 +245,8 @@ fun PhoneQueueSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    contentPadding = PaddingValues(horizontal = M_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                 ) {
                     itemsIndexed(upNext, key = { _, entry -> entry.key }) { localIndex, entry ->
                         val song = entry.song
@@ -313,7 +319,6 @@ fun PhoneQueueSheet(
                                 song = song,
                                 isNowPlaying = false,
                                 onClick = { onSkipTo(upNextStart + localIndex) },
-                                containerColor = sheetColor,
                                 handle = Modifier.pointerInputReorder(
                                     key = entry.key,
                                     onStart = {
@@ -428,80 +433,31 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** Queue row styled like the unified library song row (56dp artwork, menu song typography). */
 @Composable
 private fun QueueSongRow(
     song: Song,
     isNowPlaying: Boolean,
     onClick: (() -> Unit)?,
     handle: Modifier?,
-    pinned: Boolean = false,
-    containerColor: Color = Color.Transparent,
+    modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = if (pinned) M_PADDING else 0.dp)
-            .clip(RoundedCornerShape(if (pinned) GrooveTheme.radii.card else 0.dp))
-            .background(if (pinned) GrooveTheme.colors.surface else containerColor)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = M_PADDING, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            MediaArtwork(
-                url = song.artworkUrl,
-                kind = MediaArtworkKind.SONG,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                cornerRadius = S_PADDING,
-            )
-            if (isNowPlaying) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(S_PADDING))
-                        .background(Color.Black.copy(alpha = 0.45f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AudioWaveAnimation(waveHeight = 18.dp, modifier = Modifier.width(40.dp))
-                }
-            }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = song.title,
-                style = GrooveTheme.typography.menuSongTitle.toTextStyle(),
-                color = GrooveTheme.colors.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = song.artist,
-                style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
-                color = GrooveTheme.colors.muted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        val availability = com.aethelworks.grooveplayer.presentation.common.rememberSongAvailabilityMark(song)
-        if (availability != null) {
-            com.aethelworks.grooveplayer.presentation.common.SongAvailabilityBadge(
-                mark = availability,
-                iconSize = 16.dp,
-            )
-        }
-        if (handle != null) {
-            Box(
-                modifier = handle
-                    .size(48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(XGripVertical, contentDescription = stringResource(R.string.cd_drag_to_reorder), tint = GrooveTheme.colors.muted)
-            }
-        }
-    }
+    val availability = rememberSongAvailabilityMark(song)
+    SongListItem(
+        title = song.title,
+        artist = song.artist,
+        artworkUrl = song.artworkUrl,
+        artworkContentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
+        modifier = modifier,
+        slots = if (isNowPlaying) SongListSlots.NowPlaying else SongListSlots.UpNext,
+        highlighted = isNowPlaying,
+        onClick = onClick,
+        dragHandleModifier = handle ?: Modifier,
+        artworkBadge = if (availability != null) {
+            { SongAvailabilityBadge(mark = availability, iconSize = 16.dp) }
+        } else {
+            null
+        },
+    )
 }
 
 internal fun Modifier.pointerInputReorder(

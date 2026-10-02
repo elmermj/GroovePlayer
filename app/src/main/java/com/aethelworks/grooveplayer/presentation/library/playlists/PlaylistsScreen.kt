@@ -6,24 +6,19 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,28 +30,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.domain.model.M3uImportResult
 import com.aethelworks.grooveplayer.domain.model.Playlist
 import com.aethelworks.grooveplayer.domain.playlist.PlaylistNames
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelworks.grooveplayer.presentation.common.PlaylistListItem
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
+import com.aethelworks.grooveplayer.presentation.common.SongListOverflowIcon
 import com.aethelworks.grooveplayer.presentation.library.importing.LocalLibraryImport
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
-import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
 import com.aethelworks.grooveplayer.presentation.common.GrooveTinySpacer
 import com.aethelworks.grooveplayer.presentation.common.grooveBottomContentInset
 import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.S_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
 import com.aethelworks.grooveplayer.utils.theme.icons.XListMusic
-import com.aethelworks.grooveplayer.utils.theme.icons.XMore
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
@@ -149,7 +141,7 @@ fun PlaylistsScreen(
                             includeMiniPlayer = rememberClearMiniPlayer(),
                         ),
                     ),
-                    verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                 ) {
                     if (!message.isNullOrBlank()) {
                         item {
@@ -274,60 +266,48 @@ private fun PlaylistRow(
     onDelete: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    GrooveSurfaceCard {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-        ) {
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(onClick = onClick),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(S_PADDING),
-            ) {
-            PlaylistSwatch(playlist.name)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = playlist.name,
-                    style = GrooveTheme.typography.body.toTextStyle(),
-                    fontWeight = FontWeight.Medium,
-                    color = GrooveTheme.colors.onSurface,
-                )
-                GrooveTinySpacer()
-                GrooveMutedText(if (playlist.trackCount == 1) stringResource(R.string.count_tracks_one) else stringResource(R.string.count_tracks, playlist.trackCount))
-            }
-            }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(XMore, contentDescription = stringResource(R.string.cd_playlist_options), tint = SoftWhite)
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_rename)) },
-                        onClick = {
-                            menuOpen = false
-                            onRename()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.playlist_export_m3u)) },
-                        onClick = {
-                            menuOpen = false
-                            onExport()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.action_delete)) },
-                        onClick = {
-                            menuOpen = false
-                            onDelete()
-                        },
-                    )
-                }
-            }
-        }
+    val trackLabel = if (playlist.trackCount == 1) {
+        stringResource(R.string.count_tracks_one)
+    } else {
+        stringResource(R.string.count_tracks, playlist.trackCount)
     }
+    PlaylistListItem(
+        title = playlist.name,
+        subtitle = trackLabel,
+        onClick = onClick,
+        icon = { PlaylistSwatch(playlist.name) },
+        menu = {
+            SongListOverflowIcon(
+                contentDescription = stringResource(R.string.cd_playlist_options),
+                onClick = { menuOpen = true },
+                dropdown = {
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_rename)) },
+                            onClick = {
+                                menuOpen = false
+                                onRename()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.playlist_export_m3u)) },
+                            onClick = {
+                                menuOpen = false
+                                onExport()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.action_delete)) },
+                            onClick = {
+                                menuOpen = false
+                                onDelete()
+                            },
+                        )
+                    }
+                },
+            )
+        },
+    )
 }
 
 @Composable
@@ -335,8 +315,7 @@ private fun PlaylistSwatch(name: String) {
     val tint = PlaylistTints[(name.hashCode() and Int.MAX_VALUE) % PlaylistTints.size]
     Box(
         modifier = Modifier
-            .size(48.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .fillMaxSize()
             .background(
                 Brush.linearGradient(
                     listOf(tint.copy(alpha = 0.95f), tint.copy(alpha = 0.45f)),
