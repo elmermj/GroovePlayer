@@ -374,6 +374,8 @@ dependencies {
     implementation(libs.androidx.media3.database)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.ui)
+
+    // In-app splash animation (intro once, then loop until the first screen).
     implementation(libs.lottie.compose)
 
     // Hilt

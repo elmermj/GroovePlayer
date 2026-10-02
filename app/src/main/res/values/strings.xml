@@ -49,6 +49,7 @@
 
     <!-- Accessibility -->
     <string name="cd_artwork">Artwork</string>
+    <string name="cd_splash_logo">Groove Player logo</string>
     <string name="cd_album_artwork">Album artwork</string>
     <string name="cd_profile_avatar">Profile avatar</string>
     <string name="cd_no_artwork">No artwork</string>
