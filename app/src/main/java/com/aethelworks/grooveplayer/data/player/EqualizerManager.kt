@@ -78,7 +78,8 @@ class EqualizerManager @Inject constructor() {
     }
     
     /**
-     * Get center frequency for a band in Hz
+     * Get center frequency for a band in milliHertz.
+     * [android.media.audiofx.Equalizer.getCenterFreq] does not return hertz.
      */
     fun getCenterFrequency(band: Int): Int {
         return try {

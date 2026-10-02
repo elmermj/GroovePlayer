@@ -73,7 +73,6 @@ import com.aethelworks.grooveplayer.presentation.player.ui.PlayerControls
 import com.aethelworks.grooveplayer.presentation.player.ui.PhoneEqualizerSheet
 import com.aethelworks.grooveplayer.presentation.player.ui.PhoneQueueSheet
 import com.aethelworks.grooveplayer.presentation.player.ui.PhoneUpNextPeekRow
-import com.aethelworks.grooveplayer.presentation.player.ui.PlayerSheetGradientScrim
 import com.aethelworks.grooveplayer.presentation.player.ui.PlayerShareButton
 import com.aethelworks.grooveplayer.presentation.player.ui.SongDetails
 import com.aethelworks.grooveplayer.presentation.player.ui.SwipeableArtwork
@@ -500,13 +499,11 @@ fun PhonePlayerLayout(
 
             Spacer(modifier = Modifier.height(S_PADDING + bottomSafeInset))
         }
-        if (showQueue || showEqualizer) {
-            PlayerSheetGradientScrim()
-        }
         if (showQueue) {
             PhoneQueueSheet(
                 currentSong = song,
                 queue = queue,
+                isPlaying = isPlaying,
                 onDismiss = { showQueue = false },
                 onSkipTo = { index -> playerViewModel.skipToQueueItem(index) },
                 onMove = { from, to -> playerViewModel.moveQueueItem(from, to) },
