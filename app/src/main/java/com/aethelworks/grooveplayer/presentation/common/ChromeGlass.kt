@@ -1,15 +1,20 @@
 package com.aethelworks.grooveplayer.presentation.common
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
@@ -115,15 +120,56 @@ fun Modifier.groovePeekFrostedGlass(
 }
 
 /**
- * Bottom chrome glass: long fade above the mini-player into a near-opaque base.
- * Uses [GrooveColors.edgeGradient], not canvas, so the veil stays distinct from the page.
- * Fade is drawn past layout bounds ([clip] = false) so it does not steal touches.
+ * Bottom chrome glass.
+ *
+ * With [tint] left null, this is the mini-player veil: a long fade above the bar into a
+ * near-opaque base, drawn past layout bounds so it does not steal touches.
+ *
+ * With [tint] set, this is the frosted sheet plate: translucent black, a faint top
+ * highlight, and [blurRadius] hoisted onto the sheet window. A modal sheet is its own
+ * window, so an in-window [Modifier.blur] cannot see the player underneath.
  */
 @Composable
 fun Modifier.grooveBottomChromeGlass(
     edge: Color = GrooveTheme.colors.edgeGradient,
     fadeExtension: Dp = ChromeGlassFadeExtension,
+    shape: Shape = RectangleShape,
+    tint: Color? = null,
+    blurRadius: Dp = 0.dp,
 ): Modifier {
+    if (tint != null) {
+        val view = LocalView.current
+        val radiusPx = with(LocalDensity.current) { blurRadius.roundToPx() }
+        SideEffect {
+            // Scrim is drawn by the sheet. Keep the system dim off so it does not stack on the blur.
+            view.dialogWindow()?.let { window ->
+                window.setDimAmount(0f)
+                window.applyBackdropBlur(radiusPx = radiusPx, enabled = radiusPx > 0)
+            }
+        }
+        val highlightHeight = 14.dp
+        return this
+            .clip(shape)
+            .drawWithCache {
+                val highlightPx = highlightHeight.toPx()
+                val highlight = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.10f),
+                        Color.Transparent,
+                    ),
+                    startY = 0f,
+                    endY = highlightPx,
+                )
+                onDrawBehind {
+                    drawRect(tint)
+                    drawRect(
+                        brush = highlight,
+                        size = Size(size.width, highlightPx),
+                    )
+                }
+            }
+    }
+
     val fadePx = with(LocalDensity.current) { fadeExtension.toPx() }
     return this
         .graphicsLayer { clip = false }

@@ -8,9 +8,20 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import android.provider.Settings
+import androidx.compose.animation.core.InfiniteTransition
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +43,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,47 +68,45 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import coil3.compose.AsyncImage
 import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.presentation.common.GlassWhite
+import com.aethelworks.grooveplayer.presentation.common.GrooveHairline
+import com.aethelworks.grooveplayer.presentation.common.GrooveSheet
+import com.aethelworks.grooveplayer.presentation.common.Hairline
 import com.aethelworks.grooveplayer.presentation.common.MediaArtwork
 import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
+import com.aethelworks.grooveplayer.presentation.common.Overline
 import com.aethelworks.grooveplayer.presentation.common.SongAvailabilityBadge
-import com.aethelworks.grooveplayer.presentation.common.SongListItem
-import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
-import com.aethelworks.grooveplayer.presentation.common.SongListSlots
 import com.aethelworks.grooveplayer.presentation.common.rememberSongAvailabilityMark
 import com.aethelworks.grooveplayer.presentation.equalizer.ui.EqualizerControlsComponent
-import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.theme.icons.XChevronUp
+import com.aethelworks.grooveplayer.utils.theme.icons.XMusic
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.utils.theme.ui.PoppinsFontFamily
 import kotlinx.coroutines.launch
-
-/**
- * Subtle dark gradient drawn behind the phone queue and EQ sheets.
- * The sheets themselves use a transparent scrim so this gradient shows through the dialog window.
- */
-@Composable
-fun PlayerSheetGradientScrim(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.42f to Color.Black.copy(alpha = 0.22f),
-                    1f to Color.Black.copy(alpha = 0.55f),
-                )
-            )
-    )
-}
 
 /**
  * "Up next" peek row under the transport controls. Shows what plays next; tapping opens the queue sheet.
@@ -165,6 +174,7 @@ fun PhoneUpNextPeekRow(
 fun PhoneQueueSheet(
     currentSong: Song?,
     queue: List<Song>,
+    isPlaying: Boolean,
     onDismiss: () -> Unit,
     onSkipTo: (Int) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
@@ -194,59 +204,80 @@ fun PhoneQueueSheet(
     val listState = rememberLazyListState()
     val latestUpNextStart by rememberUpdatedState(upNextStart)
     val latestOnMove by rememberUpdatedState(onMove)
+    val reduceMotion = rememberReducedMotion()
 
-    val sheetColor = GrooveTheme.colors.edgeGradient
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    GrooveSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
-        scrimColor = Color.Transparent,
-        containerColor = sheetColor,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = GrooveTheme.radii.card, topEnd = GrooveTheme.radii.card),
     ) {
-        Box(modifier = Modifier.fillMaxHeight()) {
+        Box(modifier = Modifier.fillMaxHeight().navigationBarsPadding()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = M_PADDING, vertical = S_PADDING),
+                        .height(52.dp)
+                        .padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
                         text = stringResource(R.string.cd_queue),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
+                        color = GlassWhite,
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 20.sp,
+                        modifier = Modifier.weight(1f),
                     )
                     if (queue.isNotEmpty()) {
                         Text(
                             text = queue.size.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = GrooveTheme.colors.muted,
+                            color = GlassWhite.copy(alpha = 0.55f),
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp,
                         )
                     }
                 }
+                Hairline()
 
                 if (currentSong != null) {
-                    SectionLabel(stringResource(R.string.player_now_playing))
+                    Overline(
+                        text = stringResource(R.string.player_now_playing),
+                        modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp),
+                    )
                     QueueSongRow(
                         song = currentSong,
                         isNowPlaying = true,
+                        playing = isPlaying,
+                        reduceMotion = reduceMotion,
+                        showBars = true,
+                        indexLabel = null,
                         onClick = null,
                         handle = null,
-                        modifier = Modifier.padding(horizontal = M_PADDING),
+                        dragging = false,
                     )
+                    Hairline()
                 }
 
-                SectionLabel(if (upNext.isEmpty()) stringResource(R.string.player_nothing_up_next) else stringResource(R.string.player_up_next))
+                Overline(
+                    text = stringResource(R.string.player_up_next),
+                    modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 4.dp),
+                )
+                if (upNext.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.player_nothing_up_next),
+                        color = GlassWhite.copy(alpha = 0.55f),
+                        fontFamily = PoppinsFontFamily,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
+                }
 
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    contentPadding = PaddingValues(horizontal = M_PADDING),
-                    verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
+                    contentPadding = PaddingValues(bottom = 12.dp),
                 ) {
                     itemsIndexed(upNext, key = { _, entry -> entry.key }) { localIndex, entry ->
                         val song = entry.song
@@ -279,10 +310,7 @@ fun PhoneQueueSheet(
                         val itemModifier = if (isDragging) {
                             Modifier
                                 .zIndex(1f)
-                                .graphicsLayer {
-                                    translationY = dragOffset
-                                    shadowElevation = 12f
-                                }
+                                .graphicsLayer { translationY = dragOffset }
                         } else {
                             Modifier.animateItem()
                         }
@@ -299,26 +327,24 @@ fun PhoneQueueSheet(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(GrooveTheme.colors.error)
-                                            .padding(horizontal = M_PADDING),
+                                            .background(Color.Black)
+                                            .padding(end = 20.dp),
                                         contentAlignment = Alignment.CenterEnd,
                                     ) {
-                                        Text(
-                                            stringResource(R.string.action_remove),
-                                            color = Color.White,
-                                            style = MaterialTheme.typography.labelLarge,
-                                        )
+                                        OutlinedDeleteIcon()
                                     }
                                 }
                             },
                         ) {
-                            // The dismiss background is always composed behind the row. An opaque
-                            // sheet color covers it at rest; a left swipe translates this row and
-                            // reveals Remove. A transparent row leaves the red fill visible.
                             QueueSongRow(
                                 song = song,
                                 isNowPlaying = false,
+                                playing = isPlaying,
+                                reduceMotion = reduceMotion,
+                                showBars = currentSong?.id == song.id,
+                                indexLabel = (localIndex + 1).toString(),
                                 onClick = { onSkipTo(upNextStart + localIndex) },
+                                dragging = isDragging,
                                 handle = Modifier.pointerInputReorder(
                                     key = entry.key,
                                     onStart = {
@@ -366,9 +392,15 @@ fun PhoneQueueSheet(
                 hostState = snackbarHostState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(M_PADDING),
-            )
+                    .padding(20.dp),
+            ) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = Color(0xFF161616),
+                    contentColor = GlassWhite,
+                    actionColor = GlassWhite,
+                )
+            }
         }
     }
 }
@@ -393,18 +425,15 @@ fun PhoneEqualizerSheet(
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     // Drag handle sits above this content; together they land near 70% and cannot grow to full screen.
     val contentHeight = (screenHeight * 0.70f - 48.dp).coerceAtLeast(240.dp)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    GrooveSheet(
+        onDismiss = onDismiss,
         sheetState = sheetState,
-        scrimColor = Color.Transparent,
-        containerColor = GrooveTheme.colors.edgeGradient,
-        contentColor = Color.White,
-        shape = RoundedCornerShape(topStart = GrooveTheme.radii.card, topEnd = GrooveTheme.radii.card),
     ) {
         EqualizerControlsComponent(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(contentHeight),
+                .height(contentHeight)
+                .navigationBarsPadding(),
             isPhoneSheet = true,
             onSliderDragChange = { sliderDragging.value = it },
         )
@@ -424,40 +453,283 @@ internal fun List<Song>.toQueueEntries(): List<QueueEntry> {
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = GrooveTheme.colors.muted,
-        modifier = Modifier.padding(start = M_PADDING, end = M_PADDING, top = S_PADDING, bottom = 4.dp),
+private fun QueueSongRow(
+    song: Song,
+    isNowPlaying: Boolean,
+    playing: Boolean,
+    reduceMotion: Boolean,
+    showBars: Boolean,
+    indexLabel: String?,
+    onClick: (() -> Unit)?,
+    handle: Modifier?,
+    dragging: Boolean,
+) {
+    val availability = rememberSongAvailabilityMark(song)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val highlight = pressed || dragging
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isNowPlaying) 64.dp else 56.dp)
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (highlight) GlassWhite.copy(alpha = 0.06f) else Color.Transparent),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (onClick != null) {
+                            Modifier.clickable(
+                                interactionSource = interaction,
+                                indication = null,
+                                onClick = onClick,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (showBars) {
+                        QueueBars(playing = playing && !reduceMotion)
+                    } else if (indexLabel != null) {
+                        Text(
+                            text = indexLabel,
+                            color = GlassWhite.copy(alpha = 0.40f),
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Box(modifier = Modifier.size(40.dp)) {
+                    QueueArtwork(
+                        url = song.artworkUrl,
+                        contentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
+                    )
+                    if (availability != null) {
+                        SongAvailabilityBadge(
+                            mark = availability,
+                            iconSize = 14.dp,
+                            modifier = Modifier.align(Alignment.BottomEnd),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = song.title,
+                        color = GlassWhite,
+                        fontFamily = PoppinsFontFamily,
+                        fontWeight = if (isNowPlaying) FontWeight.SemiBold else FontWeight.Medium,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (song.artist.isNotEmpty()) {
+                        Text(
+                            text = song.artist,
+                            color = GlassWhite.copy(alpha = 0.55f),
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (handle != null) {
+                QueueGrip(
+                    active = dragging,
+                    modifier = handle.size(48.dp),
+                )
+            } else if (!isNowPlaying) {
+                Spacer(Modifier.size(48.dp))
+            }
+        }
+        if (!isNowPlaying) {
+            Box(
+                modifier = Modifier
+                    .padding(start = 108.dp)
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(GrooveHairline.color),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QueueArtwork(
+    url: String?,
+    contentDescription: String?,
+) {
+    var failed by remember(url) { mutableStateOf(url.isNullOrBlank()) }
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF161616)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!failed && !url.isNullOrBlank()) {
+            AsyncImage(
+                model = url,
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onError = { failed = true },
+            )
+        }
+        if (failed) {
+            Icon(
+                imageVector = XMusic,
+                contentDescription = contentDescription,
+                tint = GlassWhite.copy(alpha = 0.40f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QueueBars(playing: Boolean) {
+    val transition = rememberInfiniteTransition(label = "queueBars")
+    Row(
+        modifier = Modifier.size(width = 16.dp, height = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        listOf(0, 120, 240).forEach { delayMs ->
+            QueueBar(playing = playing, delayMs = delayMs, transition = transition)
+        }
+    }
+}
+
+@Composable
+private fun QueueBar(
+    playing: Boolean,
+    delayMs: Int,
+    transition: InfiniteTransition,
+) {
+    val animated by transition.animateFloat(
+        initialValue = 4f,
+        targetValue = 14f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 480,
+                delayMillis = delayMs,
+                easing = LinearEasing,
+            ),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "bar$delayMs",
+    )
+    Box(
+        modifier = Modifier
+            .width(3.dp)
+            .height(if (playing) animated.dp else 8.dp)
+            .background(GlassWhite, RoundedCornerShape(1.5.dp)),
     )
 }
 
 @Composable
-private fun QueueSongRow(
-    song: Song,
-    isNowPlaying: Boolean,
-    onClick: (() -> Unit)?,
-    handle: Modifier?,
-    modifier: Modifier = Modifier,
-) {
-    val availability = rememberSongAvailabilityMark(song)
-    SongListItem(
-        title = song.title,
-        artist = song.artist,
-        artworkUrl = song.artworkUrl,
-        artworkContentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
-        modifier = modifier,
-        slots = if (isNowPlaying) SongListSlots.NowPlaying else SongListSlots.UpNext,
-        highlighted = isNowPlaying,
-        onClick = onClick,
-        dragHandleModifier = handle ?: Modifier,
-        artworkBadge = if (availability != null) {
-            { SongAvailabilityBadge(mark = availability, iconSize = 16.dp) }
-        } else {
-            null
-        },
-    )
+private fun QueueGrip(active: Boolean, modifier: Modifier = Modifier) {
+    val tint = if (active) GlassWhite else GlassWhite.copy(alpha = 0.40f)
+    val description = stringResource(R.string.cd_drag_to_reorder)
+    Column(
+        modifier = modifier.semantics { contentDescription = description },
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.5.dp)) {
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 14.dp, height = 1.5.dp)
+                        .background(tint, RoundedCornerShape(1.dp)),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutlinedDeleteIcon() {
+    val label = stringResource(R.string.action_remove)
+    Canvas(
+        modifier = Modifier
+            .size(22.dp)
+            .semantics { contentDescription = label },
+    ) {
+        val stroke = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val w = size.width
+        val h = size.height
+        drawLine(
+            color = GlassWhite,
+            start = Offset(w * 0.38f, h * 0.16f),
+            end = Offset(w * 0.62f, h * 0.16f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = GlassWhite,
+            start = Offset(w * 0.16f, h * 0.30f),
+            end = Offset(w * 0.84f, h * 0.30f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+        val body = Path().apply {
+            addRoundRect(
+                androidx.compose.ui.geometry.RoundRect(
+                    left = w * 0.24f,
+                    top = h * 0.36f,
+                    right = w * 0.76f,
+                    bottom = h * 0.88f,
+                    cornerRadius = CornerRadius(1.5.dp.toPx(), 1.5.dp.toPx()),
+                ),
+            )
+        }
+        drawPath(body, GlassWhite, style = stroke)
+        drawLine(
+            color = GlassWhite,
+            start = Offset(w * 0.40f, h * 0.46f),
+            end = Offset(w * 0.40f, h * 0.76f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = GlassWhite,
+            start = Offset(w * 0.60f, h * 0.46f),
+            end = Offset(w * 0.60f, h * 0.76f),
+            strokeWidth = stroke.width,
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
+private fun rememberReducedMotion(): Boolean {
+    val context = LocalContext.current
+    return remember {
+        val duration = runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        }.getOrDefault(1f)
+        val transition = runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.TRANSITION_ANIMATION_SCALE, 1f)
+        }.getOrDefault(1f)
+        duration == 0f || transition == 0f
+    }
 }
 
 internal fun Modifier.pointerInputReorder(

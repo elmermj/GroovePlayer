@@ -5,24 +5,37 @@ import com.aethelworks.grooveplayer.R
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,14 +43,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.domain.model.M3uImportResult
 import com.aethelworks.grooveplayer.domain.model.Playlist
 import com.aethelworks.grooveplayer.domain.playlist.PlaylistNames
+import com.aethelworks.grooveplayer.presentation.common.GlassWhite
+import com.aethelworks.grooveplayer.presentation.common.GrooveDialog
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
+import com.aethelworks.grooveplayer.presentation.common.GrooveTextButton
+import com.aethelworks.grooveplayer.presentation.common.Overline
 import com.aethelworks.grooveplayer.presentation.common.PlaylistListItem
 import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.common.SongListOverflowIcon
@@ -50,6 +76,7 @@ import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.theme.icons.XListMusic
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
+import com.aethelworks.grooveplayer.utils.theme.ui.PoppinsFontFamily
 import com.aethelworks.grooveplayer.utils.theme.ui.SoftWhite
 
 private val PlaylistTints = listOf(
@@ -341,37 +368,127 @@ internal fun PlaylistNameDialog(
 ) {
     var name by remember(initialName) { mutableStateOf(initialName) }
     val error = PlaylistNames.validationError(name)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = GrooveTheme.colors.surface,
-        titleContentColor = GrooveTheme.colors.onSurface,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.playlist_name_label)) },
-                singleLine = true,
-                isError = name.isNotBlank() && error != null,
-                supportingText = {
-                    if (name.isNotBlank() && error != null) Text(error)
-                },
-            )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(name) },
-                enabled = error == null,
-            ) {
-                Text(confirmLabel, color = SoftWhite)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel), color = SoftWhite.copy(alpha = 0.65f))
-            }
-        },
+    val canConfirm = error == null
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val nameLabel = stringResource(R.string.playlist_name_label)
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboard?.show()
+    }
+    val lineWidth by animateDpAsState(
+        targetValue = if (focused) 1.5.dp else 1.dp,
+        animationSpec = tween(durationMillis = 120),
+        label = "playlistUnderline",
     )
+    val lineColor by animateColorAsState(
+        targetValue = if (focused) GlassWhite else GlassWhite.copy(alpha = 0.12f),
+        animationSpec = tween(durationMillis = 120),
+        label = "playlistUnderlineColor",
+    )
+    GrooveDialog(onDismiss = onDismiss, anchorUpper = true) {
+        Text(
+            text = title,
+            color = GlassWhite,
+            fontFamily = PoppinsFontFamily,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 18.sp,
+        )
+        Spacer(Modifier.height(24.dp))
+        BasicTextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+            textStyle = TextStyle(
+                color = GlassWhite,
+                fontFamily = PoppinsFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 16.sp,
+            ),
+            cursorBrush = SolidColor(GlassWhite),
+            singleLine = true,
+            interactionSource = interaction,
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Sentences,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { if (canConfirm) onConfirm(name) },
+            ),
+            decorationBox = { inner ->
+                Column {
+                    if (name.isNotEmpty()) {
+                        Overline(nameLabel)
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (name.isEmpty()) {
+                            Text(
+                                text = nameLabel,
+                                color = GlassWhite.copy(alpha = 0.40f),
+                                fontFamily = PoppinsFontFamily,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 16.sp,
+                            )
+                        }
+                        inner()
+                    }
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .fillMaxWidth()
+                            .height(lineWidth)
+                            .background(lineColor),
+                    )
+                    if (name.isNotEmpty()) {
+                        Text(
+                            text = "${name.length}/${PlaylistNames.MAX_LENGTH}",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp),
+                            color = GlassWhite.copy(alpha = 0.40f),
+                            fontFamily = PoppinsFontFamily,
+                            fontSize = 11.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                        )
+                    }
+                    if (name.isNotBlank() && error != null) {
+                        Text(
+                            text = error,
+                            modifier = Modifier.padding(top = 6.dp),
+                            color = GlassWhite.copy(alpha = 0.65f),
+                            fontFamily = PoppinsFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+            },
+        )
+        Spacer(Modifier.height(32.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GrooveTextButton(
+                text = stringResource(R.string.action_cancel),
+                color = GlassWhite.copy(alpha = 0.55f),
+                onClick = onDismiss,
+            )
+            Spacer(Modifier.width(20.dp))
+            GrooveTextButton(
+                text = confirmLabel,
+                color = GlassWhite,
+                enabled = canConfirm,
+                onClick = { onConfirm(name) },
+            )
+        }
+    }
 }
 
 @Composable
