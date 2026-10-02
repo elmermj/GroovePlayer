@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.runtime.Composable
 import com.aethelworks.grooveplayer.domain.model.LibraryGenre
 import com.aethelworks.grooveplayer.domain.model.MostPlayedTrack
@@ -10,16 +12,16 @@ internal fun GenresLibraryCard(
     onClick: () -> Unit,
 ) {
     val subtitle = when {
-        genres == null -> "Tap to browse"
-        genres.isEmpty() -> "No genre tags"
-        genres.size == 1 -> "1 genre"
-        else -> "${genres.size} genres"
+        genres == null -> stringResource(R.string.home_tap_to_browse)
+        genres.isEmpty() -> stringResource(R.string.home_no_genre_tags)
+        genres.size == 1 -> stringResource(R.string.count_genre_one)
+        else -> stringResource(R.string.count_genres, genres.size)
     }
     LibraryCardComponent(
-        title = "Genres",
+        title = stringResource(R.string.home_genres),
         subtitle = subtitle,
         artworks = genres.orEmpty().map { genre -> genre.artworkUrl.toCardArtwork() },
-        emptyNoticeText = "No genre tags",
+        emptyNoticeText = stringResource(R.string.home_no_genre_tags),
         onClick = onClick,
     )
 }
@@ -30,14 +32,14 @@ internal fun MostPlayedLibraryCard(
     onClick: () -> Unit,
 ) {
     LibraryCardComponent(
-        title = "Most played",
+        title = stringResource(R.string.home_most_played),
         subtitle = if (mostPlayed.isNotEmpty()) {
-            "${mostPlayed.size} tracks"
+            stringResource(R.string.count_tracks, mostPlayed.size)
         } else {
-            "No plays yet"
+            stringResource(R.string.home_no_plays)
         },
         artworks = mostPlayed.map { track -> track.song.artworkUrl.toCardArtwork() },
-        emptyNoticeText = "No plays yet",
+        emptyNoticeText = stringResource(R.string.home_no_plays),
         onClick = onClick,
     )
 }

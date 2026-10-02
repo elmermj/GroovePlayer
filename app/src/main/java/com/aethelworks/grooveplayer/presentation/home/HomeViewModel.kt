@@ -1,5 +1,6 @@
 package com.aethelworks.grooveplayer.presentation.home
 
+import com.aethelworks.grooveplayer.R
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -130,7 +131,7 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) {
                 android.util.Log.e("HomeViewModel", "Failed to load songs", e)
                 if (_uiState.value !is UiState.Success) {
-                    setError(e.message ?: "Failed to load songs")
+                    setError(e.message ?: getApplication<Application>().getString(R.string.home_failed_load_songs))
                 }
             }
             try {

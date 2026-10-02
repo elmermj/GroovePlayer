@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.search
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +23,7 @@ import com.aethelworks.grooveplayer.presentation.common.MediaArtworkKind
 import com.aethelworks.grooveplayer.domain.model.makeAlbumId
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.library.ui.AlbumItemComponent
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.S_PADDING
 import com.aethelworks.grooveplayer.utils.theme.icons.XBack
@@ -53,10 +56,10 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Search") },
+                title = { Text(stringResource(R.string.search_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(XBack, contentDescription = "Back")
+                        Icon(XBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -82,22 +85,22 @@ fun SearchScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { viewModel.setSelectedTab(0) },
-                    text = { Text("All") }
+                    text = { Text(stringResource(R.string.action_all)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { viewModel.setSelectedTab(1) },
-                    text = { Text("Songs") }
+                    text = { Text(stringResource(R.string.search_songs)) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { viewModel.setSelectedTab(2) },
-                    text = { Text("Albums") }
+                    text = { Text(stringResource(R.string.search_albums)) }
                 )
                 Tab(
                     selected = selectedTab == 3,
                     onClick = { viewModel.setSelectedTab(3) },
-                    text = { Text("Artists") }
+                    text = { Text(stringResource(R.string.search_artists)) }
                 )
             }
             
@@ -116,7 +119,7 @@ fun SearchScreen(
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                     ) {
                         if (songs.isNotEmpty()) {
                             item {
@@ -208,7 +211,7 @@ fun SearchScreen(
                                     modifier = Modifier.fillMaxWidth().padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("No results found")
+                                    Text(stringResource(R.string.search_no_results))
                                 }
                             }
                         }
@@ -221,13 +224,13 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No songs found")
+                            Text(stringResource(R.string.search_no_songs))
                         }
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(songs) { song ->
                                 SongItemComponent(
@@ -261,13 +264,13 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No albums found")
+                            Text(stringResource(R.string.search_no_albums))
                         }
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(albums) { albumName ->
                                 SearchAlbumItem(
@@ -295,13 +298,13 @@ fun SearchScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No artists found")
+                            Text(stringResource(R.string.search_no_artists))
                         }
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
                         ) {
                             items(artists) { artistName ->
                                 SearchArtistItem(

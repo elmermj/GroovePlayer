@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.common
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.LocalActivity
 import androidx.compose.material3.Icon
@@ -73,7 +75,7 @@ fun SongLikeButton(
     ) { isLiked ->
         Icon(
             imageVector = if (isLiked) XHeartFilled else XHeart,
-            contentDescription = if (isLiked) "Unlike" else "Like",
+            contentDescription = if (isLiked) stringResource(R.string.cd_unlike) else stringResource(R.string.cd_like),
             tint = if (isLiked) likedTint else unlikedTint,
             modifier = Modifier.size(iconSize),
         )

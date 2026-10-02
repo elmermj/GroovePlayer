@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.add_playlist
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,7 +31,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberClearMiniPlayer
 import com.aethelworks.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
@@ -43,7 +45,7 @@ fun AddPlaylistTracksScreen(
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
 
     GrooveScreen(
-        title = "Add tracks",
+        title = stringResource(R.string.playlist_add_tracks),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues(
             start = M_PADDING,
@@ -58,7 +60,7 @@ fun AddPlaylistTracksScreen(
                 onValueChange = viewModel::onQueryChange,
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                label = { Text("Search songs") },
+                label = { Text(stringResource(R.string.playlist_search_songs)) },
             )
             when {
                 isLoading && songs.isEmpty() -> {
@@ -69,7 +71,7 @@ fun AddPlaylistTracksScreen(
                 songs.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         GrooveMutedText(
-                            if (query.isBlank()) "No songs in your library" else "No matching songs",
+                            if (query.isBlank()) stringResource(R.string.library_no_songs_in_library) else stringResource(R.string.library_no_matching_songs),
                         )
                     }
                 }
@@ -77,7 +79,7 @@ fun AddPlaylistTracksScreen(
                     LazyColumn(
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = M_PADDING),
-                        verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                     ) {
                         items(songs, key = { it.id }) { song ->
                             SongItemComponent(

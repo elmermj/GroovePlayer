@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -55,7 +57,7 @@ fun LastPlayedSectionComponent(
             modifier = Modifier.padding(bottom = S_PADDING)
         ){
             Text(
-                text = "Where you left off",
+                text = stringResource(R.string.home_where_you_left_off),
                 style = GrooveTheme.typography.sectionTitle.toTextStyle(),
                 color = GrooveTheme.colors.onSurface,
             )
@@ -112,7 +114,7 @@ fun LastPlayedSectionComponent(
                             titleMaxLines = tile.titleMaxLines,
                             subtitleMaxLines = tile.subtitleMaxLines,
                             title = song.title,
-                            subtitle = if (presence.playable) song.artist else "${song.artist} · Unavailable",
+                            subtitle = if (presence.playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
                             artworks = singleArtworkUrl,
                             onClick = {
                                 if (!presence.playable) return@LibraryCardComponent
@@ -134,14 +136,14 @@ fun LastPlayedSectionComponent(
                                     )
                                 }
                             },
-                            emptyNoticeText = "Artwork not available",
+                            emptyNoticeText = stringResource(R.string.home_artwork_unavailable),
                         )
                         if (presence.canRestore) {
                             TextButton(
                                 onClick = { import.restoreSong(song) },
                                 modifier = Modifier.align(Alignment.TopCenter),
                             ) {
-                                Text("Restore", color = HighlightPrimary)
+                                Text(stringResource(R.string.action_restore), color = HighlightPrimary)
                             }
                         }
                     }

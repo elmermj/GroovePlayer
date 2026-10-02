@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -189,7 +191,7 @@ private fun PhoneMiniPlayerBarContent(
                 MediaArtwork(
                     url = song.artworkUrl,
                     kind = MediaArtworkKind.SONG,
-                    contentDescription = "Artwork",
+                    contentDescription = stringResource(R.string.cd_artwork),
                     modifier = Modifier.size(56.dp),
                     cornerRadius = 8.dp,
                 )
@@ -215,9 +217,9 @@ private fun PhoneMiniPlayerBarContent(
                             onClick = { playerViewModel.playPauseToggle() }
                         ) { playing ->
                             if (playing) {
-                                Icon(XPause, contentDescription = "Pause", tint = GrooveTheme.colors.onSurface)
+                                Icon(XPause, contentDescription = stringResource(R.string.cd_pause), tint = GrooveTheme.colors.onSurface)
                             } else {
-                                Icon(XPlay, contentDescription = "Play", tint = GrooveTheme.colors.onSurface)
+                                Icon(XPlay, contentDescription = stringResource(R.string.cd_play), tint = GrooveTheme.colors.onSurface)
                             }
                         }
                     }
@@ -292,7 +294,7 @@ private fun TabletMiniPlayerBarContent(
                 MediaArtwork(
                     url = song.artworkUrl,
                     kind = MediaArtworkKind.SONG,
-                    contentDescription = "Artwork",
+                    contentDescription = stringResource(R.string.cd_artwork),
                     modifier = Modifier.size(56.dp),
                     cornerRadius = 8.dp,
                 )

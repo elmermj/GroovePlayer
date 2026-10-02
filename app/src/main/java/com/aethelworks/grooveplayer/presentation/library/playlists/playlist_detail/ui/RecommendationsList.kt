@@ -1,6 +1,9 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.playlist_detail.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
 import com.aethelworks.grooveplayer.utils.S_PADDING
@@ -63,7 +67,7 @@ fun RecommendationsList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Recommended",
+                text = stringResource(R.string.playlist_recommended),
                 modifier = Modifier.weight(1f),
                 style = GrooveTheme.typography.sectionTitle.toTextStyle(),
                 color = GrooveTheme.colors.onSurface,
@@ -72,12 +76,12 @@ fun RecommendationsList(
                 onClick = { onAddAll(recommends) },
                 enabled = recommends.isNotEmpty(),
             ) {
-                Text("Add all", color = SoftWhite)
+                Text(stringResource(R.string.playlist_add_all), color = SoftWhite)
             }
             IconButton(onClick = onDismissSheet) {
                 Icon(
                     imageVector = XClose,
-                    contentDescription = "Dismiss recommendations",
+                    contentDescription = stringResource(R.string.cd_dismiss_recommendations),
                     tint = GrooveTheme.colors.onSurface,
                 )
             }
@@ -85,7 +89,9 @@ fun RecommendationsList(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = M_PADDING, vertical = SongListItemDefaults.rowSpacing),
+            verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
         ) {
             recommends.forEach { song ->
                 key(song.id) {

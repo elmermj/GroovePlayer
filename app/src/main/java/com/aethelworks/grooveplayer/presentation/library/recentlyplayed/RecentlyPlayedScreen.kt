@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.recentlyplayed
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,7 +22,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 
 @Composable
 fun RecentlyPlayedScreen(
@@ -31,7 +33,7 @@ fun RecentlyPlayedScreen(
     val playerViewModel = rememberPlayerViewModel()
 
     GrooveScreen(
-        title = "Recently Played",
+        title = stringResource(R.string.home_recently_played),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues.Zero,
     ) {
@@ -40,7 +42,7 @@ fun RecentlyPlayedScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("No recently played tracks")
+                GrooveMutedText(stringResource(R.string.library_no_recently_played))
             }
         } else {
             LazyColumn(
@@ -51,7 +53,7 @@ fun RecentlyPlayedScreen(
                     top = topBarContentInset() + M_PADDING,
                     bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
                 ),
-                verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
             ) {
                 itemsIndexed(
                     items = recentlyPlayed,

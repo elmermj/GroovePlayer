@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.favorites
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,7 +21,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 
 @Composable
 fun FavoriteTracksScreen(
@@ -32,7 +34,7 @@ fun FavoriteTracksScreen(
 
     val playerViewModel = rememberPlayerViewModel()
     GrooveScreen(
-        title = "Favorite Tracks",
+        title = stringResource(R.string.home_favorite_tracks),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues.Zero,
     ) {
@@ -41,7 +43,7 @@ fun FavoriteTracksScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("Like a song to see it here")
+                GrooveMutedText(stringResource(R.string.library_like_song_here))
             }
         } else {
             LazyColumn(
@@ -52,7 +54,7 @@ fun FavoriteTracksScreen(
                     top = topBarContentInset() + M_PADDING,
                     bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
                 ),
-                verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
             ) {
                 itemsIndexed(
                     items = favoriteTracks,

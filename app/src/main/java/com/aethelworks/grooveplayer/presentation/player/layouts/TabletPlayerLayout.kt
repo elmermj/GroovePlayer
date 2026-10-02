@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.graphics.BlurMaskFilter
 import android.util.Log
 import androidx.compose.animation.core.Spring
@@ -266,7 +268,7 @@ fun TabletPlayerLayout(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
-                    Icon(XBack, contentDescription = "Close")
+                    Icon(XBack, contentDescription = stringResource(R.string.action_close))
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     PlayerShareButton(song = song)
@@ -560,7 +562,7 @@ fun TabletPlayerLayout(
                             ) {
                                 Icon(
                                     XAudioLines,
-                                    contentDescription = "Equalizer",
+                                    contentDescription = stringResource(R.string.cd_equalizer),
                                     tint = if (showEqualizer) Color.Black else Color.White
                                 )
                             }
@@ -573,7 +575,7 @@ fun TabletPlayerLayout(
                             ){
                                 Icon(
                                     XListMusic,
-                                    contentDescription = "Queue",
+                                    contentDescription = stringResource(R.string.cd_queue),
                                     tint = if (showQueue) Color.Black else Color.White
                                 )
                             }

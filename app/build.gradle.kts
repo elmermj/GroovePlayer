@@ -297,6 +297,10 @@ android {
         }
         release {
             // Distribute builds :app:assembleDevRelease and :app:assembleStagingRelease.
+            // Native debug symbols in the release bundle (Play Console upload).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -370,6 +374,8 @@ dependencies {
     implementation(libs.androidx.media3.database)
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.ui)
+
+    // In-app splash animation (intro once, then loop until the first screen).
     implementation(libs.lottie.compose)
 
     // Hilt

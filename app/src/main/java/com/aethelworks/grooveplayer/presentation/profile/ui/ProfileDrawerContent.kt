@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -110,7 +112,7 @@ fun ProfileDrawerContent(
         }
         // Transparent control row; veil is drawn on the content box above.
         GradientAppBar(
-            title = if (showRecentUpdates) recentUpdatesViewModel.updates.title else "Profile",
+            title = if (showRecentUpdates) recentUpdatesViewModel.updates.title else stringResource(R.string.settings_profile),
             deviceType = deviceType,
             modifier = Modifier,
             onBackClick = {

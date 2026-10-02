@@ -1,6 +1,7 @@
 package com.aethelworks.grooveplayer.wear.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -12,6 +13,8 @@ import androidx.wear.compose.ui.tooling.preview.WearPreviewLargeRound
 import androidx.wear.compose.ui.tooling.preview.WearPreviewSmallRound
 import androidx.wear.compose.ui.tooling.preview.WearPreviewSquare
 import androidx.wear.tooling.preview.devices.WearDevices
+import com.aethelworks.grooveplayer.R
+import com.aethelworks.grooveplayer.wear.logic.RemoteStatusCopy
 import com.aethelworks.grooveplayer.wear.logic.WatchSnapshot
 import com.aethelworks.grooveplayer.wear.logic.remoteUi
 
@@ -53,9 +56,16 @@ private fun PreviewRemote(
     connected: Boolean,
     artwork: Painter?,
 ) {
+    val copy = RemoteStatusCopy(
+        disconnectedTitle = stringResource(R.string.wear_disconnected),
+        disconnectedArtist = stringResource(R.string.wear_open_phone),
+        waitingTitle = stringResource(R.string.wear_waiting_title),
+        waitingArtist = stringResource(R.string.wear_waiting_artist),
+        nothingPlaying = stringResource(R.string.wear_nothing_playing),
+    )
     MaterialTheme {
         RemoteScreen(
-            state = remoteUi(snapshot, connected, snapshot?.updatedAtMs ?: 0L),
+            state = remoteUi(snapshot, connected, snapshot?.updatedAtMs ?: 0L, copy),
             artwork = artwork,
             onPlayPause = {},
             onNext = {},

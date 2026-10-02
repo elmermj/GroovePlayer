@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.playlist_detail
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -62,7 +64,7 @@ fun PlaylistDetailScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var deleteOpen by remember { mutableStateOf(false) }
-    val title = playlist?.playlist?.name ?: "Playlist"
+    val title = playlist?.playlist?.name ?: stringResource(R.string.playlist_fallback_title)
     val tracks = playlist?.tracks.orEmpty()
 
     val deviceType = rememberDeviceType()
@@ -79,29 +81,29 @@ fun PlaylistDetailScreen(
         contentPadding = PaddingValues.Zero,
         actions = {
             TextButton(onClick = onAddTracks) {
-                Text("Add", color = GrooveTheme.colors.onSurface)
+                Text(stringResource(R.string.action_add), color = GrooveTheme.colors.onSurface)
             }
             Box {
                 IconButton(onClick = { menuOpen = true }) {
-                    Icon(XMore, contentDescription = "Playlist options", tint = GrooveTheme.colors.onSurface)
+                    Icon(XMore, contentDescription = stringResource(R.string.cd_playlist_options), tint = GrooveTheme.colors.onSurface)
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { Text(stringResource(R.string.action_rename)) },
                         onClick = {
                             menuOpen = false
                             renameOpen = true
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Export M3U") },
+                        text = { Text(stringResource(R.string.playlist_export_m3u)) },
                         onClick = {
                             menuOpen = false
                             exportLauncher.launch(PlaylistNames.fileName(title))
                         },
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete") },
+                        text = { Text(stringResource(R.string.action_delete)) },
                         onClick = {
                             menuOpen = false
                             deleteOpen = true
@@ -158,8 +160,8 @@ fun PlaylistDetailScreen(
 
     if (renameOpen) {
         PlaylistNameDialog(
-            title = "Rename playlist",
-            confirmLabel = "Save",
+            title = stringResource(R.string.playlist_rename),
+            confirmLabel = stringResource(R.string.action_save),
             initialName = title,
             onDismiss = { renameOpen = false },
             onConfirm = { name ->
@@ -170,9 +172,9 @@ fun PlaylistDetailScreen(
     }
     if (deleteOpen) {
         ConfirmPlaylistDialog(
-            title = "Delete playlist",
-            body = "Delete \"$title\"? Songs stay in your library.",
-            confirmLabel = "Delete",
+            title = stringResource(R.string.playlist_delete_title),
+            body = stringResource(R.string.playlist_delete_body, title),
+            confirmLabel = stringResource(R.string.action_delete),
             onDismiss = { deleteOpen = false },
             onConfirm = {
                 deleteOpen = false

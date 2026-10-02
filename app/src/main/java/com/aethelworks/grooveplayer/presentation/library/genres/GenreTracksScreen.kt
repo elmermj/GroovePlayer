@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.genres
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -21,7 +23,7 @@ import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
 import com.aethelworks.grooveplayer.utils.M_PADDING
-import com.aethelworks.grooveplayer.utils.XS_PADDING
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
 
 @Composable
@@ -53,7 +55,7 @@ fun GenreTracksScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    GrooveMutedText("No tracks in this genre")
+                    GrooveMutedText(stringResource(R.string.library_no_tracks_in_genre))
                 }
             }
             else -> {
@@ -65,7 +67,7 @@ fun GenreTracksScreen(
                         top = topBarContentInset() + M_PADDING,
                         bottom = M_PADDING + grooveBottomContentInset(includeMiniPlayer = rememberClearMiniPlayer()),
                     ),
-                    verticalArrangement = Arrangement.spacedBy(XS_PADDING),
+                    verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing),
                 ) {
                     itemsIndexed(
                         items = songs,

@@ -13,18 +13,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aethelworks.grooveplayer.R
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.itemKey
 import com.aethelworks.grooveplayer.domain.model.Song
+import com.aethelworks.grooveplayer.presentation.common.SongListItemDefaults
 import com.aethelworks.grooveplayer.presentation.common.rememberPlayerViewModel
 import com.aethelworks.grooveplayer.presentation.common.topBarContentInset
-import com.aethelworks.grooveplayer.presentation.library.ui.AllSongsItemStyle
 import com.aethelworks.grooveplayer.presentation.library.ui.ItemSelectionConfig
 import com.aethelworks.grooveplayer.presentation.library.ui.SongItemComponent
-import com.aethelworks.grooveplayer.utils.S_PADDING
 
 @Composable
 fun TabletSongsLayout(
@@ -50,7 +51,7 @@ fun TabletSongsLayout(
             top = topBarContentInset() + 20.dp,
             bottom = 20.dp + bottomPaddingForSelectionBar
         ),
-        verticalArrangement = Arrangement.spacedBy(S_PADDING / 2)
+        verticalArrangement = Arrangement.spacedBy(SongListItemDefaults.rowSpacing)
     ) {
         items(
             count = songsPagingItems.itemCount,
@@ -69,8 +70,6 @@ fun TabletSongsLayout(
                     onPlayNext = { playerViewModel.playNext(it) },
                     onEditMetadata = { onEditSong(it) },
                     onLongPress = onLongPress,
-                    padding = 0.dp,
-                    style = AllSongsItemStyle,
                     selectionConfig = if (isSelectionMode) {
                         ItemSelectionConfig(
                             isSelected = song.id in selectedIds,
@@ -100,8 +99,14 @@ fun TabletSongsLayout(
                     item {
                         Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Error: ${(refresh as LoadState.Error).error.message}", Modifier.padding(bottom = 16.dp))
-                                Button(onClick = { songsPagingItems.retry() }) { Text("Retry") }
+                                Text(
+                                    stringResource(
+                                        R.string.songs_load_error,
+                                        (refresh as LoadState.Error).error.message ?: "null",
+                                    ),
+                                    Modifier.padding(bottom = 16.dp),
+                                )
+                                Button(onClick = { songsPagingItems.retry() }) { Text(stringResource(R.string.action_retry)) }
                             }
                         }
                     }

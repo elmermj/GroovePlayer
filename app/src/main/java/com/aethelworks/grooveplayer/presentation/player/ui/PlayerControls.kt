@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -54,7 +56,7 @@ fun PlayerControls(
         ) { isShuffled ->
             Icon(
                 XShuffle,
-                contentDescription = "Shuffle",
+                contentDescription = stringResource(R.string.cd_shuffle),
                 tint = if (isShuffled) Color.White else Color.White.copy(alpha = 0.6f)
             )
         }
@@ -63,7 +65,7 @@ fun PlayerControls(
 
         // Previous
         IconButton(onClick = { playerViewModel.previous() }) {
-            Icon(XSkipBack, contentDescription = "Previous")
+            Icon(XSkipBack, contentDescription = stringResource(R.string.cd_previous))
         }
 
         Spacer(modifier = Modifier.width(M_PADDING))
@@ -74,9 +76,9 @@ fun PlayerControls(
             onClick = { playerViewModel.playPauseToggle() }
         ) { playing ->
             if (playing) {
-                Icon(XPause, contentDescription = "Pause")
+                Icon(XPause, contentDescription = stringResource(R.string.cd_pause))
             } else {
-                Icon(XPlay, contentDescription = "Play")
+                Icon(XPlay, contentDescription = stringResource(R.string.cd_play))
             }
         }
 
@@ -84,7 +86,7 @@ fun PlayerControls(
 
         // Next
         IconButton(onClick = { playerViewModel.next() }) {
-            Icon(XSkipForward, contentDescription = "Next")
+            Icon(XSkipForward, contentDescription = stringResource(R.string.cd_next))
         }
 
         Spacer(modifier = Modifier.width(M_PADDING))
@@ -103,17 +105,17 @@ fun PlayerControls(
         ) { repeatMode ->
             when (repeatMode) {
                 RepeatMode.ALL ->
-                    Icon(XRepeatAll, contentDescription = "Repeat All")
+                    Icon(XRepeatAll, contentDescription = stringResource(R.string.cd_repeat_all))
 
                 RepeatMode.OFF ->
                     Icon(
                         XRepeatAll,
-                        contentDescription = "Repeat Off",
+                        contentDescription = stringResource(R.string.cd_repeat_off),
                         tint = Color.DarkGray
                     )
 
                 RepeatMode.ONE ->
-                    Icon(XRepeatOne, contentDescription = "Repeat One")
+                    Icon(XRepeatOne, contentDescription = stringResource(R.string.cd_repeat_one))
             }
         }
     }
@@ -122,8 +124,8 @@ fun PlayerControls(
 @Composable
 fun BuildRepeatButtonIcon(repeatMode: RepeatMode){
     when (repeatMode){
-        RepeatMode.ALL -> Icon(XRepeatAll, contentDescription = "Repeat All")
-        RepeatMode.OFF -> Icon(XRepeatAll, contentDescription = "Repeat Off", tint = Color.DarkGray)
-        RepeatMode.ONE -> Icon(XRepeatOne, contentDescription = "Repeat One")
+        RepeatMode.ALL -> Icon(XRepeatAll, contentDescription = stringResource(R.string.cd_repeat_all))
+        RepeatMode.OFF -> Icon(XRepeatAll, contentDescription = stringResource(R.string.cd_repeat_off), tint = Color.DarkGray)
+        RepeatMode.ONE -> Icon(XRepeatOne, contentDescription = stringResource(R.string.cd_repeat_one))
     }
 }

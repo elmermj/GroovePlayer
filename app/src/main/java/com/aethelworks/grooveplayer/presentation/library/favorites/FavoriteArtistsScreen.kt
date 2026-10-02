@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.favorites
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,7 +40,7 @@ fun FavoriteArtistsScreen(
     ).value
 
     GrooveScreen(
-        title = "Favorite Artists",
+        title = stringResource(R.string.home_favorite_artists),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues.Zero,
     ) {
@@ -47,7 +49,7 @@ fun FavoriteArtistsScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("Like a song to see its artist here")
+                GrooveMutedText(stringResource(R.string.library_like_artist_here))
             }
         } else {
             LazyColumn(
