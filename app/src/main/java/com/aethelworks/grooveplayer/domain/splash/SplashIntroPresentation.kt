@@ -46,7 +46,7 @@ object SplashIntroPresentation {
         Phase.INTRO, Phase.DONE -> FrameClip(INTRO_MIN_FRAME, INTRO_MAX_FRAME)
     }
 
-    /** Matches [com.airbnb.lottie.LottieConstants.IterateForever] for the loop. */
+    /** Matches [com.airbnb.lottie.compose.LottieConstants.IterateForever] for the loop. */
     fun iterations(phase: Phase): Int = when (phase) {
         Phase.LOOP -> Int.MAX_VALUE
         Phase.INTRO, Phase.DONE -> 1

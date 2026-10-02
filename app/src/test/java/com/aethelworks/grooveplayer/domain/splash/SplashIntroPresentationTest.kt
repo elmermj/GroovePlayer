@@ -2,10 +2,9 @@ package com.aethelworks.grooveplayer.domain.splash
 
 import com.aethelworks.grooveplayer.R
 import com.aethelworks.grooveplayer.domain.splash.SplashIntroPresentation.Phase
-import com.airbnb.lottie.LottieConstants
+import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.LottieClipSpec
 import com.airbnb.lottie.compose.LottieCompositionSpec
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -110,35 +109,29 @@ class SplashIntroPresentationTest {
 
     @Test
     fun splashIntroFileMatchesTheClipFrames() {
-        val json = JSONObject(splashIntroFile().readText())
-        assertEquals(60, json.getInt("fr"))
-        assertEquals(0, json.getInt("ip"))
-        assertEquals(234, json.getInt("op"))
-        assertEquals(1080, json.getInt("w"))
-        assertEquals(1080, json.getInt("h"))
-        val markers = json.getJSONArray("markers")
-        var introTm = -1
-        var introDr = -1
-        var loopTm = -1
-        var loopDr = -1
-        for (i in 0 until markers.length()) {
-            val marker = markers.getJSONObject(i)
-            when (marker.getString("cm")) {
-                "intro" -> {
-                    introTm = marker.getInt("tm")
-                    introDr = marker.getInt("dr")
-                }
-                "loop" -> {
-                    loopTm = marker.getInt("tm")
-                    loopDr = marker.getInt("dr")
-                }
-            }
+        val json = splashIntroFile().readText()
+        assertEquals(60, jsonInt(json, "fr"))
+        assertEquals(0, jsonInt(json, "ip"))
+        assertEquals(234, jsonInt(json, "op"))
+        assertEquals(1080, jsonInt(json, "w"))
+        assertEquals(1080, jsonInt(json, "h"))
+        val markers = Regex(""""tm":(\d+),"cm":"(intro|loop)","dr":(\d+)""")
+        val found = markers.findAll(json).associate { match ->
+            match.groupValues[2] to (match.groupValues[1].toInt() to match.groupValues[3].toInt())
         }
+        val (introTm, introDr) = found["intro"] ?: error("intro marker missing")
+        val (loopTm, loopDr) = found["loop"] ?: error("loop marker missing")
         assertEquals(SplashIntroPresentation.INTRO_MIN_FRAME, introTm)
         assertEquals(SplashIntroPresentation.INTRO_MAX_FRAME, introTm + introDr)
         assertEquals(SplashIntroPresentation.LOOP_MIN_FRAME, loopTm)
         assertEquals(SplashIntroPresentation.LOOP_MAX_FRAME, loopTm + loopDr)
-        assertEquals(json.getInt("op"), SplashIntroPresentation.LOOP_MAX_FRAME)
+        assertEquals(jsonInt(json, "op"), SplashIntroPresentation.LOOP_MAX_FRAME)
+    }
+
+    private fun jsonInt(json: String, key: String): Int {
+        val match = Regex(""""$key":(-?\d+)""").find(json)
+            ?: error("missing $key in splash_intro.json")
+        return match.groupValues[1].toInt()
     }
 
     @Test
