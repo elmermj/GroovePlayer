@@ -72,6 +72,7 @@ import com.aethelworks.grooveplayer.utils.rememberNotificationPermissionState
 import com.aethelworks.grooveplayer.utils.rememberRecordAudioPermissionState
 import com.aethelworks.grooveplayer.utils.theme.ui.GroovePlayerTheme
 import com.aethelworks.grooveplayer.domain.auth.ColdStartPresentation
+import com.aethelworks.grooveplayer.presentation.splash.SplashIntro
 import com.aethelworks.grooveplayer.presentation.ads.AdsConsentHelper
 import com.aethelworks.grooveplayer.presentation.ads.AdsViewModel
 import com.aethelworks.grooveplayer.presentation.ads.StartupInterstitialHelper
@@ -149,28 +150,46 @@ class MainActivity : ComponentActivity() {
         )
         handleNfcIntent(intent)
 
+        // Cold start only. configChanges keeps this activity across rotation, and a
+        // restored instance already passed the splash.
+        val playIntroSplash = savedInstanceState == null
         setContent {
-            SideEffect { coldStartFrameReady.set(true) }
-            val grooveStyle by appThemeViewModel.style.collectAsState()
-            GroovePlayerTheme(style = grooveStyle) {
-                val adaptiveWindowInfo = rememberAdaptiveWindowInfo()
+            var appReady by remember { mutableStateOf(false) }
+            var splashVisible by remember { mutableStateOf(playIntroSplash) }
+            // First composition releases the system splash. SplashIntro is in that
+            // same frame and covers the window until the intro has played.
+            SideEffect {
+                coldStartFrameReady.set(true)
+                appReady = true
+            }
+            Box(Modifier.fillMaxSize()) {
+                val grooveStyle by appThemeViewModel.style.collectAsState()
+                GroovePlayerTheme(style = grooveStyle) {
+                    val adaptiveWindowInfo = rememberAdaptiveWindowInfo()
 
-                // Compact windows are portrait-only. Crossing into either tablet bucket removes
-                // the app-level lock; configChanges keeps this Activity/NavController alive.
-                LaunchedEffect(adaptiveWindowInfo.deviceType) {
-                    val target = requestedOrientationFor(adaptiveWindowInfo.deviceType)
-                    if (requestedOrientation != target) requestedOrientation = target
-                }
-
-                // One live window snapshot and shared activity-scoped player are used by all routes.
-                CompositionLocalProvider(
-                    LocalAdaptiveWindowInfo provides adaptiveWindowInfo,
-                    LocalPlayerViewModel provides playerViewModel,
-                    LocalBluetoothViewModel provides bluetoothViewModel
-                ) {
-                    LibraryImportHost {
-                        GroovePlayerAppMain()
+                    // Compact windows are portrait-only. Crossing into either tablet bucket removes
+                    // the app-level lock; configChanges keeps this Activity/NavController alive.
+                    LaunchedEffect(adaptiveWindowInfo.deviceType) {
+                        val target = requestedOrientationFor(adaptiveWindowInfo.deviceType)
+                        if (requestedOrientation != target) requestedOrientation = target
                     }
+
+                    // One live window snapshot and shared activity-scoped player are used by all routes.
+                    CompositionLocalProvider(
+                        LocalAdaptiveWindowInfo provides adaptiveWindowInfo,
+                        LocalPlayerViewModel provides playerViewModel,
+                        LocalBluetoothViewModel provides bluetoothViewModel
+                    ) {
+                        LibraryImportHost {
+                            GroovePlayerAppMain()
+                        }
+                    }
+                }
+                if (splashVisible) {
+                    SplashIntro(
+                        appReady = appReady,
+                        onFinished = { splashVisible = false },
+                    )
                 }
             }
         }
