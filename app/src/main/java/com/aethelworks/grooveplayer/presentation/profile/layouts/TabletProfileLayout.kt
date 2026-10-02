@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -67,22 +69,22 @@ fun TabletProfileLayout(
              * - Reset account
              */
             ProfileSectionComponent(
-                sectionTitle = "Account",
+                sectionTitle = stringResource(R.string.settings_account),
             ) {
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XShareMusic) },
-                    title = "Share Music",
-                    subtitle = "Share via Tap (NFC) or nearby device",
+                    title = stringResource(R.string.settings_share_music),
+                    subtitle = stringResource(R.string.settings_share_music_sub),
                     actionType = ActionType.EXPANDABLE,
                     onClick = onNavigateToShare
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XUiStyle) },
-                    title = "UI Customisation",
-                    subtitle = "Customize colors, type, spacing, and more",
+                    title = stringResource(R.string.settings_ui_customisation),
+                    subtitle = stringResource(R.string.settings_ui_customisation_sub),
                     actionType = ActionType.LINK,
                     onClick = onNavigateToUiStyling,
                 )
@@ -112,7 +114,7 @@ fun TabletProfileLayout(
              * - Equalizer preset and settings.
              */
             ProfileSectionComponent(
-                sectionTitle = "Playback",
+                sectionTitle = stringResource(R.string.settings_playback),
             ) {
                 val activeRowId by viewModel.activeRowId.collectAsState()
 
@@ -185,41 +187,41 @@ fun TabletProfileLayout(
              * - App privacy policy.
              */
             ProfileSectionComponent(
-                sectionTitle = "About",
+                sectionTitle = stringResource(R.string.settings_about),
             ) {
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XAppVersion) },
-                    title = "App version",
-                    subtitle = "See current version"
+                    title = stringResource(R.string.settings_app_version),
+                    subtitle = stringResource(R.string.settings_app_version_sub)
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XRecentUpdates) },
-                    title = "Recent updates",
-                    subtitle = "What’s new in GroovePlayer",
+                    title = stringResource(R.string.settings_recent_updates),
+                    subtitle = stringResource(R.string.settings_recent_updates_sub),
                     actionType = ActionType.LINK,
                     onClick = onOpenRecentUpdates,
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XCopyright) },
-                    title = "Copyright & licenses",
-                    subtitle = "Legal information"
+                    title = stringResource(R.string.settings_copyright),
+                    subtitle = stringResource(R.string.settings_legal)
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XPrivacyPolicy) },
                     actionType = ActionType.LINK,
-                    title = "Privacy policy",
-                    subtitle = "How your data is handled",
+                    title = stringResource(R.string.settings_privacy),
+                    subtitle = stringResource(R.string.settings_privacy_sub),
                     onClick = { LegalUrls.open(context, LegalUrls.PRIVACY) },
                 )
                 Spacer(Modifier.height(S_PADDING))
                 ProfileSettingRow(
                     icon = { ProfileRowIcon(XCopyright) },
                     actionType = ActionType.LINK,
-                    title = "Terms of service",
-                    subtitle = "Rules for using GroovePlayer",
+                    title = stringResource(R.string.settings_terms),
+                    subtitle = stringResource(R.string.settings_terms_sub),
                     onClick = { LegalUrls.open(context, LegalUrls.TERMS) },
                 )
             }

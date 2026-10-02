@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.importing
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
@@ -33,8 +35,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.data.library.LibraryImportUiState
-import com.aethelworks.grooveplayer.domain.library.ImportPromptCopy
-import com.aethelworks.grooveplayer.domain.library.LibraryUpgradePrompt
 import com.aethelworks.grooveplayer.domain.model.Song
 import com.aethelworks.grooveplayer.services.LibraryImportService
 import com.aethelworks.grooveplayer.utils.theme.ui.GrooveTheme
@@ -112,7 +112,7 @@ fun LibraryImportHost(
                     containerColor = colors.surface,
                     titleContentColor = colors.onSurface,
                     textContentColor = SoftWhite,
-                    title = { Text(ImportPromptCopy.progress(state.completed, state.total)) },
+                    title = { Text(stringResource(R.string.import_progress, state.completed, state.total)) },
                     text = {
                         Column {
                             Text(state.fileName.ifBlank { " " }, color = SoftWhite)
@@ -130,7 +130,7 @@ fun LibraryImportHost(
                     },
                     confirmButton = {
                         TextButton(onClick = viewModel::cancelImport) {
-                            Text("Cancel", color = colors.accent)
+                            Text(stringResource(R.string.action_cancel), color = colors.accent)
                         }
                     },
                 )
@@ -145,7 +145,7 @@ fun LibraryImportHost(
                     containerColor = colors.surface,
                     titleContentColor = colors.onSurface,
                     textContentColor = SoftWhite,
-                    title = { Text(ImportPromptCopy.TITLE) },
+                    title = { Text(stringResource(R.string.import_complete)) },
                     text = {
                         Column {
                             Text(state.body)
@@ -160,12 +160,12 @@ fun LibraryImportHost(
                     },
                     confirmButton = {
                         TextButton(onClick = viewModel::keepOriginals) {
-                            Text(ImportPromptCopy.KEEP, color = colors.accent)
+                            Text(stringResource(R.string.import_keep_originals), color = colors.accent)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { scope.launch { viewModel.deleteOriginals() } }) {
-                            Text(ImportPromptCopy.DELETE, color = colors.muted)
+                            Text(stringResource(R.string.import_delete_originals), color = colors.muted)
                         }
                     },
                 )
@@ -176,11 +176,11 @@ fun LibraryImportHost(
                     containerColor = colors.surface,
                     titleContentColor = colors.onSurface,
                     textContentColor = SoftWhite,
-                    title = { Text("Import") },
+                    title = { Text(stringResource(R.string.import_title)) },
                     text = { Text(state.message) },
                     confirmButton = {
                         TextButton(onClick = viewModel::dismissFinished) {
-                            Text("OK", color = colors.accent)
+                            Text(stringResource(R.string.action_ok), color = colors.accent)
                         }
                     },
                 )
@@ -193,14 +193,14 @@ fun LibraryImportHost(
                 containerColor = colors.surface,
                 titleContentColor = colors.onSurface,
                 textContentColor = SoftWhite,
-                text = { Text(LibraryUpgradePrompt.BODY) },
+                text = { Text(stringResource(R.string.import_upgrade_body)) },
                 confirmButton = {
                     TextButton(onClick = {
                         viewModel.importFoldersFromPrompt()
                         actions.pickFolder()
                     }) {
                         Text(
-                            LibraryUpgradePrompt.IMPORT,
+                            stringResource(R.string.import_folders),
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.End,
                             color = colors.accent,
@@ -209,7 +209,7 @@ fun LibraryImportHost(
                 },
                 dismissButton = {
                     TextButton(onClick = viewModel::later) {
-                        Text(LibraryUpgradePrompt.LATER, color = colors.muted)
+                        Text(stringResource(R.string.import_later), color = colors.muted)
                     }
                 },
             )

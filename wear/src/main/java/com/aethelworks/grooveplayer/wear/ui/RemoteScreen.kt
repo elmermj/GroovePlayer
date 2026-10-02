@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -49,6 +52,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import com.aethelworks.grooveplayer.R
 import com.aethelworks.grooveplayer.wear.logic.Outline
 import com.aethelworks.grooveplayer.wear.logic.RemoteGesture
 import com.aethelworks.grooveplayer.wear.logic.RemoteMetrics
@@ -85,6 +89,10 @@ fun RemoteScreen(
     val durationMs by rememberUpdatedState(state.durationMs)
     val seekEnabled by rememberUpdatedState(state.connected && state.durationMs > 0L)
     val controlsEnabled by rememberUpdatedState(state.connected)
+    val artworkDescription = stringResource(R.string.wear_artwork)
+    val transportDescription = stringResource(
+        if (state.isPlaying) R.string.wear_pause else R.string.wear_play,
+    )
     val playPause by rememberUpdatedState(onPlayPause)
     val next by rememberUpdatedState(onNext)
     val previous by rememberUpdatedState(onPrevious)
@@ -179,7 +187,7 @@ fun RemoteScreen(
             if (artwork != null) {
                 Image(
                     painter = artwork,
-                    contentDescription = null,
+                    contentDescription = artworkDescription,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
@@ -220,7 +228,11 @@ fun RemoteScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (state.showTransport) {
-                    Canvas(Modifier.size(mark)) {
+                    Canvas(
+                        Modifier
+                            .size(mark)
+                            .semantics { contentDescription = transportDescription },
+                    ) {
                         if (state.isPlaying) drawPauseMark() else drawPlayMark()
                     }
                 }

@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.genres
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -53,7 +55,7 @@ fun GenreTracksScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    GrooveMutedText("No tracks in this genre")
+                    GrooveMutedText(stringResource(R.string.library_no_tracks_in_genre))
                 }
             }
             else -> {

@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.playlist_detail.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -63,7 +65,7 @@ fun RecommendationsList(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Recommended",
+                text = stringResource(R.string.playlist_recommended),
                 modifier = Modifier.weight(1f),
                 style = GrooveTheme.typography.sectionTitle.toTextStyle(),
                 color = GrooveTheme.colors.onSurface,
@@ -72,12 +74,12 @@ fun RecommendationsList(
                 onClick = { onAddAll(recommends) },
                 enabled = recommends.isNotEmpty(),
             ) {
-                Text("Add all", color = SoftWhite)
+                Text(stringResource(R.string.playlist_add_all), color = SoftWhite)
             }
             IconButton(onClick = onDismissSheet) {
                 Icon(
                     imageVector = XClose,
-                    contentDescription = "Dismiss recommendations",
+                    contentDescription = stringResource(R.string.cd_dismiss_recommendations),
                     tint = GrooveTheme.colors.onSurface,
                 )
             }

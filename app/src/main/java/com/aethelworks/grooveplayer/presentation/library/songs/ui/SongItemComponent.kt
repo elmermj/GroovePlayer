@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.songs.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -108,7 +110,7 @@ fun SongItemComponent(
                     ) {
                         Icon(
                             XMore,
-                            contentDescription = "More options",
+                            contentDescription = stringResource(R.string.cd_more_options),
                             tint = SoftWhite,
                         )
                     }
@@ -118,7 +120,7 @@ fun SongItemComponent(
                     ) {
                         if (onPlayNext != null) {
                             DropdownMenuItem(
-                                text = { Text("Play next") },
+                                text = { Text(stringResource(R.string.library_play_next)) },
                                 onClick = {
                                     showOptionsMenu = false
                                     onPlayNext()
@@ -126,7 +128,7 @@ fun SongItemComponent(
                             )
                         }
                         DropdownMenuItem(
-                            text = { Text("Edit song metadata") },
+                            text = { Text(stringResource(R.string.library_edit_metadata)) },
                             onClick = {
                                 showOptionsMenu = false
                                 onMoreClick()

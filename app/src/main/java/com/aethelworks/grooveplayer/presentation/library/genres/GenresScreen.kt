@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.genres
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aethelworks.grooveplayer.domain.model.LibraryGenre
-import com.aethelworks.grooveplayer.domain.model.trackCountLabel
 import com.aethelworks.grooveplayer.presentation.common.GrooveMutedText
 import com.aethelworks.grooveplayer.presentation.common.GrooveScreen
 import com.aethelworks.grooveplayer.presentation.common.GrooveSurfaceCard
@@ -51,7 +52,7 @@ fun GenresScreen(
     val isLoading by viewModel.isLoading.collectAsState()
 
     GrooveScreen(
-        title = "Genres",
+        title = stringResource(R.string.home_genres),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues.Zero,
     ) {
@@ -69,7 +70,7 @@ fun GenresScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    GrooveMutedText("No genre tags")
+                    GrooveMutedText(stringResource(R.string.home_no_genre_tags))
                 }
             }
             else -> {
@@ -128,7 +129,7 @@ private fun GenreRow(
                     color = GrooveTheme.colors.onSurface,
                 )
                 GrooveTinySpacer()
-                GrooveMutedText(text = trackCountLabel(genre.trackCount))
+                GrooveMutedText(text = if (genre.trackCount == 1) stringResource(R.string.count_tracks_one) else stringResource(R.string.count_tracks, genre.trackCount))
             }
         }
     }

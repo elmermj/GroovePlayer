@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -246,7 +248,7 @@ private fun PlaylistTrackRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = if (playable) song.artist else "${song.artist} · Unavailable",
+                    text = if (playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
                     style = GrooveTheme.typography.menuSongArtist.toTextStyle(),
                     color = SoftWhite,
                     maxLines = 1,
@@ -256,16 +258,16 @@ private fun PlaylistTrackRow(
         }
         if (presence.canRestore) {
             TextButton(onClick = { import.restoreSong(song) }) {
-                Text("Restore", color = HighlightPrimary)
+                Text(stringResource(R.string.action_restore), color = HighlightPrimary)
             }
         }
         Box {
             IconButton(onClick = { menuOpen = true }) {
-                Icon(XMore, contentDescription = "Track options", tint = SoftWhite)
+                Icon(XMore, contentDescription = stringResource(R.string.cd_track_options), tint = SoftWhite)
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
-                    text = { Text("Move up") },
+                    text = { Text(stringResource(R.string.playlist_move_up)) },
                     enabled = canMoveUp,
                     onClick = {
                         menuOpen = false
@@ -273,7 +275,7 @@ private fun PlaylistTrackRow(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Move down") },
+                    text = { Text(stringResource(R.string.playlist_move_down)) },
                     enabled = canMoveDown,
                     onClick = {
                         menuOpen = false
@@ -281,7 +283,7 @@ private fun PlaylistTrackRow(
                     },
                 )
                 DropdownMenuItem(
-                    text = { Text("Remove") },
+                    text = { Text(stringResource(R.string.action_remove)) },
                     onClick = {
                         menuOpen = false
                         onRemove()
@@ -295,7 +297,7 @@ private fun PlaylistTrackRow(
         ) {
             Icon(
                 XGripVertical,
-                contentDescription = "Drag to reorder",
+                contentDescription = stringResource(R.string.cd_drag_to_reorder),
                 tint = GrooveTheme.colors.muted,
             )
         }

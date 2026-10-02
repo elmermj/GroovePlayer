@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.profile.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,18 +60,18 @@ fun SubscriptionPaywallSection(
 
     Spacer(Modifier.height(S_PADDING))
     Text(
-        text = "Subscription",
+        text = stringResource(R.string.sub_title),
         style = GrooveTheme.typography.sectionItemTitle.toTextStyle(),
         color = GrooveTheme.colors.onSurface,
     )
     Spacer(Modifier.height(4.dp))
     Text(
         text = when {
-            user == null -> "Signed out · Free · ads on"
-            tier == PrivilegeTier.FREE -> "Free · ads on"
-            tier == PrivilegeTier.BASIC -> "Basic · ads off"
-            tier == PrivilegeTier.PREMIUM -> "Premium · ads off + backup"
-            else -> "Free · ads on"
+            user == null -> stringResource(R.string.sub_signed_out)
+            tier == PrivilegeTier.FREE -> stringResource(R.string.sub_free)
+            tier == PrivilegeTier.BASIC -> stringResource(R.string.sub_basic)
+            tier == PrivilegeTier.PREMIUM -> stringResource(R.string.sub_premium)
+            else -> stringResource(R.string.sub_free)
         },
         style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
         color = SoftWhite,
@@ -79,7 +81,7 @@ fun SubscriptionPaywallSection(
     if (renewalDate != null) {
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "Renews · $renewalDate (Premium + add-ons)",
+            text = stringResource(R.string.sub_renews, renewalDate),
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = SoftWhite,
         )
@@ -93,14 +95,14 @@ fun SubscriptionPaywallSection(
         val days = remaining / (24 * 60 * 60 * 1000L)
         val hours = (remaining % (24 * 60 * 60 * 1000L)) / (60 * 60 * 1000L)
         Text(
-            text = "Grace period: ${days}d ${hours}h left — backups read-only. After grace, cloud backup is wiped.",
+            text = stringResource(R.string.sub_grace, days.toInt(), hours.toInt()),
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = Color(0xFFFFB74D),
         )
     } else if (storage?.overQuota != true && storage?.readOnly == true) {
         Spacer(Modifier.height(S_PADDING))
         Text(
-            text = "Grace period active — backups read-only until you resubscribe.",
+            text = stringResource(R.string.sub_grace_active),
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = Color(0xFFFFB74D),
         )
@@ -112,7 +114,7 @@ fun SubscriptionPaywallSection(
         Spacer(Modifier.height(S_PADDING))
         ProfileSettingsButton(
             onClick = onNavigateToBackup,
-            title = "Cloud backup",
+            title = stringResource(R.string.sub_cloud_backup),
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -148,7 +150,7 @@ fun SubscriptionPaywallSection(
                 onClick = {
                     if (activity != null) billingViewModel.purchase(activity, basic.productId)
                 },
-                title = "Get Basic · ${basic.formattedPrice}",
+                title = stringResource(R.string.sub_get_basic, basic.formattedPrice),
                 isActive = activity != null && !inFlight,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -158,7 +160,7 @@ fun SubscriptionPaywallSection(
                 onClick = {
                     if (activity != null) billingViewModel.purchase(activity, premium.productId)
                 },
-                title = "Get Premium · ${premium.formattedPrice}",
+                title = stringResource(R.string.sub_get_premium, premium.formattedPrice),
                 isActive = activity != null && !inFlight,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -172,22 +174,22 @@ fun SubscriptionPaywallSection(
                     if (activity != null) billingViewModel.purchase(activity, addon.productId)
                 },
                 title = if (canBuy) {
-                    "Add +20 GB · ${addon.formattedPrice} ($count/$max)"
+                    stringResource(R.string.sub_add_storage, addon.formattedPrice, count, max)
                 } else {
-                    "Storage packs maxed ($count/$max)"
+                    stringResource(R.string.sub_storage_maxed, count, max)
                 },
                 isActive = activity != null && !inFlight && canBuy,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "Add-ons renew on the same date as Premium.",
+                text = stringResource(R.string.sub_addons_renew),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = SoftWhite,
             )
         }
         ProfileSettingsButton(
             onClick = { billingViewModel.restore() },
-            title = "Restore purchases",
+            title = stringResource(R.string.sub_restore),
             isInverse = true,
             isActive = !inFlight,
             modifier = Modifier.fillMaxWidth(),
@@ -215,7 +217,7 @@ fun QuotaBar(storage: StorageEntitlement) {
         else -> GrooveTheme.colors.accent
     }
     Text(
-        text = "Backup quota · ${StorageFormatUtils.formatBytes(used, total)} / ${StorageFormatUtils.formatBytes(total, total)}",
+        text = stringResource(R.string.sub_quota, StorageFormatUtils.formatBytes(used, total), StorageFormatUtils.formatBytes(total, total)),
         style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
         color = SoftWhite,
     )
@@ -230,7 +232,7 @@ fun QuotaBar(storage: StorageEntitlement) {
         storage.overQuota -> {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Over cloud quota — free cloud space or wait for auto-trim. Local library is untouched.",
+                text = stringResource(R.string.sub_over_quota),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = Color(0xFFFF5252),
             )
@@ -238,7 +240,7 @@ fun QuotaBar(storage: StorageEntitlement) {
         storage.hardStop -> {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Storage full — new cloud backups blocked.",
+                text = stringResource(R.string.sub_hard_stop),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = Color(0xFFFF5252),
             )
@@ -246,7 +248,7 @@ fun QuotaBar(storage: StorageEntitlement) {
         storage.softWarn -> {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "Warning: over 80% of backup quota used.",
+                text = stringResource(R.string.sub_soft_warn),
                 style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
                 color = Color(0xFFFFB74D),
             )
@@ -256,7 +258,7 @@ fun QuotaBar(storage: StorageEntitlement) {
     if (pending != null && pending != storage.quotaBytes && !storage.overQuota) {
         Spacer(Modifier.height(4.dp))
         Text(
-            text = "After renewals drop · cloud quota → ${StorageFormatUtils.formatBytes(pending, pending.coerceAtLeast(1L))}",
+            text = stringResource(R.string.sub_pending, StorageFormatUtils.formatBytes(pending, pending.coerceAtLeast(1L))),
             style = GrooveTheme.typography.sectionItemSubtitle.toTextStyle(),
             color = Color(0xFFFFCC80),
         )

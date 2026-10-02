@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.playlists.playlist_detail.layouts
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -74,7 +76,7 @@ fun PhonePlaylistDetailLayout(
         }
         playlist == null -> {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                GrooveMutedText("Playlist not found")
+                GrooveMutedText(stringResource(R.string.playlist_not_found))
             }
         }
         tracks.isEmpty() -> {
@@ -83,10 +85,10 @@ fun PhonePlaylistDetailLayout(
                     modifier = Modifier.align(Alignment.Center),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    GrooveMutedText("No tracks yet")
+                    GrooveMutedText(stringResource(R.string.playlist_no_tracks))
                     GrooveTinySpacer()
                     TextButton(onClick = onAddTracks) {
-                        Text("Add tracks", color = SoftWhite)
+                        Text(stringResource(R.string.playlist_add_tracks), color = SoftWhite)
                     }
                 }
                 AnimatedVisibility(

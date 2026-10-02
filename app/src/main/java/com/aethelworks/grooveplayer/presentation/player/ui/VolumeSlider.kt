@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateDpAsState
@@ -271,7 +273,7 @@ fun VolumeSlider(
                 ) { glyph ->
                     Icon(
                         imageVector = glyph,
-                        contentDescription = if (isMuted || volume == 0f) "Unmute" else "Mute",
+                        contentDescription = if (isMuted || volume == 0f) stringResource(R.string.cd_unmute) else stringResource(R.string.cd_mute),
                         modifier = Modifier
                             .size(animatedIconSize)
                             .clickable(

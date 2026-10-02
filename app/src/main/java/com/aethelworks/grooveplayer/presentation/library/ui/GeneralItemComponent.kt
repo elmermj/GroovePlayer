@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import XCheckCircle
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -340,7 +342,7 @@ private fun ClassicGeneralItem(
                             ) { selected ->
                                 Icon(
                                     imageVector = if (selected) XCheckCircle else XCircle,
-                                    contentDescription = if (selected) "Selected" else "Unselected",
+                                    contentDescription = if (selected) stringResource(R.string.cd_selected) else stringResource(R.string.cd_unselected),
                                     tint = SoftWhite,
                                 )
                             }
@@ -352,7 +354,7 @@ private fun ClassicGeneralItem(
                         ) {
                             Icon(
                                 XMore,
-                                contentDescription = "More options",
+                                contentDescription = stringResource(R.string.cd_more_options),
                                 tint = SoftWhite,
                             )
                         }
@@ -394,16 +396,16 @@ private fun DefaultOptionsContent(
 ) {
     val actions = buildList {
         optionsConfig.onPlayNext?.let { onPlayNext ->
-            add(TrackStripAction("Play next", XPlay, onPlayNext))
+            add(TrackStripAction(stringResource(R.string.library_play_next), XPlay, onPlayNext))
         }
         optionsConfig.onEditMetadata?.let { onEdit ->
-            add(TrackStripAction("Edit song metadata", XEdit, onEdit))
+            add(TrackStripAction(stringResource(R.string.library_edit_metadata), XEdit, onEdit))
         }
         optionsConfig.onShareViaTap?.let { onShare ->
-            add(TrackStripAction("Tap to share", XNFC, onShare))
+            add(TrackStripAction(stringResource(R.string.library_share_tap), XNFC, onShare))
         }
         optionsConfig.onShareViaNearby?.let { onNearby ->
-            add(TrackStripAction("Share with nearby", XWifiSync, onNearby))
+            add(TrackStripAction(stringResource(R.string.library_share_nearby), XWifiSync, onNearby))
         }
     }
     if (actions.isEmpty()) return
@@ -499,14 +501,14 @@ fun SongItemComponent(
     val import = LocalLibraryImport.current
     GeneralItemComponent(
         title = song.title,
-        subtitle = if (presence.playable) song.artist else "${song.artist} · Unavailable",
+        subtitle = if (presence.playable) song.artist else stringResource(R.string.library_unavailable, song.artist),
         artworkUrl = song.artworkUrl,
         metaText = metaText ?: formatDuration(song.durationMs),
         onClick = { if (presence.playable) onClick() },
         contentAlpha = if (presence.playable) 1f else 0.45f,
         padding = padding,
         artworkKind = MediaArtworkKind.SONG,
-        contentDescription = "${song.title} by ${song.artist}",
+        contentDescription = stringResource(R.string.cd_song_by_artist, song.title, song.artist),
         optionsConfig = ItemOptionsConfig(
             onPlayNext = if (presence.playable) onPlayNext?.let { cb -> { cb(song) } } else null,
             onEditMetadata = { onEditMetadata(song) },
@@ -533,7 +535,7 @@ fun SongItemComponent(
                 SongLikeButton(song = song, iconSize = 20.dp)
                 if (presence.canRestore) {
                     TextButton(onClick = { import.restoreSong(song) }) {
-                        Text("Restore", color = HighlightPrimary)
+                        Text(stringResource(R.string.action_restore), color = HighlightPrimary)
                     }
                 }
                 if (availability != null) {
@@ -565,7 +567,7 @@ fun AlbumItemComponent(
         onClick = onClick,
         padding = padding,
         artworkKind = MediaArtworkKind.ALBUM,
-        contentDescription = "${album.name} by ${album.artist}",
+        contentDescription = stringResource(R.string.cd_song_by_artist, album.name, album.artist),
         optionsConfig = optionsConfig ?: if (songsToShare.isNotEmpty()) {
             ItemOptionsConfig(
                 onShareViaTap = { navigation.openShareViaNfcWithSongs(songsToShare) },
@@ -765,7 +767,7 @@ private fun StretchedGlassworkItem(
                             ) { selected ->
                                 Icon(
                                     imageVector = if (selected) XCheckCircle else XCircle,
-                                    contentDescription = if (selected) "Selected" else "Unselected",
+                                    contentDescription = if (selected) stringResource(R.string.cd_selected) else stringResource(R.string.cd_unselected),
                                     tint = Color.White,
                                 )
                             }
@@ -775,7 +777,7 @@ private fun StretchedGlassworkItem(
                         IconButton(onClick = { isExpanded = !isExpanded }) {
                             Icon(
                                 XMore,
-                                contentDescription = "More options",
+                                contentDescription = stringResource(R.string.cd_more_options),
                                 tint = Color.White.copy(alpha = 0.85f),
                             )
                         }

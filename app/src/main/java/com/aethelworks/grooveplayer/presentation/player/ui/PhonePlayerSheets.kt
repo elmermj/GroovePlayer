@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.player.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -109,7 +111,7 @@ fun PhoneUpNextPeekRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(GrooveTheme.radii.card))
             .background(GrooveTheme.colors.surface)
-            .clickable(onClickLabel = "Open queue", onClick = onClick)
+            .clickable(onClickLabel = stringResource(R.string.cd_open_queue), onClick = onClick)
             .padding(horizontal = S_PADDING, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -123,7 +125,7 @@ fun PhoneUpNextPeekRow(
         Spacer(Modifier.width(S_PADDING))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Up next",
+                text = stringResource(R.string.player_up_next),
                 style = MaterialTheme.typography.labelSmall,
                 color = GrooveTheme.colors.muted,
             )
@@ -145,7 +147,7 @@ fun PhoneUpNextPeekRow(
                 )
             }
         }
-        Icon(XChevronUp, contentDescription = "Open queue", tint = GrooveTheme.colors.muted)
+        Icon(XChevronUp, contentDescription = stringResource(R.string.cd_open_queue), tint = GrooveTheme.colors.muted)
     }
 }
 
@@ -208,7 +210,7 @@ fun PhoneQueueSheet(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = "Queue",
+                        text = stringResource(R.string.cd_queue),
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White,
                     )
@@ -222,7 +224,7 @@ fun PhoneQueueSheet(
                 }
 
                 if (currentSong != null) {
-                    SectionLabel("Now playing")
+                    SectionLabel(stringResource(R.string.player_now_playing))
                     QueueSongRow(
                         song = currentSong,
                         isNowPlaying = true,
@@ -232,7 +234,7 @@ fun PhoneQueueSheet(
                     )
                 }
 
-                SectionLabel(if (upNext.isEmpty()) "Nothing up next" else "Up next")
+                SectionLabel(if (upNext.isEmpty()) stringResource(R.string.player_nothing_up_next) else stringResource(R.string.player_up_next))
 
                 LazyColumn(
                     state = listState,
@@ -245,6 +247,8 @@ fun PhoneQueueSheet(
                         val isDragging = draggingId == entry.key
                         val dismissState = rememberSwipeToDismissBoxState()
                         var removed by remember { mutableStateOf(false) }
+                        val removedMessage = stringResource(R.string.player_removed, song.title)
+                        val undoLabel = stringResource(R.string.action_undo)
 
                         LaunchedEffect(dismissState.currentValue) {
                             if (!removed && dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
@@ -255,8 +259,8 @@ fun PhoneQueueSheet(
                                 snackbarHostState.currentSnackbarData?.dismiss()
                                 scope.launch {
                                     val result = snackbarHostState.showSnackbar(
-                                        message = "Removed \"${song.title}\"",
-                                        actionLabel = "Undo",
+                                        message = removedMessage,
+                                        actionLabel = undoLabel,
                                         duration = SnackbarDuration.Short,
                                     )
                                     if (result == SnackbarResult.ActionPerformed) {
@@ -294,7 +298,7 @@ fun PhoneQueueSheet(
                                         contentAlignment = Alignment.CenterEnd,
                                     ) {
                                         Text(
-                                            "Remove",
+                                            stringResource(R.string.action_remove),
                                             color = Color.White,
                                             style = MaterialTheme.typography.labelLarge,
                                         )
@@ -494,7 +498,7 @@ private fun QueueSongRow(
                     .size(48.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(XGripVertical, contentDescription = "Drag to reorder", tint = GrooveTheme.colors.muted)
+                Icon(XGripVertical, contentDescription = stringResource(R.string.cd_drag_to_reorder), tint = GrooveTheme.colors.muted)
             }
         }
     }

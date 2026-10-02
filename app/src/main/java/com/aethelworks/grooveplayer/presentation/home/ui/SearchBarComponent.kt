@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.home.ui
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -185,9 +187,9 @@ private fun PhoneSearchBarContent(
                             }
                         }
                     },
-                placeholder = { Text("Search", color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
+                placeholder = { Text(stringResource(R.string.search_title), color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
                 leadingIcon = {
-                    Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
+                    Icon(XSearch, contentDescription = stringResource(R.string.cd_search), tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = GrooveTheme.colors.onSurface,
@@ -230,7 +232,7 @@ private fun PhoneSearchBarContent(
                     },
                     modifier = Modifier.size(48.dp)
                 ) {
-                    Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
+                    Icon(XSearch, contentDescription = stringResource(R.string.cd_search), tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
                 }
             }
         }
@@ -308,9 +310,9 @@ private fun TabletSearchBarContent(
                         isExpanded = false
                     }
                 },
-            placeholder = { Text("Search", color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
+            placeholder = { Text(stringResource(R.string.search_title), color = GrooveTheme.colors.muted.copy(alpha = 0.6f)) },
             leadingIcon = {
-                Icon(XSearch, contentDescription = "Search", tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
+                Icon(XSearch, contentDescription = stringResource(R.string.cd_search), tint = GrooveTheme.colors.muted.copy(alpha = 0.6f))
             },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = GrooveTheme.colors.onSurface,

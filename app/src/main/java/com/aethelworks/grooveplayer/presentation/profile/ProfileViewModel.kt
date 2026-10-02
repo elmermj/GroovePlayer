@@ -1,5 +1,6 @@
 package com.aethelworks.grooveplayer.presentation.profile
 
+import com.aethelworks.grooveplayer.R
 import android.app.Application
 import android.app.Activity
 import com.aethelworks.grooveplayer.data.auth.GoogleIdTokenProvider
@@ -175,7 +176,7 @@ class ProfileViewModel @Inject constructor(
         val result = withContext(NonCancellable) { signOutUseCase() }
         _authLoading.value = false
         result.onFailure { e ->
-            _authError.value = e.message ?: "Sign-out failed"
+            _authError.value = e.message ?: getApplication<Application>().getString(R.string.auth_sign_out_failed)
         }
     }
 
@@ -185,7 +186,7 @@ class ProfileViewModel @Inject constructor(
         val result = withContext(NonCancellable) { deleteAccountUseCase() }
         _authLoading.value = false
         result.onFailure { e ->
-            _authError.value = e.message ?: "Couldn't delete account. Try again."
+            _authError.value = e.message ?: getApplication<Application>().getString(R.string.auth_delete_failed)
         }
     }
 
@@ -238,7 +239,7 @@ class ProfileViewModel @Inject constructor(
 
     private fun showRestoreError(error: Throwable) {
         _authError.value = error.message?.takeIf { it.isNotBlank() }
-            ?: "Can't reach server. Check Wi‑Fi or API URL, then retry."
+            ?: getApplication<Application>().getString(R.string.auth_server_unreachable)
     }
 
     override fun refresh() {

@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.mostplayed
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,7 +35,7 @@ fun MostPlayedScreen(
     val songs = mostPlayed.map { it.song }
 
     GrooveScreen(
-        title = "Most played",
+        title = stringResource(R.string.home_most_played),
         onBackClick = onNavigateBack,
         contentPadding = PaddingValues.Zero,
     ) {
@@ -42,7 +44,7 @@ fun MostPlayedScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
-                GrooveMutedText("No plays yet")
+                GrooveMutedText(stringResource(R.string.home_no_plays))
             }
         } else {
             LazyColumn(

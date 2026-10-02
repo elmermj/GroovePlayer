@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.artists
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -110,7 +112,7 @@ fun ArtistDetailScreen(
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                GrooveMutedText("No songs for this artist")
+                                GrooveMutedText(stringResource(R.string.library_no_songs_for_artist))
                             }
                         }
                     }

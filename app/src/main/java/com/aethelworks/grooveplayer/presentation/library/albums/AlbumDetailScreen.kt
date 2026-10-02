@@ -1,5 +1,7 @@
 package com.aethelworks.grooveplayer.presentation.library.albums
 
+import androidx.compose.ui.res.stringResource
+import com.aethelworks.grooveplayer.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -117,7 +119,7 @@ fun AlbumDetailScreen(
                                     .padding(32.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                GrooveMutedText("No songs in this album")
+                                GrooveMutedText(stringResource(R.string.library_no_songs_in_album))
                             }
                         }
                     }
