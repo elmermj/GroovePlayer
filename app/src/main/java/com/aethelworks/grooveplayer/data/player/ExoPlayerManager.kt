@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.media.audiofx.Visualizer
 import android.net.Uri
 import android.os.Looper
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
@@ -98,7 +99,13 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private val premiumStreamSignals: PremiumStreamSignals,
 ) : PlayerRepository {
 
-    private val player: ExoPlayer = createPlayerOnMainThread()
+    private val player: ExoPlayer = createPlayerOnMainThread(handleAudioFocus = true)
+
+    /**
+     * Plays the track that is fading out. It does not take audio focus or the
+     * media session; [player] seeks to the incoming track and fades in.
+     */
+    private val outgoingPlayer: ExoPlayer = createPlayerOnMainThread(handleAudioFocus = false)
     private val audioManager: AudioManager = ctx.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     private val _currentSong = MutableStateFlow<Song?>(null)
@@ -126,9 +133,19 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         const val VISUALIZATION_EMIT_INTERVAL_MS = 66L
     }
     
-    // Observe fade timer from user_category settings
+    // Observe fade timer from user_category settings. 0 leaves playback gapless.
     private var fadeTimerSeconds = 0
-    private var isFading = false
+    private var crossfadePhase = TrackCrossfade.Phase.IDLE
+    private var outgoingReady = false
+    private var heldAtEnd = false
+    private var inCrossfadeTick = false
+    private var armNextIndex = -1
+    private var armPositionMs = 0L
+    private var armStartedAtMs = 0L
+    private var activeFadeMs = 0L
+    private var overlapOutgoingIndex = -1
+    private var overlapStartedAtMs = 0L
+    private var stoppingOutgoing = false
     private var visualizationMode: VisualizationMode = VisualizationMode.REAL_TIME
     
     // Endless queue feature
@@ -155,7 +172,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
      * ExoPlayer binds to the current thread's looper at construction time.
      * Always build on the main looper, even if Hilt injects this singleton off-main.
      */
-    private fun createPlayerOnMainThread(): ExoPlayer {
+    private fun createPlayerOnMainThread(handleAudioFocus: Boolean): ExoPlayer {
         fun build(): ExoPlayer {
             // Cloud items are groove-playback://. StreamPlaybackCache resolves the
             // signed URL, caches the bytes, and leaves local files uncached.
@@ -169,11 +186,15 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                         .setUsage(C.USAGE_MEDIA)
                         .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
                         .build(),
-                    /* handleAudioFocus = */ true,
+                    handleAudioFocus,
                 )
-                // Pauses when headphones / Bluetooth audio disconnect (AUDIO_BECOMING_NOISY).
-                .setHandleAudioBecomingNoisy(true)
+                // Only the session player pauses when headphones disconnect.
+                // The outgoing player follows that pause instead of requesting focus.
+                .setHandleAudioBecomingNoisy(handleAudioFocus)
                 .build()
+                .also { created ->
+                    if (!handleAudioFocus) created.volume = 0f
+                }
         }
         return if (Looper.myLooper() == Looper.getMainLooper()) {
             build()
@@ -193,7 +214,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     private fun attachPlayerListener() {
         player.addListener(object : androidx.media3.common.Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                _isPlaying.value = isPlaying
+                _isPlaying.value = isPlaying || outgoingHoldsTransport()
 
                 // Start foreground service when playback begins
                 if (isPlaying) {
@@ -207,6 +228,25 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                     // becomes valid after playback begins, which previously left us
                     // stuck on the fallback "template" visualization.
                     initializeVisualizerIfNeeded(reason = "onIsPlayingChanged")
+                }
+            }
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (playWhenReady) return
+                if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM) {
+                    // pauseAtEndOfMediaItems holds the item so a late crossfade can still cut.
+                    // Ignore the callback while a tick is already seeking away from that end.
+                    if (!inCrossfadeTick) {
+                        heldAtEnd = true
+                        tickCrossfade()
+                    }
+                    return
+                }
+                heldAtEnd = false
+                if (crossfadePhase == TrackCrossfade.Phase.OVERLAPPING ||
+                    crossfadePhase == TrackCrossfade.Phase.ARMING
+                ) {
+                    outgoingPlayer.pause()
                 }
             }
 
@@ -304,8 +344,13 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         scope.launch {
             try {
                 userRepository.observeUserSettings().collect { settings ->
-                    fadeTimerSeconds = settings.fadeTimer
+                    fadeTimerSeconds = settings.fadeTimer.coerceIn(0, 10)
                     visualizationMode = settings.visualizationMode
+                    if (fadeTimerSeconds <= 0 &&
+                        (crossfadePhase != TrackCrossfade.Phase.IDLE || player.pauseAtEndOfMediaItems)
+                    ) {
+                        endCrossfade()
+                    }
                 }
             } catch (e: Exception) {
                 android.util.Log.e("ExoPlayerManager", "Failed to observe user settings", e)
@@ -316,6 +361,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         // Listener + player touches must run on the player's application thread (main).
         runOnMainThread {
             attachPlayerListener()
+            attachOutgoingPlayerListener()
         }
 
         // position ticker
@@ -323,6 +369,17 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             while (true) {
                 _position.value = player.currentPosition
                 kotlinx.coroutines.delay(300)
+            }
+        }
+
+        // Crossfade poll. Idle and disabled fades sleep longer.
+        scope.launch {
+            var wasActive = false
+            while (true) {
+                val active = fadeTimerSeconds > 0 || crossfadePhase != TrackCrossfade.Phase.IDLE
+                if (active || wasActive) tickCrossfade()
+                wasActive = fadeTimerSeconds > 0 || crossfadePhase != TrackCrossfade.Phase.IDLE
+                kotlinx.coroutines.delay(if (wasActive) 50 else 250)
             }
         }
 
@@ -748,6 +805,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     private suspend fun prepareFromSong(song: Song) {
         withContext(Dispatchers.Main.immediate) {
+            endCrossfade()
             player.setMediaItem(buildMediaItem(Uri.parse(song.uri)))
             player.prepare()
         }
@@ -787,6 +845,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
      * The queue, the position, and the signed-in session stay.
      */
     private fun resumeStreamAfterRefresh() {
+        endCrossfade()
         val index = player.currentMediaItemIndex.coerceAtLeast(0)
         val position = player.currentPosition.coerceAtLeast(0L)
         player.seekTo(index, position)
@@ -876,6 +935,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         
         // All ExoPlayer operations MUST run on Main thread
         val savedPosition = withContext(Dispatchers.Main.immediate) {
+            endCrossfade()
             player.clearMediaItems()
             if (songs.isEmpty()) {
                 player.stop()
@@ -931,6 +991,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         if (index !in q.indices) return
         withContext(Dispatchers.Main.immediate) {
             if (index >= player.mediaItemCount) return@withContext
+            endCrossfade()
             player.seekTo(index, 0)
             player.playWhenReady = true
         }
@@ -1076,6 +1137,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         val playing = _isPlaying.value
         _queue.value = orig
         withContext(Dispatchers.Main.immediate) {
+            endCrossfade()
             player.setMediaItems(
                 orig.map { buildMediaItem(it.uri.toUri()) },
                 origIndex,
@@ -1195,6 +1257,10 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     override suspend fun play() {
         clearStreamRecovery()
         withContext(Dispatchers.Main.immediate) {
+            if (heldAtEnd) {
+                tickCrossfade()
+                return@withContext
+            }
             // If the song has finished (reached the end), seek to the beginning
             val duration = player.duration
             val currentPosition = player.currentPosition
@@ -1208,6 +1274,12 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
             }
             player.playWhenReady = true
             player.play()
+            if (crossfadePhase == TrackCrossfade.Phase.OVERLAPPING ||
+                crossfadePhase == TrackCrossfade.Phase.ARMING
+            ) {
+                outgoingPlayer.playWhenReady = true
+                outgoingPlayer.play()
+            }
         }
     }
 
@@ -1215,6 +1287,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
         withContext(Dispatchers.Main.immediate) {
             player.playWhenReady = false
             player.pause()
+            outgoingPlayer.pause()
         }
     }
 
@@ -1230,92 +1303,65 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
     }
 
     override suspend fun next() {
-//        if (fadeTimerSeconds > 0 && _isPlaying.value) {
-//            applyFadeOut()
-//        }
         withContext(Dispatchers.Main.immediate) {
-            player.seekToNext()
-            player.play()
+            endCrossfade()
+            val target = TrackCrossfade.skipNextIndex(
+                player.currentMediaItemIndex,
+                player.mediaItemCount,
+                _repeat.value,
+            )
+            val fadeMs = TrackCrossfade.manualFadeMs(fadeTimerSeconds * 1000L, remainingMs())
+            if (target != null && player.playWhenReady && fadeMs > 0L) {
+                beginArm(target, fadeMs)
+            } else {
+                player.seekToNext()
+                player.play()
+            }
         }
-//        if (fadeTimerSeconds > 0) {
-//            applyFadeIn()
-//        }
     }
 
     override suspend fun previous() {
-        val currentPos = withContext(Dispatchers.Main.immediate) {
-            player.currentPosition
-        }
-        
-        // if position > 3s, restart; else previous track
-        if (currentPos > 3000) {
-            withContext(Dispatchers.Main.immediate) {
+        withContext(Dispatchers.Main.immediate) {
+            if (crossfadePhase == TrackCrossfade.Phase.OVERLAPPING &&
+                player.currentPosition <= 3_000L &&
+                overlapOutgoingIndex >= 0
+            ) {
+                val index = overlapOutgoingIndex
+                val resumeAt = outgoingPlayer.currentPosition.coerceAtLeast(0L)
+                endCrossfade()
+                if (index < player.mediaItemCount) {
+                    player.seekTo(index, resumeAt)
+                    player.playWhenReady = true
+                }
+                return@withContext
+            }
+            val currentPos = player.currentPosition
+            endCrossfade()
+            // if position > 3s, restart; else previous track
+            if (currentPos > 3000) {
                 player.seekTo(0)
                 player.play()
-            }
-        } else {
-//            if (fadeTimerSeconds > 0 && _isPlaying.value) {
-//                applyFadeOut()
-//            }
-            withContext(Dispatchers.Main.immediate) {
-                player.seekToPrevious()
-                player.play()
-            }
-//            if (fadeTimerSeconds > 0) {
-//                applyFadeIn()
-//            }
-        }
-    }
-    
-    /**
-     * Applies fade-out effect by gradually reducing volume.
-     * Duration is controlled by fadeTimerSeconds from user_category settings.
-     */
-    private suspend fun applyFadeOut() {
-        if (isFading) return // Prevent concurrent fades
-        isFading = true
-        
-        withContext(Dispatchers.Main.immediate) {
-            val originalVolume = player.volume
-            val steps = 20 // Number of volume reduction steps
-            val delayMs = (fadeTimerSeconds * 1000L) / steps
-
-            for (i in steps downTo 0) {
-                val newVolume = originalVolume * (i.toFloat() / steps)
-                player.volume = newVolume
-                delay(delayMs)
+            } else {
+                val target = TrackCrossfade.skipPreviousIndex(
+                    player.currentMediaItemIndex,
+                    player.mediaItemCount,
+                    _repeat.value,
+                )
+                val fadeMs = TrackCrossfade.manualFadeMs(fadeTimerSeconds * 1000L, remainingMs())
+                if (target != null && player.playWhenReady && fadeMs > 0L) {
+                    beginArm(target, fadeMs)
+                } else {
+                    player.seekToPrevious()
+                    player.play()
+                }
             }
         }
-        
-        isFading = false
-    }
-    
-    /**
-     * Applies fade-in effect by gradually increasing volume.
-     * Duration is controlled by fadeTimerSeconds from user_category settings.
-     */
-    private suspend fun applyFadeIn() {
-        if (isFading) return // Prevent concurrent fades
-        isFading = true
-        
-        withContext(Dispatchers.Main.immediate) {
-            val targetVolume = if (_isPlayerMuted.value) 0f else 1f
-            val steps = 20 // Number of volume increase steps
-            val delayMs = (fadeTimerSeconds * 1000L) / steps
-            
-            for (i in 0..steps) {
-                val newVolume = targetVolume * (i.toFloat() / steps)
-                player.volume = newVolume
-                delay(delayMs)
-            }
-        }
-        
-        isFading = false
     }
 
     override suspend fun seekTo(positionMs: Long) {
         clearStreamRecovery()
         withContext(Dispatchers.Main.immediate) {
+            endCrossfade()
             player.seekTo(positionMs.coerceAtLeast(0L))
             _position.value = player.currentPosition
         }
@@ -1346,6 +1392,7 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
                 RepeatMode.ONE -> ExoPlayer.REPEAT_MODE_ONE
                 RepeatMode.ALL -> ExoPlayer.REPEAT_MODE_ALL
             }
+            syncPauseAtEnd()
         }
         withContext(Dispatchers.IO) {
             userRepository.updateRepeatAndShuffle(_shuffle.value, _repeat.value.name)
@@ -1369,13 +1416,246 @@ class ExoPlayerManager @OptIn(UnstableApi::class)
 
     override suspend fun setMute(mute: Boolean) {
         _isPlayerMuted.value = mute
-        if (!isFading) {  // Don't interfere with fade effects
+        if (crossfadePhase != TrackCrossfade.Phase.OVERLAPPING) {
             withContext(Dispatchers.Main.immediate) {
-                player.volume = if (mute) 0f else 1f
+                player.volume = audibleGain()
             }
         }
     }
 
+    private fun attachOutgoingPlayerListener() {
+        outgoingPlayer.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                outgoingReady = playbackState == Player.STATE_READY
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                if (stoppingOutgoing) return
+                android.util.Log.w("ExoPlayerManager", "Outgoing crossfade player failed", error)
+                outgoingReady = false
+                when (crossfadePhase) {
+                    TrackCrossfade.Phase.ARMING -> hardCut(armNextIndex)
+                    TrackCrossfade.Phase.OVERLAPPING -> endCrossfade()
+                    else -> stopOutgoing()
+                }
+            }
+        })
+    }
+
+    private fun outgoingHoldsTransport(): Boolean {
+        return player.playWhenReady &&
+            crossfadePhase == TrackCrossfade.Phase.OVERLAPPING &&
+            outgoingPlayer.isPlaying
+    }
+
+    private fun audibleGain(): Float = if (_isPlayerMuted.value) 0f else 1f
+
+    private fun knownDurationMs(): Long {
+        val reported = player.duration
+        if (reported > 0L) return reported
+        return _duration.value.coerceAtLeast(0L)
+    }
+
+    private fun remainingMs(): Long {
+        val duration = knownDurationMs()
+        if (duration <= 0L) return 0L
+        return (duration - player.currentPosition).coerceAtLeast(0L)
+    }
+
+    private fun tickCrossfade() {
+        if (inCrossfadeTick) return
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            scope.launch(Dispatchers.Main.immediate) { tickCrossfade() }
+            return
+        }
+        inCrossfadeTick = true
+        try {
+            if (fadeTimerSeconds <= 0) {
+                if (crossfadePhase != TrackCrossfade.Phase.IDLE || player.pauseAtEndOfMediaItems) {
+                    endCrossfade()
+                }
+                return
+            }
+            when (crossfadePhase) {
+                TrackCrossfade.Phase.ARMING -> tickArming()
+                TrackCrossfade.Phase.OVERLAPPING -> tickOverlapping()
+                else -> applyNatural(
+                    TrackCrossfade.planNatural(
+                        TrackCrossfade.NaturalInput(
+                            fadeDurationMs = fadeTimerSeconds * 1000L,
+                            positionMs = player.currentPosition.coerceAtLeast(0L),
+                            durationMs = knownDurationMs(),
+                            playWhenReady = player.playWhenReady,
+                            heldAtEnd = heldAtEnd,
+                            currentIndex = player.currentMediaItemIndex,
+                            itemCount = player.mediaItemCount,
+                            repeatMode = _repeat.value,
+                            phase = crossfadePhase,
+                            outgoingReady = outgoingReady,
+                        ),
+                    ),
+                )
+            }
+            if (crossfadePhase != TrackCrossfade.Phase.ARMING) syncPauseAtEnd()
+        } finally {
+            inCrossfadeTick = false
+        }
+    }
+
+    private fun applyNatural(step: TrackCrossfade.Step) {
+        when (step) {
+            TrackCrossfade.Step.None -> Unit
+            TrackCrossfade.Step.PreloadOutgoing -> preloadOutgoing()
+            is TrackCrossfade.Step.Begin -> beginArm(step.nextIndex, step.fadeMs)
+            TrackCrossfade.Step.CancelOutgoing -> endCrossfade()
+            is TrackCrossfade.Step.HardCut -> hardCut(step.nextIndex)
+            else -> Unit
+        }
+    }
+
+    private fun tickArming() {
+        if (heldAtEnd) {
+            hardCut(armNextIndex)
+            return
+        }
+        if (!player.playWhenReady) {
+            endCrossfade()
+            return
+        }
+        val waited = SystemClock.elapsedRealtime() - armStartedAtMs
+        if (outgoingCaughtUp()) {
+            commitOverlap()
+        } else if (waited >= TrackCrossfade.ARM_TIMEOUT_MS) {
+            hardCut(armNextIndex)
+        }
+    }
+
+    private fun tickOverlapping() {
+        val step = TrackCrossfade.planOverlap(
+            incomingPositionMs = player.currentPosition.coerceAtLeast(0L),
+            stallMs = SystemClock.elapsedRealtime() - overlapStartedAtMs,
+            fadeDurationMs = activeFadeMs,
+            audible = audibleGain(),
+            playWhenReady = player.playWhenReady,
+            incomingPlaying = player.isPlaying,
+        )
+        when (step) {
+            is TrackCrossfade.Step.Volumes -> {
+                outgoingPlayer.volume = step.outgoing
+                player.volume = step.incoming
+            }
+            TrackCrossfade.Step.Finish -> endCrossfade()
+            else -> Unit
+        }
+    }
+
+    private fun syncPauseAtEnd() {
+        player.pauseAtEndOfMediaItems = TrackCrossfade.shouldPauseAtEnd(
+            fadeSeconds = fadeTimerSeconds,
+            durationMs = knownDurationMs(),
+            currentIndex = player.currentMediaItemIndex,
+            itemCount = player.mediaItemCount,
+            repeatMode = _repeat.value,
+        )
+    }
+
+    private fun preloadOutgoing() {
+        val item = player.currentMediaItem ?: return
+        outgoingPlayer.volume = 0f
+        outgoingPlayer.playWhenReady = false
+        outgoingReady = false
+        outgoingPlayer.setMediaItem(item)
+        outgoingPlayer.prepare()
+        crossfadePhase = TrackCrossfade.Phase.PRELOADING
+    }
+
+    private fun beginArm(nextIndex: Int, fadeMs: Long) {
+        val item = player.currentMediaItem
+        if (item == null || fadeMs < TrackCrossfade.MIN_FADE_MS || nextIndex !in 0 until player.mediaItemCount) {
+            if (nextIndex in 0 until player.mediaItemCount) hardCut(nextIndex)
+            return
+        }
+        armNextIndex = nextIndex
+        activeFadeMs = fadeMs
+        armPositionMs = player.currentPosition.coerceAtLeast(0L)
+        armStartedAtMs = SystemClock.elapsedRealtime()
+        outgoingPlayer.volume = 0f
+        val outgoingUri = outgoingPlayer.currentMediaItem?.localConfiguration?.uri
+        val currentUri = item.localConfiguration?.uri
+        if (outgoingUri != currentUri) {
+            outgoingReady = false
+            outgoingPlayer.setMediaItem(item)
+            outgoingPlayer.prepare()
+        }
+        outgoingPlayer.seekTo(armPositionMs)
+        outgoingPlayer.playWhenReady = true
+        crossfadePhase = TrackCrossfade.Phase.ARMING
+    }
+
+    private fun outgoingCaughtUp(): Boolean {
+        if (outgoingPlayer.playbackState != Player.STATE_READY) return false
+        return outgoingPlayer.currentPosition >= armPositionMs - 300L
+    }
+
+    private fun commitOverlap() {
+        val next = armNextIndex
+        if (next !in 0 until player.mediaItemCount) {
+            endCrossfade()
+            return
+        }
+        crossfadePhase = TrackCrossfade.Phase.OVERLAPPING
+        overlapOutgoingIndex = player.currentMediaItemIndex
+        overlapStartedAtMs = SystemClock.elapsedRealtime()
+        // Raise the outgoing tail first, then silence the main player, so the
+        // handoff does not open a gap while the incoming item seeks.
+        outgoingPlayer.volume = audibleGain()
+        player.volume = 0f
+        player.seekTo(next, 0L)
+        player.playWhenReady = true
+        _queue.value.getOrNull(next)?.let { song ->
+            _currentSong.value = song
+            _duration.value = song.durationMs
+        }
+        _position.value = 0L
+        heldAtEnd = false
+    }
+
+    private fun hardCut(nextIndex: Int) {
+        endCrossfade()
+        if (nextIndex in 0 until player.mediaItemCount) {
+            player.seekTo(nextIndex, 0L)
+            player.playWhenReady = true
+        }
+    }
+
+    /** Drops the outgoing tail and restores the main player's volume. */
+    private fun endCrossfade() {
+        val wasActive = crossfadePhase != TrackCrossfade.Phase.IDLE
+        stopOutgoing()
+        crossfadePhase = TrackCrossfade.Phase.IDLE
+        heldAtEnd = false
+        armNextIndex = -1
+        overlapOutgoingIndex = -1
+        activeFadeMs = 0L
+        if (wasActive) player.volume = audibleGain()
+        syncPauseAtEnd()
+    }
+
+    private fun stopOutgoing() {
+        outgoingReady = false
+        if (stoppingOutgoing) return
+        stoppingOutgoing = true
+        try {
+            outgoingPlayer.volume = 0f
+            outgoingPlayer.playWhenReady = false
+            outgoingPlayer.stop()
+            outgoingPlayer.clearMediaItems()
+        } catch (e: Exception) {
+            android.util.Log.w("ExoPlayerManager", "Failed to stop crossfade player", e)
+        } finally {
+            stoppingOutgoing = false
+        }
+    }
 
     override fun observeCurrentSong(): Flow<Song?> = _currentSong.asStateFlow()
     override fun observeIsPlaying(): Flow<Boolean> = _isPlaying.asStateFlow()

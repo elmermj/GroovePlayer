@@ -25,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -174,10 +176,16 @@ fun LargeTabletProfileLayout(
                 )
                 Spacer(Modifier.height(S_PADDING))
 
-                // Cross-fade UI hidden until real crossfade is implemented (P1).
-                // CrossFadeModeRow(... fade ...)
-                // Spacer(Modifier.height(S_PADDING))
-MiniPlayerOnStartRow(
+                CrossFadeModeRow(
+                    viewModel = viewModel,
+                    isExpanded = activeRowId == "crossfade",
+                    onExpandedChange = { expanded ->
+                        viewModel.setActiveRowId(if (expanded) "crossfade" else null)
+                    }
+                )
+                Spacer(Modifier.height(S_PADDING))
+
+                MiniPlayerOnStartRow(
                     viewModel = viewModel,
                     isExpanded = activeRowId == "mini_player",
                     onExpandedChange = { expanded ->
@@ -385,7 +393,7 @@ fun CrossFadeModeRow(
 ) {
     val settings by viewModel.userSettings.collectAsState()
     val fadeSeconds = settings.fadeTimer.coerceIn(0, 10)
-    var sliderValue = fadeSeconds.toFloat()
+    var sliderValue by remember(fadeSeconds) { mutableFloatStateOf(fadeSeconds.toFloat()) }
 
     ProfileSettingRow(
         icon = { ProfileRowIcon(XCrossFade) },
